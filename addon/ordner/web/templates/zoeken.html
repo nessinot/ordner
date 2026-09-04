@@ -22,7 +22,7 @@
 <ul class="kaarten">
 {% for k in kaarten %}
   <li class="kaart">
-    <a class="rij" href="{{ url_for('document', jaar=k.jaar, map=k.map) }}{{ herkomst }}">
+    <div class="rij">
       {% if k.soort == 'pdf' %}
       <svg class="icoon pdf" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zM8 12h8v1.5H8V12zm0 3h8v1.5H8V15zm0 3h5v1.5H8V18z"/></svg>
       {% elif k.soort == 'afbeelding' %}
@@ -32,13 +32,14 @@
       {% endif %}
       <span class="tekst">
         <span class="titel-rij">
-          <span class="titel">{{ k.titel }}</span>
+          <a class="titel" href="{{ url_for('document', jaar=k.jaar, map=k.map) }}{{ herkomst }}">{{ k.titel }}</a>
           {% if k.ocr != 'done' %}<span class="badge badge-{{ k.ocr }}">OCR {{ k.ocr }}</span>{% endif %}
         </span>
         {% if k.omschrijving %}<span class="omschrijving">{{ k.omschrijving }}</span>{% endif %}
       </span>
+      {% if k.tags %}<span class="tags">{% for tag in k.tags %}<a class="badge badge-tag" href="{{ url_for('zoeken') }}?q={{ tag|urlencode }}">{{ tag }}</a>{% endfor %}</span>{% endif %}
       <span class="datum">{{ k.documentdatum.isoformat() }}</span>
-    </a>
+    </div>
     {% if q and k.snippet %}<p class="snippet">{{ k.snippet }} <span class="bron">({{ k.bron }})</span></p>{% endif %}
   </li>
 {% else %}

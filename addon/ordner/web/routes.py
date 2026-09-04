@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import mimetypes
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
@@ -41,6 +41,7 @@ class Kaart:
     snippet: str = ""
     bron: str = ""
     soort: str = "overig"  # "pdf", "afbeelding" of "overig": bepaalt het icoon in de lijst
+    tags: list[str] = field(default_factory=list)  # klikbare labels, volgorde zoals in meta.md (pakket 15c)
 
 
 def _kaart_soort(bestanden: list[str]) -> str:
@@ -132,8 +133,9 @@ async def zoeken(request: Request) -> Response:
             entry = index.docs.get(t.rel)
             ocr: OcrStatus = entry.meta.ocr if entry else "done"
             soort = _kaart_soort(entry.meta.bestanden) if entry else "overig"
+            tags = list(entry.meta.tags) if entry else []
             kaarten.append(
-                Kaart(jaar, map, t.titel, t.documentdatum, t.omschrijving, ocr, t.snippet, t.bron, soort)
+                Kaart(jaar, map, t.titel, t.documentdatum, t.omschrijving, ocr, t.snippet, t.bron, soort, tags)
             )
     else:
         docs = index.alle()
@@ -141,7 +143,9 @@ async def zoeken(request: Request) -> Response:
         for entry in docs[:_RECENT]:
             jaar, map = _splits_rel(entry.rel)
             m = entry.meta
-            kaarten.append(Kaart(jaar, map, m.titel, m.documentdatum, m.omschrijving, m.ocr, soort=_kaart_soort(m.bestanden)))
+            kaarten.append(
+                Kaart(jaar, map, m.titel, m.documentdatum, m.omschrijving, m.ocr, soort=_kaart_soort(m.bestanden), tags=list(m.tags))
+            )
     return _templates(request).TemplateResponse(
         request,
         "zoeken.html",

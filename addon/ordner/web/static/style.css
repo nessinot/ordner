@@ -12,6 +12,7 @@
   --accent: #0b57d0;
   --accent-tekst: #ffffff;
   --actief: #c2e7ff;      /* actieve navigatie, tags */
+  --actief-hover: #a6d8f7; /* tag-label onder de muis */
   --actief-tekst: #001d35;
   --ok: #146c2e;
   --ok-tint: #e6f4ea;
@@ -37,6 +38,7 @@
     --accent: #a8c7fa;
     --accent-tekst: #062e6f;
     --actief: #004a77;
+    --actief-hover: #003a5e;
     --actief-tekst: #c2e7ff;
     --ok: #6dd58c;
     --ok-tint: #1e3a26;
@@ -133,19 +135,25 @@ form.zoek button:hover { background: var(--vlak-hover); filter: none; }
 ul.kaarten { list-style: none; padding: 0; margin: 0; border-top: 1px solid var(--hairline); }
 .kaart { position: relative; border-bottom: 1px solid var(--hairline); }
 .kaart:hover { background: var(--vlak); }
-.kaart .rij { display: grid; grid-template-columns: auto 1fr; column-gap: 1rem; align-items: center; padding: 0.7rem 0.5rem; color: inherit; text-decoration: none; }
+.kaart .rij { display: grid; grid-template-columns: auto 1fr; column-gap: 1rem; align-items: center; padding: 0.7rem 0.5rem; }
 .kaart .icoon { color: var(--overig); }
 .kaart .icoon.pdf { color: var(--pdf); }
 .kaart .icoon.afbeelding { color: var(--afbeelding); }
-.kaart .titel { font-weight: 500; font-size: 1rem; overflow-wrap: anywhere; }
+.kaart .titel { font-weight: 500; font-size: 1rem; overflow-wrap: anywhere; color: inherit; text-decoration: none; }
+/* Stretched link: de titel-link dekt via ::after de hele kaart (`.kaart` is position: relative); de tag-labels liggen erboven. */
+.kaart a.titel::after { content: ""; position: absolute; inset: 0; }
+.kaart a.titel:focus-visible { box-shadow: none; }
+.kaart a.titel:focus-visible::after { box-shadow: inset var(--focus); }
+.kaart .tags { position: relative; z-index: 1; grid-column: 2; display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.35rem; }
 .kaart .titel-rij { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.5rem; min-width: 0; }
 .kaart .datum { grid-column: 2; color: var(--gedempt); font-size: 0.85rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .kaart .omschrijving { color: var(--gedempt); font-size: 0.875rem; margin-top: 0.1rem; }
 .kaart .snippet { margin: 0 0.5rem 0.75rem 3.25rem; padding-left: 0.6rem; border-left: 2px solid var(--rand); font-size: 0.875rem; color: var(--gedempt); }
 .kaart .snippet .bron { opacity: 0.8; }
 @media (min-width: 640px) {
-  .kaart .rij { grid-template-columns: auto 1fr auto; padding: 0.65rem 0.75rem; }
-  .kaart .datum { grid-column: 3; }
+  .kaart .rij { grid-template-columns: auto 1fr auto auto; padding: 0.65rem 0.75rem; }
+  .kaart .tags { grid-column: 3; justify-content: flex-end; max-width: 18rem; margin-top: 0; }
+  .kaart .datum { grid-column: 4; }
   .kaart .snippet { margin-left: 3.75rem; }
 }
 .kaarten .leeg { padding: 1.5rem 0.5rem; }
@@ -160,6 +168,8 @@ ul.kaarten { list-style: none; padding: 0; margin: 0; border-top: 1px solid var(
 .badge-pending { background: var(--pending-tint); color: var(--pending); }
 .badge-failed { background: var(--failed-tint); color: var(--failed); }
 .badge-tag { background: var(--actief); color: var(--actief-tekst); }
+a.badge-tag { text-decoration: none; }
+a.badge-tag:hover { background: var(--actief-hover); }
 .badges { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.6rem; }
 
 /* --- formulieren ---------------------------------------------------------- */
