@@ -610,7 +610,9 @@ def test_document_pagina_volledig(client: TestClient) -> None:
     for actie in ("meta", "bestanden", "ocr", "verwijder"):
         assert f'action="{_DOC}/{actie}"' in r.text, actie
     assert f'<object type="application/pdf" data="{_DOC}/bestand/a.pdf"' in r.text
-    assert 'target="_blank"' in r.text
+    # Geen target="_blank": de HA-app opent zo'n link in een externe browser zonder Ingress-sessie (404/401).
+    assert f'<a class="knop" href="{_DOC}/bestand/a.pdf">Open</a>' in r.text
+    assert 'target="_blank"' not in r.text
     assert "De mapnaam verandert niet." in r.text
     assert "confirm('Naar de prullenbak?')" in r.text
     assert 'value="woz, gemeente"' in r.text

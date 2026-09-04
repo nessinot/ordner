@@ -21,7 +21,7 @@
 - `<section data-ocr="{{ meta.ocr }}" data-rel="{{ rel }}">` om de hele pagina zodat JS kan pollen.
 - **Bewerkformulier** (`POST` → `document_meta`): titel (required), omschrijving (textarea), documentdatum (`type="date"`), tags (komma-gescheiden). Knop "Opslaan". Tekst eronder: "De mapnaam verandert niet."
 - **Notities**: `meta.notities` tonen als `<pre class="notities">` (alleen tonen; bewerken niet in v1).
-- **Bestanden**: per bestand een blok met naam, "Open"-link (`bestand`, `target="_blank"`), badge "tekst aanwezig" als er een `.txt` is, en inline weergave: extensie in `.jpg .jpeg .png` → `<img src=... loading="lazy">`; `.pdf` → `<object type="application/pdf" data="..." width="100%" height="600">Kan de pdf hier niet tonen — <a>Open</a></object>`; overige → alleen de link. (HEIC niet inline: browsers tonen het niet; alleen link.)
+- **Bestanden**: per bestand een blok met naam, "Open"-link (`bestand`; sinds 0.9.1 zonder `target="_blank"`, zie STATUS), badge "tekst aanwezig" als er een `.txt` is, en inline weergave: extensie in `.jpg .jpeg .png` → `<img src=... loading="lazy">`; `.pdf` → `<object type="application/pdf" data="..." width="100%" height="600">Kan de pdf hier niet tonen — <a>Open</a></object>`; overige → alleen de link. (HEIC niet inline: browsers tonen het niet; alleen link.)
 - **Bestand toevoegen** (`POST` multipart → `document_bestanden`): `bestanden` multiple, zelfde `accept` als upload, geen `capture`.
 - **OCR opnieuw** (`POST` → `document_ocr`): knop.
 - **Verwijderen** (`POST` → `document_verwijder`): knop met `onclick="return confirm('Naar de prullenbak?')"`; zonder JS gewoon submit.
