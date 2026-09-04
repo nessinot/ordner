@@ -1,4 +1,4 @@
-"""Tests voor ordner.datum (pakket 14)."""
+"""Tests voor ordner.datum (pakket 14, kolomlayout in 0.6.0)."""
 
 from __future__ import annotations
 
@@ -67,12 +67,74 @@ def test_vervaldatum_en_betaaldatum_tellen_niet() -> None:
 
 def test_datum_moet_direct_achter_het_woord_staan() -> None:
     assert _datum("Factuurdatum en nummer: 12-03-2024") is None
-    assert _datum("Factuurdatum\n12-03-2024") is None  # volgende regel telt niet (v1)
     assert _datum("Factuurdatum: zie boven 12-03-2024") is None
 
 
 def test_brede_kolom_uit_pdftotext_layout() -> None:
     assert _datum("Factuurdatum" + " " * 40 + "12-03-2024      Factuurnummer 2024001") == date(2024, 3, 12)
+
+
+# --- kolomlayout: label op de ene regel, waarde in dezelfde kolom op de volgende ---
+
+KOLOM = "Factuurnummer        Factuurdatum        Vervaldatum\n2024001              12-03-2024          12-04-2024\n"
+
+
+def test_kolomlayout_label_boven_waarde() -> None:
+    t = vind_datum(KOLOM, VANDAAG)
+    assert t is not None
+    assert t.datum == date(2024, 3, 12)
+    assert t.sleutelwoord == "factuurdatum"
+    assert t.regel == "2024001              12-03-2024          12-04-2024"
+
+
+def test_kolomlayout_enkel_label_en_waarde() -> None:
+    assert _datum("Factuurdatum\n12-03-2024") == date(2024, 3, 12)
+    assert _datum("Datum\n\n\n12 maart 2024") == date(2024, 3, 12)  # lege regels ertussen mogen
+
+
+def test_kolomlayout_dichtstbijzijnde_kolom_wint() -> None:
+    assert _datum("Vervaldatum          Factuurdatum\n12-04-2024           12-03-2024\n") == date(2024, 3, 12)
+    assert _datum("Factuurdatum         Vervaldatum\n12-03-2024           12-04-2024\n") == date(2024, 3, 12)
+
+
+def test_kolomlayout_rechts_uitgelijnd() -> None:
+    tekst = "        Factuurnummer        Factuurdatum\n              2024001          12-03-2024\n"
+    assert _datum(tekst) == date(2024, 3, 12)
+
+
+def test_kolomlayout_iso_en_tabs() -> None:
+    assert _datum("Factuurnummer\tFactuurdatum\n2024001\t\t2024-03-12") == date(2024, 3, 12)
+    assert _datum("Factuurdatum\n2024-03-12") == date(2024, 3, 12)  # niet "24-03-12" binnen de ISO-datum
+
+
+def test_kolomlayout_te_ver_weg_of_geen_datum() -> None:
+    assert _datum("Factuurdatum\n" + " " * 33 + "12-03-2024") is None  # afstand 21 > _MAX_KOLOMAFSTAND
+    assert _datum("Factuurdatum\n" + " " * 32 + "12-03-2024") == date(2024, 3, 12)  # afstand 20 mag nog
+    assert _datum("Factuurdatum\nFactuurnummer 2024001\n12-03-2024") is None  # alleen de eerstvolgende regel
+    assert _datum("Factuurdatum\nzonder datum") is None
+    assert _datum("Factuurdatum\n31-02-2024") is None  # ongeldige datum in de kolom
+
+
+def test_kolomlayout_regeltreffer_gaat_voor() -> None:
+    tekst = "Factuurdatum\n12-03-2024\nFactuurdatum: 15-03-2024\n"
+    t = vind_datum(tekst, VANDAAG)
+    assert t is not None
+    assert t.datum == date(2024, 3, 15)
+    assert t.regel == "Factuurdatum: 15-03-2024"
+
+
+def test_kolomlayout_sleutelwoordprioriteit_boven_regeltreffer() -> None:
+    t = vind_datum("Datum: 01-01-2024\n" + KOLOM, VANDAAG)
+    assert t is not None
+    assert t.datum == date(2024, 3, 12)
+    assert t.sleutelwoord == "factuurdatum"
+
+
+def test_kolomlayout_vervaldatum_telt_niet() -> None:
+    assert _datum("Vervaldatum\n12-04-2024") is None
+
+
+# --- plausibiliteit en randgevallen ---
 
 
 def test_onmogelijke_en_onwaarschijnlijke_datums() -> None:

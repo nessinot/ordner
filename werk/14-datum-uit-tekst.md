@@ -1,6 +1,6 @@
 # Pakket 14 — Documentdatum uit de tekst
 
-> **Agent-prompt:** Lees `werk/00-contract.md` en `werk/14-datum-uit-tekst.md`. Dit pakket is gebouwd en gecommit (release 0.5.0, 2026-09-04); gebruik dit bestand als naslag bij vervolgwerk aan datumherkenning.
+> **Agent-prompt:** Lees `werk/00-contract.md` en `werk/14-datum-uit-tekst.md`. Dit pakket is gebouwd en gecommit (release 0.5.0, 2026-09-04; kolomlayout in 0.6.0); gebruik dit bestand als naslag bij vervolgwerk aan datumherkenning.
 
 **Doel:** Documenten die zonder datum worden aangeleverd (uploadformulier met leeg datumveld, of via `_inbox/`) krijgen automatisch de datum die in het document staat, zodat oude documenten die nu pas worden ingescand een historisch juiste documentdatum én mapnaam krijgen. Zonder treffer wordt het vandaag.
 
@@ -13,6 +13,7 @@
 3. **Bronregistratie** in `meta.md`: `datumbron: gebruiker | tekst | upload`. `gebruiker` wordt nooit automatisch overschreven. Wijzigt de gebruiker later de datum in het formulier, dan wordt de bron `gebruiker`; alleen tags/titel wijzigen laat de bron staan. Oude `meta.md` zonder het veld telt als `gebruiker`.
 4. **Sleutelwoorden in prioriteitsvolgorde:** factuurdatum, notadatum, orderdatum, dagtekening, datum. Optionele spatie ("factuur datum"), optionele dubbele punt, hoofdletterongevoelig. Letter-lookarounds zodat "Vervaldatum"/"Betaaldatum"/"Geboortedatum" niet matchen op "datum".
 5. **De datum hoort bij het woord** als hij op dezelfde regel staat, direct achter het woord, met alleen spaties (max 60, vanwege `pdftotext -layout`-kolommen) en een optionele dubbele punt ertussen.
+   **Kolomlayout (0.6.0, afgestemd 2026-09-04):** staat er geen datum achter het woord, dan telt de eerstvolgende niet-lege regel als waarderegel. Daarin wint de datum waarvan het tekenbereik het dichtst bij dat van het label ligt (afstand tussen de bereiken, 0 bij overlap; werkt voor links- en rechtsuitgelijnde kolommen). Afstand hooguit `datum._MAX_KOLOMAFSTAND` (20 tekens), anders geen treffer: een verkeerde datum in de mapnaam is erger dan de uploaddatum, want de map wordt nooit hernoemd. Tabs worden geëxpandeerd. Per sleutelwoord gaan alle regeltreffers vóór alle kolomtreffers (sterkste bewijs eerst); een kolom-"factuurdatum" wint wél van een regel-"datum". Alleen de eerstvolgende regel, niet verder naar beneden; meerregelige labels ("Factuur-" / "datum") vallen buiten scope.
 6. **Notaties:** `12-03-2024`, `12/03/2024`, `12.03.2024`, `2024-03-12`, `12 maart 2024`, `12 mrt 2024`, `12 mrt. 2024`, tweecijferig jaar (`12-03-24` → 2024; valt het boven volgend jaar dan 19xx). Altijd dag-maand, nooit maand-dag. Nederlandse en Engelse maandnamen.
 7. **Plausibiliteit:** jaar tussen 1990 (`datum.MIN_JAAR`) en volgend jaar; ongeldige kalenderdatums (31-02) worden overgeslagen en de zoektocht gaat verder.
 8. **Meerdere bestanden:** het eerste bestand (in uploadvolgorde) dat een treffer oplevert bepaalt de datum. Alle gelezen teksten worden direct als `.txt` weggeschreven, dus die bestanden hoeven niet meer door de OCR-queue. Bestanden waarvan het lezen mislukt gaan alsnog naar de queue (de worker zet dan zo nodig `failed`).
@@ -36,7 +37,7 @@
 
 ## Bekende beperkingen / vervolg
 
-- **Kolomlayout** (label op de ene regel, waarde op de volgende: "Factuurdatum  Factuurnummer  Vervaldatum" met daaronder "12-03-2024  2024001  12-04-2024") wordt niet herkend. Vervolgstap: bij een sleutelwoord zonder datum op dezelfde regel de eerstvolgende niet-lege regel bekijken en de datum kiezen waarvan de kolompositie het dichtst bij die van het sleutelwoord ligt. `pdftotext -layout` bewaart die posities.
+- **Kolomlayout** wordt sinds 0.6.0 herkend (beslissing 5). De tolerantie van 20 tekens is niet geijkt op echte facturen (er lagen geen `.txt`-bestanden in `data/`); bij een misser in de praktijk eerst de `.txt` bekijken en dan `_MAX_KOLOMAFSTAND` of de regelkeuze bijstellen, met een test erbij.
 - Alleen Nederlandse sleutelwoorden. Engelse ("Invoice date") zijn bewust weggelaten; toevoegen is één regel in `_SLEUTELWOORDEN`.
 - Het lezen vooraf gebeurt per upload sequentieel; bij veel bestanden zonder datum in één upload duurt het opslaan navenant langer.
 - Bestaande documenten krijgen met terugwerkende kracht geen datum uit tekst; `datumbron` blijft `gebruiker`. Een "datum opnieuw bepalen"-knop staat in `IDEAS.md`.

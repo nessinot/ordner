@@ -23,7 +23,7 @@ Een minimale digitale archiefkast voor privédocumenten (WOZ, facturen, bonnen, 
 | Index | In-memory (`index.Index`), gebouwd bij start, bijgewerkt door app/worker, herbouwd door reconciler. Geen indexbestand op schijf. |
 | Reconciler | Bij start, elke `reconcile_interval` s, en op knop. Synchroniseert `bestanden` met de werkelijke bestanden, queued ontbrekende `.txt`, maakt `meta.md` voor mappen zonder, ingest `_inbox/`. |
 | Inbox | `_inbox/` gepolld elke `inbox_interval` s (default 5); bestand met gelijke grootte in twee opeenvolgende polls → nieuw document (titel = bestandsnaam zonder extensie, `_`/`-` → spatie; datum uit de tekst, anders vandaag; zie "Datum uit tekst"). |
-| Datum uit tekst | Alleen als er geen datum is opgegeven (leeg datumveld bij upload, of inbox). De tekst wordt dan *vóór* het aanmaken van de map gelezen (`ingest.maak_document_uit_bestanden`), zodat de map de gevonden datum krijgt en nooit hernoemd hoeft te worden. Sleutelwoorden in prioriteitsvolgorde: factuurdatum, notadatum, orderdatum, dagtekening, datum (optionele spatie, optionele `:`, hoofdletterongevoelig; "vervaldatum" e.d. matchen niet). De datum moet op dezelfde regel direct achter het woord staan (max 60 spaties ertussen). Notaties dd-mm-jjjj, dd/mm/jjjj, dd.mm.jjjj, jjjj-mm-dd, d maand jjjj (NL/EN maandnamen), tweecijferig jaar. Jaar tussen 1990 en volgend jaar. `meta.datumbron`: `gebruiker` (opgegeven of later handmatig gewijzigd; wordt nooit automatisch overschreven), `tekst`, `upload` (geen treffer → vandaag). Gelezen tekst wordt direct als `.txt` geschreven. |
+| Datum uit tekst | Alleen als er geen datum is opgegeven (leeg datumveld bij upload, of inbox). De tekst wordt dan *vóór* het aanmaken van de map gelezen (`ingest.maak_document_uit_bestanden`), zodat de map de gevonden datum krijgt en nooit hernoemd hoeft te worden. Sleutelwoorden in prioriteitsvolgorde: factuurdatum, notadatum, orderdatum, dagtekening, datum (optionele spatie, optionele `:`, hoofdletterongevoelig; "vervaldatum" e.d. matchen niet). Per sleutelwoord eerst alle regels met de datum direct achter het woord (max 60 spaties ertussen), daarna kolomlayout: label zonder datum op de eigen regel, datum op de eerstvolgende niet-lege regel waarvan het tekenbereik het dichtst bij dat van het label ligt (afstand hooguit 20 tekens, tabs geëxpandeerd). Notaties dd-mm-jjjj, dd/mm/jjjj, dd.mm.jjjj, jjjj-mm-dd, d maand jjjj (NL/EN maandnamen), tweecijferig jaar. Jaar tussen 1990 en volgend jaar. `meta.datumbron`: `gebruiker` (opgegeven of later handmatig gewijzigd; wordt nooit automatisch overschreven), `tekst`, `upload` (geen treffer → vandaag). Gelezen tekst wordt direct als `.txt` geschreven. |
 | Zoeken | Alle woorden moeten voorkomen (AND over het hele document), hoofdletterongevoelig, over titel, omschrijving, tags, documentdatum (ISO-string), notities en alle `.txt`-teksten. Snippet ±80 tekens rond de eerste treffer + bron (veldnaam of bestandsnaam). Sortering documentdatum desc. `_inbox`/`_prullenbak` nooit in de index. |
 | Prullenbak | `_prullenbak/<mapnaam>`; bij conflict `<mapnaam>_<JJJJMMDD-HHMMSS>`. |
 | Schrijven | `meta.md` en `.txt` altijd via tempbestand in dezelfde map + `os.replace()`. |
@@ -231,10 +231,10 @@ MIN_JAAR = 1990
 class DatumTreffer:
     datum: date
     sleutelwoord: str               # "factuurdatum" | "notadatum" | "orderdatum" | "dagtekening" | "datum"
-    regel: str                      # de regel waarin de datum stond (voor logging)
+    regel: str                      # de regel waarin de datum stond (bij kolomlayout: de waarderegel), voor logging
 
 def vind_datum(tekst: str, vandaag: date | None = None) -> DatumTreffer | None
-    # per sleutelwoord in prioriteitsvolgorde over alle regels; eerste geldige datum wint. Pure functie.
+    # per sleutelwoord in prioriteitsvolgorde: eerst regeltreffers over alle regels, dan kolomtreffers; eerste geldige datum wint. Pure functie.
 ```
 
 ### `ordner/ingest.py` (pakket 14)
@@ -335,4 +335,5 @@ _(agents voegen hier regels toe: pakket · wat · waarom)_
 - 08 · `POST /upload` gebruikt `titel: str = Form("")` i.p.v. `Form(...)` · een ontbrekende titel moet 400 met het formulier opleveren, niet FastAPI's 422.
 - 08 · `app.state.templates` toegevoegd · routes in `routes.py` hebben de `Jinja2Templates`-instantie nodig zonder globale state.
 - 14 · `Meta.datumbron` toegevoegd (laatste frontmatter-sleutel), `meta.schrijf_txt`, `Archief.maak_document(datumbron=)`, `Reconciler(lees_tekst=)`, nieuwe modules `datum.py` en `ingest.py`; het uploadformulier heeft geen voorgevulde datum meer · documenten zonder opgegeven datum krijgen de datum uit de tekst (factuurdatum enz.), en omdat de map nooit hernoemd wordt moet die datum vóór het aanmaken bekend zijn. Zie `werk/14-datum-uit-tekst.md`.
+- 0.6.0 · `vind_datum` herkent ook kolomlayout (label boven waarde); interface ongewijzigd · facturen zetten factuurdatum, factuurnummer en vervaldatum vaak in een tabel, en `pdftotext -layout` bewaart de kolomposities. Zie `werk/14-datum-uit-tekst.md`.
 - 13 · Add-on-bestanden en het Python-package verhuisd naar `addon/`; `repository.yaml` in de root; `pythonpath = ["addon", "."]` in `pyproject.toml` · de Supervisor accepteert een git-URL alleen als add-on-repository (elke add-on in een eigen submap met `config.yaml`), zodat installeren en updaten via de Add-on store kan i.p.v. kopiëren naar `/addons/` via Samba.
