@@ -14,6 +14,13 @@ document.addEventListener("DOMContentLoaded", () => {
       xhr.upload.onprogress = (ev) => {
         if (bar && ev.lengthComputable) { bar.max = ev.total; bar.value = ev.loaded; }
       };
+      xhr.upload.onload = () => {
+        // Upload klaar; zonder datum leest de server nu eerst de tekst (kan even duren).
+        if (bar) bar.removeAttribute("value");
+        const bezig = form.querySelector("[data-bezig]");
+        if (bezig) bezig.hidden = false;
+        form.querySelectorAll("button[type=submit]").forEach((b) => { b.disabled = true; });
+      };
       xhr.onload = () => {
         if (xhr.status < 400 && xhr.responseURL) { window.location = xhr.responseURL; return; }
         // Validatiefout (400): toon het teruggestuurde formulier zoals bij een gewone POST.

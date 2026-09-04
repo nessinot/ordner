@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Resp
 from fastapi.templating import Jinja2Templates
 
 from ordner.index import DocEntry, Index, Reconciler
+from ordner.ingest import LeesTekst, maak_document_uit_bestanden
 from ordner.meta import MetaFout, OcrStatus, is_extraheerbaar, schrijf_meta, txt_pad
 from ordner.search import zoek
 from ordner.storage import Archief, OngeldigPad
@@ -69,6 +70,10 @@ def _index(request: Request) -> Index:
 
 def _queue(request: Request) -> OcrQueue:
     return request.app.state.queue
+
+
+def _lees_tekst(request: Request) -> LeesTekst | None:
+    return getattr(request.app.state, "lees_tekst", None)
 
 
 def _redirect(
@@ -155,7 +160,7 @@ async def zoeken(request: Request) -> Response:
 
 
 def _upload_context(**velden: str) -> dict[str, str]:
-    ctx = {"titel": "", "omschrijving": "", "documentdatum": date.today().isoformat(), "tags": "", "fout": ""}
+    ctx = {"titel": "", "omschrijving": "", "documentdatum": "", "tags": "", "fout": ""}
     ctx.update(velden)
     return ctx
 
@@ -185,21 +190,31 @@ async def upload(
 
     if not titel:
         return fout("Titel is verplicht.")
+    datum: date | None = None
     if documentdatum:
         try:
             datum = date.fromisoformat(documentdatum)
         except ValueError:
             return fout("Ongeldige documentdatum; gebruik JJJJ-MM-DD.")
-    else:
-        datum = date.today()
     taglijst = _splits_tags(tags)
 
     archief = _archief(request)
-    queue = _queue(request)
-    doc = archief.maak_document(titel, datum, omschrijving, taglijst)
-    aantal = _sla_bestanden_op(archief, queue, doc, [(f.filename, await f.read()) for f in bestanden])
+    uploads = [(f.filename, await f.read()) for f in bestanden if f.filename]
+    # Zonder datum wordt de tekst eerst gelezen (OCR kan tientallen seconden duren): in een thread,
+    # zodat de event loop en de status-polls van andere pagina's niet blokkeren.
+    doc = await asyncio.to_thread(
+        maak_document_uit_bestanden,
+        archief,
+        titel,
+        uploads,
+        documentdatum=datum,
+        omschrijving=omschrijving,
+        tags=taglijst,
+        lees_tekst=_lees_tekst(request),
+        queue_fn=_queue(request).enqueue,
+    )
     _index(request).herlaad(archief, doc)
-    log.info("upload: %s (%d bestand(en))", archief.relatief(doc), aantal)
+    log.info("upload: %s (%d bestand(en))", archief.relatief(doc), len(uploads))
 
     jaar, map = _splits_rel(archief.relatief(doc))
     return _redirect(request, "document", "Opgeslagen", jaar=jaar, map=map)
@@ -309,6 +324,8 @@ async def document_meta(
     meta = entry.meta
     meta.titel = titel
     meta.omschrijving = omschrijving.strip()
+    if datum != meta.documentdatum:
+        meta.datumbron = "gebruiker"  # een bewust gewijzigde datum wordt nooit meer automatisch overschreven
     meta.documentdatum = datum
     meta.tags = _splits_tags(tags)
     schrijf_meta(entry.map, meta)  # de map wordt nooit hernoemd

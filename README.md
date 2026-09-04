@@ -4,7 +4,7 @@ Vroeger gingen afschriften, nota's, bonnetjes en andere belangrijke papieren in 
 
 Elk document krijgt een eigen map op schijf met het origineel erin. De tekst van pdf's en foto's wordt gelezen en als gewoon tekstbestand ernaast gezet, en de gegevens over het document staan in één leesbaar `meta.md`. Geen database, niets om te ontcijferen. Alles blijft bruikbaar met de Verkenner, Samba of een HA-backup, ook zonder de app.
 
-In de app upload je documenten, zoek je erin en bekijk je ze. Dat is alles wat een ordner hoeft te doen.
+In de app upload je documenten, zoek je erin en bekijk je ze. Laat je de datum leeg, dan leest Ordner de factuurdatum uit het document zelf. Dat is alles wat een ordner hoeft te doen.
 
 Gebruikersdocumentatie staat in [`addon/DOCS.md`](addon/DOCS.md) en verschijnt op het tabblad "Documentatie" van de add-on.
 

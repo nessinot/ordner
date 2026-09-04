@@ -4,14 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import threading
 from pathlib import Path
 
 from ordner.config import META_NAAM, Settings
 from ordner.extract import ExtractieFout, extract_bestand
 from ordner.index import Index, Reconciler
-from ordner.meta import MetaFout, bepaal_ocr_status, lees_meta, schrijf_meta, txt_pad
+from ordner.meta import MetaFout, bepaal_ocr_status, lees_meta, schrijf_meta, schrijf_txt
 from ordner.storage import Archief
 
 log = logging.getLogger(__name__)
@@ -19,13 +18,7 @@ log = logging.getLogger(__name__)
 Key = tuple[str, str]  # (rel, naam)
 
 
-def _schrijf_txt(pad: Path, tekst: str) -> None:
-    """Schrijft OCR-tekst atomic via een tempbestand in dezelfde map."""
-    doel = txt_pad(pad)
-    tmp = doel.with_name("." + doel.name + ".tmp")
-    with open(tmp, "w", encoding="utf-8", newline="\n") as f:
-        f.write(tekst)
-    os.replace(tmp, doel)
+_schrijf_txt = schrijf_txt  # naam uit pakket 07; de implementatie staat sinds pakket 14 in meta.py
 
 
 class OcrQueue:

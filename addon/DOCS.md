@@ -40,6 +40,7 @@ uploaddatum: '2026-09-03T14:12'
 tags: [woz, gemeente]
 bestanden: [beschikking.pdf, foto.heic]
 ocr: done
+datumbron: gebruiker
 ---
 Eventuele eigen notities. Deze tekst wordt meegezocht.
 ```
@@ -53,10 +54,19 @@ Eventuele eigen notities. Deze tekst wordt meegezocht.
 | `tags` | Lijst met trefwoorden. Meegezocht. |
 | `bestanden` | De originelen in deze map. Wordt door Ordner bijgehouden; bestanden die je via Samba toevoegt worden bij de volgende verversing opgenomen. |
 | `ocr` | `pending` (tekst wordt nog gelezen), `done` (klaar) of `failed` (mislukt, zie hieronder). |
+| `datumbron` | Waar de documentdatum vandaan komt: `gebruiker` (zelf ingevuld of later gewijzigd), `tekst` (uit het document gelezen) of `upload` (geen datum gevonden, dag van uploaden). Zie "Documentdatum". |
 
 Alles onder de tweede `---` is vrije tekst voor eigen notities en wordt meegezocht.
 
 Je mag `meta.md` zelf bewerken in een teksteditor. Houd de drie streepjes en de veldnamen intact. Een map zonder `meta.md` krijgt er bij de volgende verversing automatisch een, met de mapnaam als titel.
+
+## Documentdatum
+
+Vul je bij het uploaden een datum in, dan is dat de documentdatum. Laat je het veld leeg, dan leest Ordner eerst de tekst van het document en zoekt daarin naar een datum achter een van deze woorden, in deze volgorde: **factuurdatum**, **notadatum**, **orderdatum**, **dagtekening**, **datum**. Het woord mag met of zonder spatie geschreven zijn ("factuur datum") en er mag een dubbele punt achter staan. De datum moet direct achter het woord op dezelfde regel staan; "vervaldatum" of "betaaldatum" tellen niet mee. Herkende notaties: `12-03-2024`, `12/03/2024`, `12.03.2024`, `2024-03-12`, `12 maart 2024`, `12 mrt 2024` en een tweecijferig jaar. Staat er geen bruikbare datum in, dan wordt het de dag van uploaden.
+
+De gevonden datum bepaalt ook de mapnaam, dus een oude factuur die je nu inscant komt in de juiste jaarmap terecht. Omdat de tekst hiervoor eerst gelezen moet worden, duurt opslaan zonder datum bij foto's en scans wat langer; de uploadpagina meldt "tekst lezen…".
+
+Op de documentpagina zie je achter de datum een label **datum uit tekst** of **datum van upload** als de datum niet door jou is ingevuld. Wijzig je de datum zelf, dan verdwijnt het label en wordt hij nooit meer automatisch aangepast. Documenten uit de inbox krijgen altijd op deze manier hun datum.
 
 ## Zoeken
 
