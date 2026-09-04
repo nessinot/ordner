@@ -1,0 +1,15 @@
+[project]
+name = "ordner"
+version = "0.3.0"
+description = "Minimale digitale archiefkast voor privédocumenten als Home Assistant add-on"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["addon", "."]
+asyncio_mode = "auto"
+addopts = "-m 'not e2e and not container'"
+markers = [
+    "e2e: browser-laag, Playwright tegen een lokaal gestarte uvicorn (traag; niet in kaal pytest)",
+    "container: add-on-image via Docker met echte OCR-tools (traag; skipt zonder docker)",
+]

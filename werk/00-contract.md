@@ -1,0 +1,298 @@
+# Ordner — contract
+
+Dit bestand is het bindende contract voor alle werkpakketten in `werk/`. **Elke agent leest dit bestand volledig vóór het eigen pakket.** Wijk niet af van de interfaces hieronder. Als iets ontbreekt of onmogelijk blijkt: kies de kleinste toevoeging, documenteer die in de commit-message én onderaan dit bestand onder "Wijzigingen op het contract".
+
+## Wat Ordner is
+
+Een minimale digitale archiefkast voor privédocumenten (WOZ, facturen, bonnen, digitale post) als lokale Home Assistant add-on via Ingress. Kernprincipe: **de bestanden op schijf zijn de waarheid**. Mappen, originelen, één leesbare `meta.md` per document en OCR-tekst als `.txt` ernaast. Alles blijft bruikbaar zonder de app (Verkenner, Samba, HA-backup). Geen database.
+
+## Ontwerpbeslissingen
+
+| Onderwerp | Keuze |
+|---|---|
+| Naam | `ordner` overal (add-on slug, Python-package, `/share/ordner`). |
+| Mapnaam | `JJJJ/JJJJ-MM-DD_slug/` met de documentdatum zoals ingevuld bij aanmaak + slug van de titel. **Nooit hernoemen**; latere titel-/datumwijziging staat alleen in `meta.md`. Collision → `_2`, `_3`, … |
+| Slug | lowercase, NFKD-normalisatie + combining characters strippen, alles buiten `[a-z0-9]` → `-`, herhaalde `-` samenvoegen, `-` aan de randen strippen, max 60 tekens, leeg → `document`. |
+| Metadata | `meta.md`: YAML-frontmatter tussen `---`-regels + optionele body (vrije notities, wordt meegezocht). Geen OCR-tekst in `meta.md`. |
+| OCR-tekst | Per bronbestand `<naam>.<ext>.txt` naast het origineel (`factuur.pdf` → `factuur.pdf.txt`). |
+| `ocr`-status | `pending` (er zijn extraheerbare bestanden zonder `.txt`), `done` (alle extraheerbare bestanden hebben een `.txt`, of er zijn er geen), `failed` (extractie mislukt; reconciler probeert niet opnieuw tot "OCR opnieuw" de status reset). |
+| Extraheerbaar | Extensies `.pdf .jpg .jpeg .png .heic` (case-insensitive). Andere bestanden worden opgeslagen en in `bestanden` opgenomen, maar niet geëxtraheerd. |
+| Extractie pdf | `pdftotext -layout <pdf> -` → tekst. Paginatelling via `pdfinfo <pdf>` (regel `Pages: N`). Als `len(tekst.strip()) < 50 * N` → `ocrmypdf --force-ocr -l <talen> --sidecar <tmp.txt> <pdf> <tmp.pdf>` en de sidecar lezen; tmp-bestanden verwijderen. |
+| Extractie afbeelding | `.heic` → tijdelijke `.jpg` via `pillow_heif` + Pillow; daarna `tesseract <img> - -l <talen>` → stdout. |
+| Subprocess | Uitsluitend via `extract.run_cmd` (asyncio subprocess, timeout 600 s). Tests mocken alleen deze functie. |
+| Index | In-memory (`index.Index`), gebouwd bij start, bijgewerkt door app/worker, herbouwd door reconciler. Geen indexbestand op schijf. |
+| Reconciler | Bij start, elke `reconcile_interval` s, en op knop. Synchroniseert `bestanden` met de werkelijke bestanden, queued ontbrekende `.txt`, maakt `meta.md` voor mappen zonder, ingest `_inbox/`. |
+| Inbox | `_inbox/` gepolld elke `inbox_interval` s (default 5); bestand met gelijke grootte in twee opeenvolgende polls → nieuw document (titel = bestandsnaam zonder extensie, `_`/`-` → spatie; datum = vandaag). |
+| Zoeken | Alle woorden moeten voorkomen (AND over het hele document), hoofdletterongevoelig, over titel, omschrijving, tags, documentdatum (ISO-string), notities en alle `.txt`-teksten. Snippet ±80 tekens rond de eerste treffer + bron (veldnaam of bestandsnaam). Sortering documentdatum desc. `_inbox`/`_prullenbak` nooit in de index. |
+| Prullenbak | `_prullenbak/<mapnaam>`; bij conflict `<mapnaam>_<JJJJMMDD-HHMMSS>`. |
+| Schrijven | `meta.md` en `.txt` altijd via tempbestand in dezelfde map + `os.replace()`. |
+| Web | FastAPI + Jinja2, geen JS-framework, geen build-stap. Vanilla JS alleen voor upload-voortgang en status-polling. Alle links/actions via `request.url_for` (Ingress `root_path`). |
+| Base image | HA Debian-base bookworm; apt: `python3 python3-venv ocrmypdf tesseract-ocr-nld tesseract-ocr-eng poppler-utils libheif1`. |
+| Niet in v1 | Meerdere gebruikers, versiebeheer, autoclassificatie, tag-beheer, map-hernoemen, MCP-server, "alles opnieuw OCR'en", prullenbak legen/terugzetten. Ideeën → `IDEAS.md`. |
+
+## Repo-structuur
+
+```
+ordner/                       # repo-root = add-on-repository (Add-on store › Repositories)
+  repository.yaml
+  README.md CLAUDE.md IDEAS.md
+  pyproject.toml requirements-dev.txt .gitignore .gitattributes
+  werk/                       # werkpakketten
+  tests/ conftest.py test_*.py e2e/
+  data/                       # lokale dev-archiefmap (gitignored)
+  addon/                      # de add-on; dit is de Docker-build-context
+    config.yaml build.yaml Dockerfile run.sh .dockerignore
+    DOCS.md                   # tabblad "Documentatie" in de add-on
+    requirements.txt
+    ordner/                   # Python-package
+      __init__.py config.py slug.py meta.py storage.py extract.py index.py search.py worker.py
+      web/ __init__.py app.py routes.py
+        templates/ base.html zoeken.html upload.html document.html beheer.html
+        static/ style.css app.js
+```
+
+## Datamodel op schijf
+
+```
+/share/ordner/
+  _inbox/
+  _prullenbak/
+  2026/
+    2026-09-03_woz-beschikking/
+      meta.md
+      beschikking.pdf
+      beschikking.pdf.txt
+      foto.heic
+      foto.heic.txt
+```
+
+`meta.md`:
+```markdown
+---
+titel: WOZ-beschikking 2026
+omschrijving: Gemeente, waarde peildatum 1-1-2025
+documentdatum: 2026-03-01
+uploaddatum: '2026-09-03T14:12'
+tags: [woz, gemeente]
+bestanden: [beschikking.pdf, foto.heic]
+ocr: done
+---
+Eventuele eigen notities (worden meegezocht).
+```
+
+## Conventies
+
+- Python ≥ 3.11, type hints overal, `from __future__ import annotations` bovenaan elke module.
+- Nederlandse namen voor domeinbegrippen (`titel`, `bestanden`, `prullenbak`), Engelse namen voor techniek (`root_path`, `queue`).
+- Geen globale state behalve `Settings`; alles wordt geïnjecteerd (`Archief(root)`, `Index`, …).
+- Fouten: eigen excepties per module (`MetaFout`, `OngeldigPad`, `ExtractieFout`); nooit bare `except`.
+- Logging via `logging.getLogger(__name__)`.
+- Tests: pytest, `tmp_path`, geen netwerk, geen echte OCR-tools. Fixtures in `tests/conftest.py`. Elk pakket levert tests voor de eigen module; `pytest` moet groen zijn bij afronden.
+- Testlagen: (1) **unit** — `tests/test_*.py`, gemockt, draait met kaal `pytest`; (2) **e2e** — `tests/e2e/test_browser.py`, marker `e2e`, Playwright tegen een lokale uvicorn; (3) **container** — `tests/e2e/test_container.py`, marker `container`, echt add-on-image met echte OCR via Docker, skipt als Docker ontbreekt. Lagen 2 en 3 komen in pakket 12 en zijn uitgesloten van het standaard `pytest`-commando.
+- Commit per pakket met bericht `pakket NN: <titel>`; daarna afvinken in `werk/STATUS.md`.
+- Windows-dev: paden altijd via `pathlib`; nooit `/` hardcoden in paden; `os.replace` voor atomic writes; tekstbestanden altijd expliciet `encoding="utf-8"`.
+- Lokaal draaien: `ORDNER_DATA=./data uvicorn --app-dir addon ordner.web.app:app --reload` (in PowerShell: `$env:ORDNER_DATA="./data"; uvicorn ...`).
+
+## Interfaces (bindend)
+
+### `ordner/config.py`
+```python
+@dataclass(frozen=True)
+class Settings:
+    data_root: Path                 # ORDNER_DATA, default Path("./data").resolve()
+    ocr_talen: str = "nld+eng"      # ORDNER_OCR_TALEN
+    ocr_parallel: int = 2           # ORDNER_OCR_PARALLEL
+    reconcile_interval: int = 300   # ORDNER_RECONCILE_INTERVAL (seconden)
+    inbox_interval: int = 5         # ORDNER_INBOX_INTERVAL (seconden)
+
+    @classmethod
+    def from_env(cls) -> "Settings": ...
+
+INBOX_DIR = "_inbox"
+TRASH_DIR = "_prullenbak"
+META_NAAM = "meta.md"
+EXTRAHEERBAAR = {".pdf", ".jpg", ".jpeg", ".png", ".heic"}
+```
+
+### `ordner/slug.py`
+```python
+def maak_slug(titel: str) -> str
+```
+
+### `ordner/meta.py`
+```python
+OcrStatus = Literal["pending", "done", "failed"]
+
+class MetaFout(Exception): ...
+
+@dataclass
+class Meta:
+    titel: str
+    documentdatum: date
+    uploaddatum: datetime            # minuut-precisie, naïef (lokale tijd)
+    omschrijving: str = ""
+    tags: list[str] = field(default_factory=list)
+    bestanden: list[str] = field(default_factory=list)
+    ocr: OcrStatus = "done"
+    notities: str = ""               # body onder de frontmatter
+
+def parse_meta(tekst: str) -> Meta          # raises MetaFout bij ontbrekende frontmatter/titel/datum
+def render_meta(meta: Meta) -> str          # frontmatter (keys in bovenstaande volgorde, tags/bestanden als flow-lijst [a, b]) + notities
+def lees_meta(map: Path) -> Meta            # leest map/meta.md
+def schrijf_meta(map: Path, meta: Meta) -> None   # atomic
+def bepaal_ocr_status(map: Path, meta: Meta) -> OcrStatus
+    # "failed" blijft "failed"; anders "pending" als een extraheerbaar bestand uit meta.bestanden geen .txt heeft, anders "done"
+def txt_pad(bestand: Path) -> Path          # bestand.with_name(bestand.name + ".txt")
+def is_extraheerbaar(naam: str) -> bool
+```
+
+### `ordner/storage.py`
+```python
+class OngeldigPad(Exception): ...
+
+class Archief:
+    def __init__(self, root: Path)          # maakt root, _inbox en _prullenbak aan als ze ontbreken
+    root: Path
+    inbox_dir: Path
+    trash_dir: Path
+
+    def maak_document(self, titel: str, documentdatum: date, omschrijving: str = "",
+                      tags: list[str] | None = None, nu: datetime | None = None) -> Path
+        # map JJJJ/JJJJ-MM-DD_slug[_N]; schrijft meta.md (bestanden=[], ocr="done"); geeft absolute map terug
+
+    def voeg_bestand_toe(self, doc: Path, naam: str, data: bytes) -> str
+        # naam saneren; conflict → stam_2.ext; schrijft bestand atomic;
+        # update meta.bestanden + ocr via bepaal_ocr_status; geeft de opgeslagen naam terug
+
+    def naar_prullenbak(self, doc: Path) -> Path
+    def documentmappen(self) -> list[Path]  # alle root/JJJJ/*/ met meta.md, gesorteerd; "_"- en "."-mappen overslaan
+    def relatief(self, doc: Path) -> str    # "2026/2026-09-03_slug" (altijd met "/")
+    def veilig_pad(self, jaar: str, map: str, naam: str | None = None) -> Path
+        # raises OngeldigPad als een component "..", een pad-scheider of niets bevat,
+        # als het resultaat buiten root ligt, of als het niet bestaat
+```
+
+### `ordner/extract.py`
+```python
+class ExtractieFout(Exception): ...
+
+async def run_cmd(args: list[str], timeout: float = 600) -> tuple[int, bytes, bytes]
+    # ENIGE subprocess-ingang. FileNotFoundError/timeout → ExtractieFout met leesbare melding.
+async def extract_pdf(pad: Path, talen: str) -> str
+async def extract_afbeelding(pad: Path, talen: str) -> str
+async def extract_bestand(pad: Path, talen: str) -> str     # dispatch op extensie; niet-extraheerbaar → ExtractieFout
+```
+
+### `ordner/index.py`
+```python
+@dataclass
+class DocEntry:
+    rel: str
+    map: Path
+    meta: Meta
+    teksten: dict[str, str]         # bestandsnaam → inhoud van de .txt; alleen voor bestanden mét .txt
+
+class Index:
+    docs: dict[str, DocEntry]
+    def herlaad(self, archief: Archief, map: Path) -> DocEntry   # leest meta.md + .txt's opnieuw
+    def verwijder(self, rel: str) -> None
+    def alle(self) -> list[DocEntry]        # documentdatum desc, daarna rel desc
+    def tellingen(self) -> dict[str, int]   # {"totaal", "pending", "done", "failed"}
+
+def bouw_index(archief: Archief) -> Index
+
+@dataclass
+class ReconcileRapport:
+    documenten: int
+    gesynchroniseerd: int
+    gequeued: int
+    meta_aangemaakt: int
+    inbox_verwerkt: int
+
+class Reconciler:
+    def __init__(self, archief: Archief, index: Index, queue_fn: Callable[[Path, str], None])
+    def run(self) -> ReconcileRapport       # synchroon; de app roept aan via asyncio.to_thread
+    def verwerk_inbox(self) -> list[Path]   # houdt self._inbox_groottes bij voor de stabiliteitscheck
+```
+
+### `ordner/search.py`
+```python
+@dataclass
+class Treffer:
+    rel: str
+    titel: str
+    omschrijving: str
+    documentdatum: date
+    snippet: str
+    bron: str                       # veldnaam ("titel", "omschrijving", "tags", "documentdatum", "notities") of bestandsnaam
+
+def zoek(index: Index, query: str) -> list[Treffer]  # alle treffers; de route kapt af op 50 (tenzij ?alles=1)
+```
+
+### `ordner/worker.py`
+```python
+class OcrQueue:
+    def __init__(self, archief: Archief, index: Index, settings: Settings)
+    def enqueue(self, doc: Path, naam: str) -> None    # idempotent; veilig aan te roepen vanuit asyncio.to_thread
+    async def start(self) -> None
+    async def stop(self) -> None
+    @property
+    def lengte(self) -> int
+    bezig: set[tuple[str, str]]     # (rel, naam) die nu geëxtraheerd worden
+
+async def reconcile_lus(reconciler: Reconciler, queue: OcrQueue, settings: Settings, stop: asyncio.Event) -> None
+async def inbox_lus(reconciler: Reconciler, queue: OcrQueue, settings: Settings, stop: asyncio.Event) -> None
+```
+
+### `ordner/web/app.py`
+```python
+def create_app(settings: Settings | None = None) -> FastAPI
+    # app.state.settings / archief / index / queue / reconciler
+    # lifespan: bouw_index, queue.start, lussen starten; bij afsluiten stop-event zetten en queue.stop
+    # Ingress-middleware; static mount op /static
+
+app = create_app()
+```
+
+### Routenamen (voor `url_for`)
+
+| Naam | Methode + pad |
+|---|---|
+| `zoeken` | `GET /` |
+| `upload` | `GET /upload`, `POST /upload` |
+| `document` | `GET /doc/{jaar}/{map}` |
+| `document_meta` | `POST /doc/{jaar}/{map}/meta` |
+| `document_bestanden` | `POST /doc/{jaar}/{map}/bestanden` |
+| `document_ocr` | `POST /doc/{jaar}/{map}/ocr` |
+| `document_verwijder` | `POST /doc/{jaar}/{map}/verwijder` |
+| `bestand` | `GET /doc/{jaar}/{map}/bestand/{naam}` |
+| `beheer` | `GET /beheer` |
+| `beheer_reconcile` | `POST /beheer/reconcile` |
+| `status` | `GET /api/status` |
+| `static` | `/static/...` |
+
+## Testfixtures (`tests/conftest.py`)
+
+```python
+@pytest.fixture
+def mock_cmd(monkeypatch) -> CmdMock         # pakket 01: vervangt ordner.extract.run_cmd
+    # mock_cmd.register("pdftotext", rc=0, stdout=b"...")
+    # mock_cmd.register("ocrmypdf", handler=fn)   # fn(args: list[str]) -> (rc, stdout, stderr); mag zelf bestanden schrijven
+    # mock_cmd.calls: list[list[str]]             # alle aanroepen, in volgorde
+    # ongeregistreerd commando → fout (vanaf pakket 04: extract.ExtractieFout)
+
+@pytest.fixture
+def archief(tmp_path) -> Archief             # pakket 03: Archief(tmp_path / "archief")
+
+@pytest.fixture
+def client(tmp_path, mock_cmd) -> TestClient # pakket 08: create_app(Settings(data_root=tmp_path / "archief"))
+```
+
+## Wijzigingen op het contract
+
+_(agents voegen hier regels toe: pakket · wat · waarom)_
+
+- 08 · Templates gebruiken de Jinja-global `url_for(naam, **params)` (in `web/app.py`, wrapper om `request.url_for(...).path`) in plaats van `request.url_for` direct; redirects via `routes._redirect` · `request.url_for` levert een absolute URL met scheme+host uit de ASGI-scope; achter Ingress/https zou dat `http://…`-links geven (mixed content) en de ingress-test uit pakket 08 verwacht paden die met `/api/hassio_ingress/...` beginnen. De global geeft het pad inclusief `root_path` terug.
+- 08 · `POST /upload` gebruikt `titel: str = Form("")` i.p.v. `Form(...)` · een ontbrekende titel moet 400 met het formulier opleveren, niet FastAPI's 422.
+- 08 · `app.state.templates` toegevoegd · routes in `routes.py` hebben de `Jinja2Templates`-instantie nodig zonder globale state.
+- 13 · Add-on-bestanden en het Python-package verhuisd naar `addon/`; `repository.yaml` in de root; `pythonpath = ["addon", "."]` in `pyproject.toml` · de Supervisor accepteert een git-URL alleen als add-on-repository (elke add-on in een eigen submap met `config.yaml`), zodat installeren en updaten via de Add-on store kan i.p.v. kopiëren naar `/addons/` via Samba.

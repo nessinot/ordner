@@ -1,0 +1,7 @@
+run.sh text eol=lf
+Dockerfile text eol=lf
+*.yaml text eol=lf
+tests/fixtures/*.pdf binary
+tests/fixtures/*.png binary
+tests/fixtures/*.jpg binary
+tests/fixtures/*.heic binary

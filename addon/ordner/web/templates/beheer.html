@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% set nav = 'beheer' %}
+{% set paginatitel = 'Beheer' %}
+{% block content %}
+<section class="beheer" data-beheer>
+  <div class="kop"><h2>Beheer</h2></div>
+
+  <section class="paneel">
+    <h3>Documenten</h3>
+    <table class="tellingen">
+      <tr><th>Totaal</th><td data-tel="totaal">{{ tellingen.totaal }}</td></tr>
+      <tr><th>OCR klaar</th><td data-tel="done">{{ tellingen.done }}</td></tr>
+      <tr><th>OCR wacht</th><td data-tel="pending">{{ tellingen.pending }}</td></tr>
+      <tr><th>OCR mislukt</th><td data-tel="failed">{{ tellingen.failed }}</td></tr>
+      <tr><th>In wachtrij</th><td data-tel="queue">{{ queue }}</td></tr>
+      <tr><th>Cache verversen</th><td data-tel="reconcile">{% if reconcile_bezig %}bezig{% else %}niet bezig{% endif %}</td></tr>
+    </table>
+  </section>
+
+  <section class="paneel">
+    <h3>Nu bezig</h3>
+    <ul data-bezig class="bezig">
+      {% for rel, naam in bezig %}<li>{{ rel }}/{{ naam }}</li>{% else %}<li class="leeg">Niets.</li>{% endfor %}
+    </ul>
+  </section>
+
+  <section class="paneel">
+    <h3>Laatste verversing</h3>
+    {% if rapport %}
+    <table class="tellingen">
+      <tr><th>Documenten</th><td>{{ rapport.documenten }}</td></tr>
+      <tr><th>Gesynchroniseerd</th><td>{{ rapport.gesynchroniseerd }}</td></tr>
+      <tr><th>Tekst gequeued</th><td>{{ rapport.gequeued }}</td></tr>
+      <tr><th>meta.md aangemaakt</th><td>{{ rapport.meta_aangemaakt }}</td></tr>
+      <tr><th>Inbox verwerkt</th><td>{{ rapport.inbox_verwerkt }}</td></tr>
+    </table>
+    {% else %}
+    <p class="leeg">Nog niet gedraaid.</p>
+    {% endif %}
+    <form method="post" action="{{ url_for('beheer_reconcile') }}">
+      <div class="knoppen vol">
+        <button type="submit"{% if reconcile_bezig %} disabled{% endif %}>Cache verversen en ontbrekende tekst extraheren</button>
+      </div>
+      <p class="hint">Loopt automatisch elke {{ interval_minuten }} minuten; gebruik deze knop na wijzigingen via Samba.</p>
+    </form>
+  </section>
+</section>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% set nav = 'upload' %}
+{% set paginatitel = 'Uploaden' %}
+{% block content %}
+<div class="kop"><h2>Nieuw document</h2></div>
+{% if fout %}<p class="fout" role="alert">{{ fout }}</p>{% endif %}
+<form method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data" data-upload class="paneel">
+  <label class="veld">
+    <span>Bestanden</span>
+    <input type="file" name="bestanden" multiple accept="image/*,application/pdf">
+  </label>
+  <p class="hint hint-bestanden">Pdf's en foto's; meerdere tegelijk mag. De tekst wordt daarna automatisch herkend.</p>
+  <label class="veld">
+    <span>Titel</span>
+    <input type="text" name="titel" value="{{ titel }}" required autocomplete="off" placeholder="Bijv. WOZ-beschikking 2026">
+  </label>
+  <label class="veld">
+    <span>Omschrijving <small>optioneel</small></span>
+    <textarea name="omschrijving" rows="3">{{ omschrijving }}</textarea>
+  </label>
+  <div class="velden-rij">
+    <label class="veld">
+      <span>Documentdatum</span>
+      <input type="date" name="documentdatum" value="{{ documentdatum }}">
+    </label>
+    <label class="veld">
+      <span>Tags <small>komma-gescheiden</small></span>
+      <input type="text" name="tags" value="{{ tags }}" autocomplete="off" placeholder="woz, gemeente">
+    </label>
+  </div>
+  <progress hidden></progress>
+  <div class="knoppen vol">
+    <button type="submit">Opslaan</button>
+  </div>
+</form>
+{% endblock %}
