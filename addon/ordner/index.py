@@ -10,9 +10,10 @@ from pathlib import Path
 from typing import Callable
 
 from ordner.config import META_NAAM
-from ordner.ingest import LeesTekst, maak_document_uit_bestanden
+from ordner.ingest import LeesTekst, lees_vooraf, maak_document_uit_voorbereid
 from ordner.meta import Meta, MetaFout, bepaal_ocr_status, is_extraheerbaar, lees_meta, schrijf_meta, txt_pad
 from ordner.storage import Archief
+from ordner.suggestie import stel_voor
 
 log = logging.getLogger(__name__)
 
@@ -228,16 +229,19 @@ class Reconciler:
         return aangemaakt
 
     def _ingest(self, pad: Path) -> Path:
-        titel = pad.stem.replace("_", " ").replace("-", " ").strip() or _FALLBACK_TITEL
-        doc = maak_document_uit_bestanden(
-            self.archief,
-            titel,
-            [(pad.name, pad.read_bytes())],
-            documentdatum=None,
-            lees_tekst=self.lees_tekst,
-            queue_fn=self.queue_fn,
-        )
+        """Inboxbestand -> document: tekst vooraf lezen, titel en tags voorstellen (pakket 15a), daarna aanmaken."""
+        vb = lees_vooraf([(pad.name, pad.read_bytes())], documentdatum=None, lees_tekst=self.lees_tekst)
+        bekende_titels = {e.meta.titel for e in self.index.alle()}
+        suggestie = stel_voor(vb.tekst, bekende_titels)
+        titel = suggestie.titel or pad.stem.replace("_", " ").replace("-", " ").strip() or _FALLBACK_TITEL
+        doc = maak_document_uit_voorbereid(self.archief, titel, vb, tags=suggestie.tags, queue_fn=self.queue_fn)
         pad.unlink()
         self.index.herlaad(self.archief, doc)
-        log.info("inbox verwerkt: %s -> %s", pad.name, self.archief.relatief(doc))
+        log.info(
+            "inbox verwerkt: %s -> %s (titel uit %s, tags %s)",
+            pad.name,
+            self.archief.relatief(doc),
+            suggestie.titelbron if suggestie.titel else "bestandsnaam",
+            suggestie.tags,
+        )
         return doc

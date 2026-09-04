@@ -7,7 +7,13 @@ from pathlib import Path
 
 import pytest
 
-from ordner.ingest import maak_document_uit_bestanden, maak_tekstlezer
+from ordner.ingest import (
+    Voorbereid,
+    lees_vooraf,
+    maak_document_uit_bestanden,
+    maak_document_uit_voorbereid,
+    maak_tekstlezer,
+)
 from ordner.meta import lees_meta
 from ordner.storage import Archief
 from tests.conftest import CmdMock
@@ -181,3 +187,73 @@ def test_lezer_krijgt_alleen_extraheerbare_bestanden(archief: Archief, naam: str
         archief, "X", [(naam, b"x"), ("c.txt", b"x")], documentdatum=None, lees_tekst=lezer, queue_fn=_Queue(), vandaag=VANDAAG
     )
     assert lezer.gelezen == [naam]  # type: ignore[attr-defined]
+
+
+# --- twee fasen (pakket 15a) ------------------------------------------------
+
+
+def test_lees_vooraf_zonder_datum_leest_en_vindt(archief: Archief) -> None:
+    lezer = _lezer({"a.pdf": "Eneco B.V.\nFactuurdatum: 12-03-2024", "b.jpg": "bon"})
+    vb = lees_vooraf(
+        [("a.pdf", _PDF), ("brief.docx", b"x"), ("b.jpg", b"x")], documentdatum=None, lees_tekst=lezer, vandaag=VANDAAG
+    )
+    assert vb.documentdatum == date(2024, 3, 12)
+    assert vb.datumbron == "tekst"
+    assert vb.teksten == {0: "Eneco B.V.\nFactuurdatum: 12-03-2024", 2: "bon"}
+    assert vb.tekst == "Eneco B.V.\nFactuurdatum: 12-03-2024\n\nbon"
+    assert vb.bestanden[1] == ("brief.docx", b"x")
+    assert lezer.gelezen == ["a.pdf", "b.jpg"]  # type: ignore[attr-defined]
+    assert sorted(archief.root.iterdir()) == sorted([archief.inbox_dir, archief.trash_dir])  # niets aangemaakt
+
+
+def test_lees_vooraf_met_datum_leest_niet(archief: Archief) -> None:
+    lezer = _lezer({"a.pdf": "Factuurdatum: 12-03-2024"})
+    vb = lees_vooraf([("a.pdf", _PDF)], documentdatum=date(2026, 1, 2), lees_tekst=lezer, vandaag=VANDAAG)
+    assert (vb.documentdatum, vb.datumbron, vb.teksten, vb.tekst) == (date(2026, 1, 2), "gebruiker", {}, "")
+    assert lezer.gelezen == []  # type: ignore[attr-defined]
+
+
+def test_lees_vooraf_zonder_treffer_wordt_upload(archief: Archief) -> None:
+    vb = lees_vooraf([("a.pdf", _PDF)], documentdatum=None, lees_tekst=_lezer({"a.pdf": "niets"}), vandaag=VANDAAG)
+    assert (vb.documentdatum, vb.datumbron, vb.tekst) == (VANDAAG, "upload", "niets")
+    vb = lees_vooraf([("a.pdf", _PDF)], documentdatum=None, lees_tekst=None, vandaag=VANDAAG)
+    assert (vb.documentdatum, vb.datumbron, vb.teksten) == (VANDAAG, "upload", {})
+
+
+def test_maak_document_uit_voorbereid_schrijft_txt_en_queued_de_rest(archief: Archief) -> None:
+    q = _Queue()
+    vb = Voorbereid([("a.pdf", _PDF), ("b.pdf", _PDF)], {0: "tekst van a"}, date(2024, 3, 12), "tekst")
+    doc = maak_document_uit_voorbereid(archief, "Eneco", vb, tags=["factuur"], omschrijving="maart", queue_fn=q)
+    assert doc.name == "2024-03-12_eneco"
+    meta = lees_meta(doc)
+    assert (meta.documentdatum, meta.datumbron) == (date(2024, 3, 12), "tekst")
+    assert (meta.tags, meta.omschrijving, meta.bestanden) == (["factuur"], "maart", ["a.pdf", "b.pdf"])
+    assert (doc / "a.pdf.txt").read_text(encoding="utf-8") == "tekst van a"
+    assert not (doc / "b.pdf.txt").exists()
+    assert meta.ocr == "pending"
+    assert q.items == [("2024-03-12_eneco", "b.pdf")]  # a.pdf is al gelezen en wordt niet gequeued
+
+
+def test_maak_document_uit_voorbereid_met_afwijkende_datum_zet_bron_gebruiker(archief: Archief) -> None:
+    q = _Queue()
+    vb = Voorbereid([("a.pdf", _PDF)], {0: "Factuurdatum: 12-03-2024"}, date(2024, 3, 12), "tekst")
+    doc = maak_document_uit_voorbereid(archief, "Eneco", vb, queue_fn=q, documentdatum=date(2025, 1, 1))
+    assert doc.name == "2025-01-01_eneco"
+    meta = lees_meta(doc)
+    assert (meta.documentdatum, meta.datumbron, meta.ocr) == (date(2025, 1, 1), "gebruiker", "done")
+    assert (doc / "a.pdf.txt").exists()
+    assert q.items == []
+
+
+def test_wrapper_is_samenstelling_van_beide_fasen(archief: Archief) -> None:
+    q = _Queue()
+    lezer = _lezer({"a.pdf": "Datum: 05-05-2021"})
+    doc = maak_document_uit_bestanden(
+        archief, "Samen", [("a.pdf", _PDF)], documentdatum=None, lees_tekst=lezer, queue_fn=q, vandaag=VANDAAG
+    )
+    vb = lees_vooraf([("a.pdf", _PDF)], documentdatum=None, lees_tekst=lezer, vandaag=VANDAAG)
+    doc2 = maak_document_uit_voorbereid(archief, "Samen", vb, queue_fn=q)
+    assert (doc.name, doc2.name) == ("2021-05-05_samen", "2021-05-05_samen_2")
+    a, b = lees_meta(doc), lees_meta(doc2)
+    assert (a.documentdatum, a.datumbron, a.ocr, a.bestanden) == (b.documentdatum, b.datumbron, b.ocr, b.bestanden)
+    assert (doc2 / "a.pdf.txt").read_text(encoding="utf-8") == (doc / "a.pdf.txt").read_text(encoding="utf-8")

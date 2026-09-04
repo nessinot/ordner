@@ -1,6 +1,6 @@
 # Pakket 15a — Titel- en tagsuggestie uit de tekst
 
-> **Agent-prompt:** Lees `werk/00-contract.md`, `werk/14-datum-uit-tekst.md` en `werk/15a-titel-en-tagsuggestie.md`. Bouw alleen wat hieronder staat, draai `pytest`, bump de versie naar 0.8.0 met release notes in `addon/CHANGELOG.md`, commit als `pakket 15a: titel- en tagsuggestie` en vink af in `werk/STATUS.md`. Vereist 15c; daarna 15b.
+> **Agent-prompt:** Lees `werk/00-contract.md`, `werk/14-datum-uit-tekst.md` en `werk/15a-titel-en-tagsuggestie.md`. Dit pakket is gebouwd en gecommit (release 0.8.0, 2026-09-04); gebruik dit bestand als naslag bij vervolgwerk aan de suggestie en bij 15b. Afwijkingen bij het bouwen: rechtsvorm-achtervoegsels matchen hoofdlettergevoelig ("b.v." is in lopende tekst "bijvoorbeeld") en een instantie-voorvoegsel telt alleen met minstens één woord erachter; zie `werk/00-contract.md` › Wijzigingen.
 
 **Doel:** Uit de gelezen tekst van een document een titel (alleen de bedrijfs- of instantienaam) en tags (het documenttype) voorstellen. Een pure module zonder I/O, met dezelfde opzet als `datum.py`, zodat 15b hem in het uploadformulier kan tonen en de inbox er nu al betere titels van krijgt dan de bestandsnaam. Daarnaast wordt `ingest.py` in twee fasen gesplitst (lezen vooraf, daarna aanmaken), omdat de titel pas ná het lezen bekend is en 15b tussen die fasen een tweede scherm zet.
 

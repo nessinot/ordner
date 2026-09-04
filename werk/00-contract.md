@@ -22,8 +22,9 @@ Een minimale digitale archiefkast voor privédocumenten (WOZ, facturen, bonnen, 
 | Subprocess | Uitsluitend via `extract.run_cmd` (asyncio subprocess, timeout 600 s). Tests mocken alleen deze functie. |
 | Index | In-memory (`index.Index`), gebouwd bij start, bijgewerkt door app/worker, herbouwd door reconciler. Geen indexbestand op schijf. |
 | Reconciler | Bij start, elke `reconcile_interval` s, en op knop. Synchroniseert `bestanden` met de werkelijke bestanden, queued ontbrekende `.txt`, maakt `meta.md` voor mappen zonder, ingest `_inbox/`. |
-| Inbox | `_inbox/` gepolld elke `inbox_interval` s (default 5); bestand met gelijke grootte in twee opeenvolgende polls → nieuw document (titel = bestandsnaam zonder extensie, `_`/`-` → spatie; datum uit de tekst, anders vandaag; zie "Datum uit tekst"). |
+| Inbox | `_inbox/` gepolld elke `inbox_interval` s (default 5); bestand met gelijke grootte in twee opeenvolgende polls → nieuw document (titel = titelsuggestie uit de tekst, anders bestandsnaam zonder extensie met `_`/`-` → spatie; tags = tagsuggestie; datum uit de tekst, anders vandaag; zie "Datum uit tekst" en "Titel en tags uit tekst"). |
 | Datum uit tekst | Alleen als er geen datum is opgegeven (leeg datumveld bij upload, of inbox). De tekst wordt dan *vóór* het aanmaken van de map gelezen (`ingest.maak_document_uit_bestanden`), zodat de map de gevonden datum krijgt en nooit hernoemd hoeft te worden. Sleutelwoorden in prioriteitsvolgorde: factuurdatum, notadatum, orderdatum, dagtekening, datum (optionele spatie, optionele `:`, hoofdletterongevoelig; "vervaldatum" e.d. matchen niet). Per sleutelwoord eerst alle regels met de datum direct achter het woord (max 60 spaties ertussen), daarna kolomlayout: label zonder datum op de eigen regel, datum op de eerstvolgende niet-lege regel waarvan het tekenbereik het dichtst bij dat van het label ligt (afstand hooguit 20 tekens, tabs geëxpandeerd). Notaties dd-mm-jjjj, dd/mm/jjjj, dd.mm.jjjj, jjjj-mm-dd, d maand jjjj (NL/EN maandnamen), tweecijferig jaar. Jaar tussen 1990 en volgend jaar. `meta.datumbron`: `gebruiker` (opgegeven of later handmatig gewijzigd; wordt nooit automatisch overschreven), `tekst`, `upload` (geen treffer → vandaag). Gelezen tekst wordt direct als `.txt` geschreven. |
+| Titel en tags uit tekst | Alleen een suggestie (`suggestie.py`, pure functies); de inbox gebruikt hem direct, het uploadformulier vanaf 15b. Titel = uitsluitend de afzender (bedrijf/instantie), nooit het documenttype of een jaartal; bij twijfel leeg. Heuristiek op prioriteit: (1) bekende archieftitel als heel woord in de tekst (langste wint, dan de vroegste treffer; titels < 3 tekens, `document` en documenttypewoorden overgeslagen), (2) naam achter "t.n.v."/"ten name van" (rest van de cel), (3) eerste kolomcel met rechtsvorm-achtervoegsel (`B.V.`, `BV`, `N.V.`, `NV`, `V.O.F.`, `VOF`, `U.A.`; hoofdlettergevoelig) → cel t/m achtervoegsel, instantie-voorvoegsel (Gemeente, Stichting, Vereniging, Waterschap, Provincie, Coöperatie, Ministerie; alleen met een woord erachter) → vanaf het woord, of los instantiewoord (Belastingdienst, Bank, Verzekeringen, Verzekeraar, Zorgverzekeraar, Ziekenhuis, Universiteit, Hogeschool) → hele cel, (4) bij < 25 niet-lege regels (bon) de eerste cel met ≥ 3 letters die geen documenttype-kopregel of datum(label) is, (5) anders leeg. Cellen = regel gesplitst op 2+ spaties (tabs geëxpandeerd). Opschonen: whitespace samengevoegd, leestekens aan de randen weg (punt van "B.V." blijft), max 60 tekens op woordgrens, hoofdletters zoals in de tekst. Tags = documenttypewoorden die een cel beginnen ("Factuur", "Factuur nr. 123"; niet "Factuurdatum"), lowercase, volgorde van voorkomen, zonder dubbelen; lijst `_DOCUMENTTYPEN` in `suggestie.py`. Meerdere bestanden: teksten aaneengeplakt in uploadvolgorde. Details: `werk/15a-titel-en-tagsuggestie.md`. |
 | Zoeken | Alle woorden moeten voorkomen (AND over het hele document), hoofdletterongevoelig, over titel, omschrijving, tags, documentdatum (ISO-string), notities en alle `.txt`-teksten. Snippet ±80 tekens rond de eerste treffer + bron (veldnaam of bestandsnaam). Sortering documentdatum desc. `_inbox`/`_prullenbak` nooit in de index. |
 | Prullenbak | `_prullenbak/<mapnaam>`; bij conflict `<mapnaam>_<JJJJMMDD-HHMMSS>`. |
 | Schrijven | `meta.md` en `.txt` altijd via tempbestand in dezelfde map + `os.replace()`. |
@@ -47,7 +48,7 @@ ordner/                       # repo-root = add-on-repository (Add-on store › 
     CHANGELOG.md              # tabblad "Changelog" in de add-on; bovenste kop = version in config.yaml (test)
     requirements.txt
     ordner/                   # Python-package
-      __init__.py config.py slug.py meta.py storage.py extract.py datum.py ingest.py index.py search.py worker.py
+      __init__.py config.py slug.py meta.py storage.py extract.py datum.py suggestie.py ingest.py index.py search.py worker.py
       web/ __init__.py app.py routes.py
         templates/ base.html zoeken.html upload.html document.html beheer.html
         static/ style.css app.js
@@ -219,7 +220,8 @@ class ReconcileRapport:
 
 class Reconciler:
     def __init__(self, archief: Archief, index: Index, queue_fn: Callable[[Path, str], None],
-                 lees_tekst: LeesTekst | None = None)   # lees_tekst: voor de inbox (datum uit tekst); None = gedrag van vóór pakket 14
+                 lees_tekst: LeesTekst | None = None)   # lees_tekst: voor de inbox (datum, titel en tags uit tekst); None = gedrag van vóór pakket 14
+    # _ingest (15a): lees_vooraf → suggestie.stel_voor(vb.tekst, {e.meta.titel for e in index.alle()}) → maak_document_uit_voorbereid
     def run(self) -> ReconcileRapport       # synchroon; de app roept aan via asyncio.to_thread
     def verwerk_inbox(self) -> list[Path]   # houdt self._inbox_groottes bij voor de stabiliteitscheck
 ```
@@ -238,7 +240,24 @@ def vind_datum(tekst: str, vandaag: date | None = None) -> DatumTreffer | None
     # per sleutelwoord in prioriteitsvolgorde: eerst regeltreffers over alle regels, dan kolomtreffers; eerste geldige datum wint. Pure functie.
 ```
 
-### `ordner/ingest.py` (pakket 14)
+### `ordner/suggestie.py` (pakket 15a)
+```python
+TitelBron = Literal["archief", "tnv", "rechtsvorm", "eerste-regel", "geen"]
+
+@dataclass(frozen=True)
+class Suggestie:
+    titel: str                  # "" als er geen betrouwbare naam is
+    titelbron: TitelBron        # voor logging en tests
+    tags: list[str]             # documenttype(n), lowercase, in volgorde van voorkomen
+
+def stel_voor(tekst: str, bekende_titels: Iterable[str] = ()) -> Suggestie
+    # pure functie; combineert stel_titel_voor en stel_tags_voor. Importeert alleen re, dataclasses, typing.
+def stel_titel_voor(tekst: str, bekende_titels: Iterable[str] = ()) -> tuple[str, TitelBron]
+def stel_tags_voor(tekst: str) -> list[str]
+def cellen(regel: str) -> list[str]     # splitst op 2+ spaties, tabs geëxpandeerd; ook bruikbaar voor datum.py later
+```
+
+### `ordner/ingest.py` (pakket 14, twee fasen sinds 15a)
 ```python
 LeesTekst = Callable[[Path], str | None]     # synchroon; None als extractie mislukt
 QueueFn = Callable[[Path, str], None]
@@ -246,13 +265,33 @@ QueueFn = Callable[[Path, str], None]
 def maak_tekstlezer(talen: str) -> LeesTekst
     # wrapper om extract.extract_bestand met asyncio.run; ExtractieFout → None + warning. Draaien in een thread.
 
+@dataclass
+class Voorbereid:
+    bestanden: list[tuple[str, bytes]]
+    teksten: dict[int, str]            # index in bestanden -> gelezen tekst
+    documentdatum: date
+    datumbron: DatumBron               # "gebruiker" | "tekst" | "upload"
+
+    @property
+    def tekst(self) -> str             # alle gelezen teksten in volgorde, gescheiden door een lege regel
+
+def lees_vooraf(bestanden: list[tuple[str, bytes]], *, documentdatum: date | None,
+                lees_tekst: LeesTekst | None, vandaag: date | None = None) -> Voorbereid
+    # Fase 1, schrijft niets in het archief. documentdatum gegeven → niets lezen, bron "gebruiker".
+    # None → extraheerbare bestanden lezen via lees_tekst (tempbestand met originele extensie);
+    #   eerste treffer van vind_datum bepaalt datum ("tekst"), anders vandaag ("upload").
+
+def maak_document_uit_voorbereid(archief: Archief, titel: str, vb: Voorbereid, *, omschrijving: str = "",
+                                 tags: list[str] | None = None, queue_fn: QueueFn,
+                                 documentdatum: date | None = None) -> Path
+    # Fase 2. documentdatum None → vb.documentdatum en vb.datumbron; anders die datum met bron "gebruiker"
+    # (15b: de gebruiker wijzigde het voorgevulde veld). Map aanmaken, bestanden en gelezen .txt's schrijven,
+    # ocr-status bepalen; wat niet gelezen is gaat pas daarna naar queue_fn (laatste stap, zie pakket 14).
+
 def maak_document_uit_bestanden(archief: Archief, titel: str, bestanden: list[tuple[str, bytes]], *,
                                 documentdatum: date | None, omschrijving: str = "", tags: list[str] | None = None,
                                 lees_tekst: LeesTekst | None, queue_fn: QueueFn, vandaag: date | None = None) -> Path
-    # documentdatum gegeven → datumbron "gebruiker", extraheerbare bestanden naar queue_fn.
-    # None → extraheerbare bestanden eerst lezen via lees_tekst (tempbestand met originele extensie);
-    #   eerste treffer van vind_datum bepaalt datum ("tekst"), anders vandaag ("upload").
-    #   Gelezen tekst → .txt direct geschreven; niet gelezen → queue_fn. Eén codepad voor upload en inbox.
+    # = lees_vooraf + maak_document_uit_voorbereid; ongewijzigde signatuur, gebruikt door POST /upload tot 15b.
 ```
 
 ### `ordner/search.py`
@@ -339,3 +378,4 @@ _(agents voegen hier regels toe: pakket · wat · waarom)_
 - 0.6.0 · `vind_datum` herkent ook kolomlayout (label boven waarde); interface ongewijzigd · facturen zetten factuurdatum, factuurnummer en vervaldatum vaak in een tabel, en `pdftotext -layout` bewaart de kolomposities. Zie `werk/14-datum-uit-tekst.md`.
 - 15c · `routes.Kaart` krijgt een veld `tags: list[str]` (default lege lijst), gevuld uit `DocEntry.meta.tags` in beide takken van de route `zoeken`; `search.Treffer` ongewijzigd · tags worden klikbare labels in de resultatenlijst en op de documentpagina (link naar `url_for('zoeken')?q=<tag>`); de route heeft de `DocEntry` al bij de hand, dus de zoeklaag hoeft niets te weten van tags-als-labels. Zie `werk/15c-tags-als-labels.md`.
 - 13 · Add-on-bestanden en het Python-package verhuisd naar `addon/`; `repository.yaml` in de root; `pythonpath = ["addon", "."]` in `pyproject.toml` · de Supervisor accepteert een git-URL alleen als add-on-repository (elke add-on in een eigen submap met `config.yaml`), zodat installeren en updaten via de Add-on store kan i.p.v. kopiëren naar `/addons/` via Samba.
+- 15a · Nieuwe module `suggestie.py` (`Suggestie`, `stel_voor`, `stel_titel_voor`, `stel_tags_voor`, `cellen`); `ingest.py` gesplitst in `Voorbereid`, `lees_vooraf` en `maak_document_uit_voorbereid`, met `maak_document_uit_bestanden` als ongewijzigde wrapper; `Reconciler._ingest` gebruikt de suggestie voor titel en tags van inboxdocumenten · de titel is pas na het lezen bekend en 15b zet tussen lezen en aanmaken een tweede scherm. Twee kleine aanscherpingen t.o.v. `werk/15a-titel-en-tagsuggestie.md`, beide omdat een verkeerde naam erger is dan geen naam: rechtsvorm-achtervoegsels matchen hoofdlettergevoelig ("b.v." in lopende tekst is "bijvoorbeeld") en een instantie-voorvoegsel telt alleen met minstens één woord erachter ("Gemeente" alleen is geen naam). De bestaande test `test_inbox_met_tekstlezer_haalt_datum_uit_tekst` kreeg een tekst zonder bruikbare naamregel, omdat de korte testtekst anders terecht een bon-titel opleverde.
