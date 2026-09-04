@@ -13,13 +13,33 @@ _PREFIX = "/api/hassio_ingress/abc"
 _PDF = b"%PDF-1.4 testinhoud"
 
 
-def _upload(client: TestClient, titel: str = "Test", datum: str = "2026-03-01", **extra: str):
-    return client.post(
-        "/upload",
-        data={"titel": titel, "documentdatum": datum, **extra},
-        files={"bestanden": ("a.pdf", _PDF, "application/pdf")},
-        follow_redirects=False,
-    )
+Bestand = tuple[str, bytes, str]  # (naam, inhoud, content-type)
+_A_PDF: Bestand = ("a.pdf", _PDF, "application/pdf")
+
+
+def _stap1(client: TestClient, bestanden: list[Bestand] | None = None, headers: dict[str, str] | None = None):
+    """Scherm 1: bestanden insturen; geeft de (303-)response met het token in `Location`."""
+    files = [("bestanden", b) for b in (bestanden if bestanden is not None else [_A_PDF])]
+    return client.post("/upload", files=files, headers=headers, follow_redirects=False)
+
+
+def _token(r) -> str:  # type: ignore[no-untyped-def]
+    assert r.status_code == 303, r.status_code
+    m = re.search(r"/upload/([A-Za-z0-9_-]+)$", r.headers["location"])
+    assert m, r.headers["location"]
+    return m.group(1)
+
+
+def _upload(
+    client: TestClient,
+    titel: str = "Test",
+    datum: str = "2026-03-01",
+    bestanden: list[Bestand] | None = None,
+    **velden: str,
+):
+    """Beide stappen: POST /upload met de bestanden, dan POST /upload/{token} met de velden (pakket 15b)."""
+    token = _token(_stap1(client, bestanden))
+    return client.post(f"/upload/{token}", data={"titel": titel, "documentdatum": datum, **velden}, follow_redirects=False)
 
 
 def _wacht_op(pad: Path, seconden: float = 2.0) -> bool:
@@ -178,31 +198,195 @@ def test_tag_label_op_documentpagina(client: TestClient) -> None:
     assert f'href="{_DOC}?q=gemeente%20amsterdam"' in r.text
 
 
-# --- upload ---------------------------------------------------------------
+# --- upload (tweestaps sinds pakket 15b) ------------------------------------
+
+_ENECO = b"Factuur                     Factuurnummer 2024-0031\nEneco Services B.V.\nFactuurdatum 12-03-2024\nVervaldatum 12-04-2024\n" + b" x" * 30
 
 
-def test_upload_zonder_titel_400(client: TestClient) -> None:
-    r = client.post("/upload", data={"documentdatum": "2026-03-01"})
-    assert r.status_code == 400
-    assert "Titel is verplicht" in r.text
-
-    r = client.post("/upload", data={"titel": "   "})
-    assert r.status_code == 400
-
-
-def test_upload_ongeldige_datum_400(client: TestClient) -> None:
-    r = client.post("/upload", data={"titel": "Test", "documentdatum": "31-03-2026"})
-    assert r.status_code == 400
-    assert "Ongeldige documentdatum" in r.text
-    assert 'value="Test"' in r.text  # ingevulde waarden blijven staan
-
-
-def test_upload_formulier(client: TestClient) -> None:
+def test_upload_formulier_scherm1_alleen_bestanden(client: TestClient) -> None:
     r = client.get("/upload")
     assert r.status_code == 200
     assert "data-upload" in r.text
     assert 'enctype="multipart/form-data"' in r.text
+    assert 'name="bestanden"' in r.text
     assert "capture" not in r.text
+    assert "Verder" in r.text
+    for veld in ("titel", "omschrijving", "documentdatum", "tags"):
+        assert f'name="{veld}"' not in r.text, veld
+    assert "Bestanden ontvangen, tekst lezen" in r.text
+
+
+def test_stap1_zonder_bestanden_400(client: TestClient) -> None:
+    r = client.post("/upload", follow_redirects=False)
+    assert r.status_code == 400
+    assert "Kies minstens één bestand." in r.text
+    assert "data-upload" in r.text
+    # oude velden worden genegeerd: nog steeds geen document
+    r = client.post("/upload", data={"titel": "Leeg", "documentdatum": "2026-03-01"}, follow_redirects=False)
+    assert r.status_code == 400
+    assert client.app.state.archief.documentmappen() == []  # type: ignore[attr-defined]
+
+
+def test_stap1_schrijft_niets_en_stuurt_door(client: TestClient) -> None:
+    archief = client.app.state.archief  # type: ignore[attr-defined]
+    voor = archief.documentmappen()
+    r = _stap1(client)
+    assert r.status_code == 303
+    token = _token(r)
+    assert r.headers["location"] == f"/upload/{token}"
+    assert archief.documentmappen() == voor == []
+    assert list((_root(client) / "_inbox").iterdir()) == []
+    assert not any(_root(client).glob("*/*"))  # geen jaarmap, geen documentmap
+    assert len(client.app.state.openstaand) == 1  # type: ignore[attr-defined]
+
+
+def test_scherm2_voorgevuld_uit_tekst(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
+    mock_cmd.register("pdftotext", stdout=_ENECO)
+    token = _token(_stap1(client, [("factuur.pdf", _PDF, "application/pdf")]))
+    r = client.get(f"/upload/{token}")
+    assert r.status_code == 200
+    assert 'name="titel" value="Eneco Services B.V."' in r.text
+    assert "voorstel uit het document" in r.text
+    assert 'name="documentdatum" value="2024-03-12"' in r.text
+    assert "datum uit tekst" in r.text
+    assert 'name="tags" value="factuur"' in r.text
+    assert "factuur.pdf" in r.text
+    assert 'action="/upload/' + token + '"' in r.text
+    assert f'formaction="/upload/{token}/annuleer"' in r.text
+    assert "Opslaan" in r.text and "Annuleren" in r.text
+    # nog steeds niets op schijf
+    assert client.app.state.archief.documentmappen() == []  # type: ignore[attr-defined]
+
+
+def test_scherm2_zonder_treffers(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
+    # lange tekst zonder naam, datum of documenttype: titel leeg, datum vandaag, geen tags
+    mock_cmd.register("pdftotext", stdout=b"\n".join(b"regel %d zonder iets bruikbaars" % i for i in range(40)))
+    token = _token(_stap1(client))
+    r = client.get(f"/upload/{token}")
+    assert 'name="titel" value=""' in r.text
+    assert "voorstel uit het document" not in r.text
+    assert f'name="documentdatum" value="{_vandaag().isoformat()}"' in r.text
+    assert "geen datum gevonden, vandaag" in r.text
+    assert 'name="tags" value=""' in r.text
+
+
+def test_opslaan_datum_ongewijzigd_bron_tekst(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
+    mock_cmd.register("pdftotext", stdout=_ENECO)
+    token = _token(_stap1(client, [("factuur.pdf", _PDF, "application/pdf")]))
+    r = client.post(
+        f"/upload/{token}",
+        data={"titel": "Eneco Services B.V.", "documentdatum": "2024-03-12", "tags": "factuur"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    assert r.headers["location"] == "/doc/2024/2024-03-12_eneco-services-b-v?m=Opgeslagen"
+    doc = _root(client) / "2024" / "2024-03-12_eneco-services-b-v"
+    meta = lees_meta(doc)
+    assert meta.titel == "Eneco Services B.V."
+    assert meta.documentdatum.isoformat() == "2024-03-12"
+    assert meta.datumbron == "tekst"
+    assert meta.tags == ["factuur"]
+    assert meta.ocr == "done"  # tekst is al in stap 1 gelezen
+    assert (doc / "factuur.pdf.txt").exists()
+    assert (doc / "factuur.pdf").read_bytes() == _PDF
+    assert len(client.app.state.openstaand) == 0  # type: ignore[attr-defined]
+    r = client.get(r.headers["location"])
+    assert "Opgeslagen" in r.text
+    assert "datum uit tekst" in r.text
+
+
+def test_opslaan_datum_gewijzigd_bron_gebruiker(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
+    mock_cmd.register("pdftotext", stdout=_ENECO)
+    r = _upload(client, titel="Eneco", datum="2026-03-01")  # voorgevuld was 2024-03-12
+    assert r.headers["location"] == "/doc/2026/2026-03-01_eneco?m=Opgeslagen"
+    meta = lees_meta(_root(client) / "2026" / "2026-03-01_eneco")
+    assert meta.datumbron == "gebruiker"
+    assert meta.documentdatum.isoformat() == "2026-03-01"
+    r = client.get("/doc/2026/2026-03-01_eneco")
+    assert "datum uit tekst" not in r.text and "datum van upload" not in r.text
+
+
+def test_opslaan_zonder_datum_in_tekst_bron_upload(client: TestClient) -> None:
+    token = _token(_stap1(client, [("bon.pdf", _PDF, "application/pdf")]))
+    r = client.post(f"/upload/{token}", data={"titel": "Bon", "documentdatum": _vandaag().isoformat()}, follow_redirects=False)
+    doc = f"/doc/{_vandaag().year}/{_vandaag().isoformat()}_bon"
+    assert r.headers["location"] == f"{doc}?m=Opgeslagen"
+    assert lees_meta(_root(client) / str(_vandaag().year) / f"{_vandaag().isoformat()}_bon").datumbron == "upload"
+    assert "datum van upload" in client.get(doc).text
+
+
+def test_scherm2_zonder_titel_400(client: TestClient) -> None:
+    token = _token(_stap1(client))
+    r = client.post(f"/upload/{token}", data={"titel": "  ", "documentdatum": "2026-03-01", "tags": "a, b"})
+    assert r.status_code == 400
+    assert "Titel is verplicht" in r.text
+    assert 'name="tags" value="a, b"' in r.text  # ingevulde waarden blijven staan
+    assert 'name="documentdatum" value="2026-03-01"' in r.text
+    # de upload staat nog open; alsnog opslaan werkt
+    assert client.app.state.archief.documentmappen() == []  # type: ignore[attr-defined]
+    r = client.post(f"/upload/{token}", data={"titel": "Alsnog", "documentdatum": "2026-03-01"}, follow_redirects=False)
+    assert r.status_code == 303
+
+
+def test_scherm2_ongeldige_datum_400(client: TestClient) -> None:
+    token = _token(_stap1(client))
+    r = client.post(f"/upload/{token}", data={"titel": "Test", "documentdatum": "31-03-2026"})
+    assert r.status_code == 400
+    assert "Ongeldige documentdatum" in r.text
+    assert 'value="Test"' in r.text
+    r = client.post(f"/upload/{token}", data={"titel": "Test", "documentdatum": ""})
+    assert r.status_code == 400
+
+
+def test_onbekend_token_verlopen_melding(client: TestClient) -> None:
+    for methode in ("get", "post"):
+        r = getattr(client, methode)("/upload/abcdefghijkl", follow_redirects=False)
+        assert r.status_code == 303, methode
+        assert r.headers["location"] == "/upload?m=Deze+upload+is+verlopen%3B+kies+de+bestanden+opnieuw.", methode
+    r = client.get("/upload?m=Deze upload is verlopen; kies de bestanden opnieuw.")
+    assert "Deze upload is verlopen" in r.text
+    # misvormd token -> 404
+    assert client.get("/upload/kort").status_code == 404
+    assert client.get("/upload/met%20spatie%20erin").status_code == 404
+    assert client.post("/upload/kort/annuleer").status_code == 404
+
+
+def test_verlopen_upload(client: TestClient) -> None:
+    from datetime import timedelta
+
+    store = client.app.state.openstaand  # type: ignore[attr-defined]
+    token = _token(_stap1(client))
+    upload = store.haal(token)
+    assert upload is not None
+    upload.aangemaakt -= timedelta(minutes=61)
+    r = client.get(f"/upload/{token}", follow_redirects=False)
+    assert r.status_code == 303
+    assert "verlopen" in r.headers["location"]
+    assert len(store) == 0
+
+
+def test_dubbel_opslaan_maakt_een_document(client: TestClient) -> None:
+    token = _token(_stap1(client))
+    velden = {"titel": "Dubbel", "documentdatum": "2026-03-01"}
+    r1 = client.post(f"/upload/{token}", data=velden, follow_redirects=False)
+    r2 = client.post(f"/upload/{token}", data=velden, follow_redirects=False)
+    assert r1.status_code == 303 and "/doc/2026/2026-03-01_dubbel?m=Opgeslagen" in r1.headers["location"]
+    assert r2.status_code == 303 and r2.headers["location"].startswith("/upload?m=Deze+upload+is+verlopen")
+    mappen = client.app.state.archief.documentmappen()  # type: ignore[attr-defined]
+    assert [m.name for m in mappen] == ["2026-03-01_dubbel"]
+
+
+def test_annuleren(client: TestClient) -> None:
+    token = _token(_stap1(client))
+    r = client.post(f"/upload/{token}/annuleer", follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/upload?m=Upload+geannuleerd"
+    assert client.app.state.archief.documentmappen() == []  # type: ignore[attr-defined]
+    assert not any(_root(client).glob("*/*"))
+    assert len(client.app.state.openstaand) == 0  # type: ignore[attr-defined]
+    assert client.get(f"/upload/{token}", follow_redirects=False).status_code == 303
+    # nogmaals annuleren is onschuldig
+    assert client.post(f"/upload/{token}/annuleer", follow_redirects=False).status_code == 303
 
 
 def test_upload_maakt_document_en_ocr(client: TestClient) -> None:
@@ -217,11 +401,9 @@ def test_upload_maakt_document_en_ocr(client: TestClient) -> None:
     meta = lees_meta(doc)
     assert meta.bestanden == ["a.pdf"]
     assert meta.tags == ["a", "b", "c"]
-    assert meta.ocr in ("pending", "done")
-
-    assert _wacht_op(doc / "a.pdf.txt")
+    assert meta.datumbron == "gebruiker"
+    assert meta.ocr == "done"  # tekst al in stap 1 gelezen
     assert (doc / "a.pdf.txt").read_text(encoding="utf-8") == "x" * 100
-    assert _wacht_op_status(doc, "done")
 
     # redirect-doel werkt en toont de melding
     r = client.get(r.headers["location"])
@@ -239,63 +421,20 @@ def _wacht_op_status(doc: Path, status: str, seconden: float = 2.0) -> bool:
     return lees_meta(doc).ocr == status
 
 
-def test_upload_zonder_datum_gebruikt_vandaag(client: TestClient) -> None:
-    r = client.post("/upload", data={"titel": "Zonder datum"}, follow_redirects=False)
+def test_onleesbaar_bestand_wordt_na_opslaan_gequeued(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
+    """Mislukt het lezen in stap 1 (hier: pdftotext faalt), dan gaat het bestand na Opslaan alsnog naar de OCR-queue."""
+    mock_cmd.register("pdftotext", rc=1, stderr=b"kapot")
+    r = _upload(client)
     assert r.status_code == 303
-    from datetime import date
-
-    assert f"/doc/{date.today().year}/{date.today().isoformat()}_zonder-datum" in r.headers["location"]
-
-
-def test_upload_zonder_datum_haalt_datum_uit_tekst(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
-    mock_cmd.register("pdftotext", stdout=b"Energie BV\nFactuurdatum: 12-03-2024\nVervaldatum: 12-04-2024" + b" x" * 30)
-    r = client.post(
-        "/upload",
-        data={"titel": "Energie"},
-        files={"bestanden": ("factuur.pdf", _PDF, "application/pdf")},
-        follow_redirects=False,
-    )
-    assert r.status_code == 303
-    assert r.headers["location"] == "/doc/2024/2024-03-12_energie?m=Opgeslagen"
-    doc = _root(client) / "2024" / "2024-03-12_energie"
-    meta = lees_meta(doc)
-    assert meta.documentdatum.isoformat() == "2024-03-12"
-    assert meta.datumbron == "tekst"
-    assert meta.ocr == "done"  # tekst is al tijdens de upload geschreven
-    assert (doc / "factuur.pdf.txt").exists()
-    # het uploadformulier heeft geen voorgevulde datum meer
-    assert 'name="documentdatum" value=""' in client.get("/upload").text
-    # label op de documentpagina
-    r = client.get("/doc/2024/2024-03-12_energie")
-    assert "datum uit tekst" in r.text
-
-
-def test_upload_zonder_datum_zonder_treffer_label_van_upload(client: TestClient) -> None:
-    r = client.post(
-        "/upload",
-        data={"titel": "Bon"},
-        files={"bestanden": ("bon.pdf", _PDF, "application/pdf")},
-        follow_redirects=False,
-    )
-    doc = f"/doc/{_vandaag().year}/{_vandaag().isoformat()}_bon"
-    assert r.headers["location"] == f"{doc}?m=Opgeslagen"
-    assert lees_meta(_root(client) / str(_vandaag().year) / f"{_vandaag().isoformat()}_bon").datumbron == "upload"
-    assert "datum van upload" in client.get(doc).text
-
-
-def test_upload_met_datum_toont_geen_label_en_queued(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
-    mock_cmd.register("pdftotext", stdout=b"Factuurdatum: 12-03-2024" + b" x" * 30)
-    _upload(client)  # datum 2026-03-01 ingevuld
-    meta = lees_meta(_root(client) / "2026" / "2026-03-01_test")
-    assert meta.datumbron == "gebruiker"
-    assert meta.documentdatum.isoformat() == "2026-03-01"
-    r = client.get(_DOC)
-    assert "datum uit tekst" not in r.text and "datum van upload" not in r.text
+    doc = _root(client) / "2026" / "2026-03-01_test"
+    assert lees_meta(doc).ocr in ("pending", "failed")
+    assert _wacht_op_status(doc, "failed")
+    assert not (doc / "a.pdf.txt").exists()
 
 
 def test_meta_bewerken_zet_datumbron_op_gebruiker(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
     mock_cmd.register("pdftotext", stdout=b"Datum: 12-03-2024" + b" x" * 30)
-    client.post("/upload", data={"titel": "Brief"}, files={"bestanden": ("b.pdf", _PDF, "application/pdf")})
+    _upload(client, titel="Brief", datum="2024-03-12", bestanden=[("b.pdf", _PDF, "application/pdf")])
     doc = _root(client) / "2024" / "2024-03-12_brief"
     assert lees_meta(doc).datumbron == "tekst"
     # alleen tags wijzigen: datum blijft uit tekst
@@ -309,12 +448,11 @@ def test_meta_bewerken_zet_datumbron_op_gebruiker(client: TestClient, mock_cmd) 
     assert doc.is_dir()
 
 
-def test_upload_zonder_bestanden(client: TestClient) -> None:
-    r = client.post("/upload", data={"titel": "Leeg"}, follow_redirects=False)
-    assert r.status_code == 303
-    doc = _root(client) / str(_vandaag().year) / f"{_vandaag().isoformat()}_leeg"
-    assert lees_meta(doc).bestanden == []
-    assert lees_meta(doc).ocr == "done"
+def test_bekende_titel_uit_archief_voorgesteld(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
+    _upload(client, titel="Eneco")
+    mock_cmd.register("pdftotext", stdout=b"\n".join(b"regel %d" % i for i in range(30)) + b"\nBetaling aan Eneco voor levering\n")
+    token = _token(_stap1(client))
+    assert 'name="titel" value="Eneco"' in client.get(f"/upload/{token}").text
 
 
 def _vandaag():  # type: ignore[no-untyped-def]
@@ -339,14 +477,32 @@ def test_ingress_prefix_in_alle_links(client: TestClient) -> None:
 
 
 def test_ingress_prefix_in_redirect(client: TestClient) -> None:
+    r = _stap1(client, headers={"X-Ingress-Path": _PREFIX + "/"})
+    assert r.status_code == 303
+    assert r.headers["location"].startswith(_PREFIX + "/upload/")
+    token = r.headers["location"].rsplit("/", 1)[1]
+    # scherm 2: alle actions (ook formaction van Annuleren) met prefix
+    r = client.get(f"/upload/{token}", headers={"X-Ingress-Path": _PREFIX})
+    assert r.status_code == 200
+    acties = re.findall(r'(?:href|action|src)="([^"]*)"', r.text)
+    assert f"{_PREFIX}/upload/{token}" in acties
+    assert f"{_PREFIX}/upload/{token}/annuleer" in acties
+    for url in acties:
+        assert url.startswith(_PREFIX + "/"), url
     r = client.post(
-        "/upload",
+        f"/upload/{token}",
         data={"titel": "Ingress", "documentdatum": "2026-03-02"},
         headers={"X-Ingress-Path": _PREFIX + "/"},
         follow_redirects=False,
     )
     assert r.status_code == 303
     assert r.headers["location"].startswith(_PREFIX + "/doc/2026/2026-03-02_ingress")
+    # verlopen-redirect en annuleren met prefix
+    r = client.get(f"/upload/{token}", headers={"X-Ingress-Path": _PREFIX}, follow_redirects=False)
+    assert r.headers["location"].startswith(_PREFIX + "/upload?m=")
+    token2 = _token(_stap1(client))
+    r = client.post(f"/upload/{token2}/annuleer", headers={"X-Ingress-Path": _PREFIX}, follow_redirects=False)
+    assert r.headers["location"] == f"{_PREFIX}/upload?m=Upload+geannuleerd"
 
 
 def test_ingress_static_bereikbaar(client: TestClient) -> None:
@@ -461,15 +617,17 @@ def test_document_pagina_volledig(client: TestClient) -> None:
 
 
 def test_document_pagina_afbeelding_en_overig(client: TestClient) -> None:
-    client.post(
-        "/upload",
-        data={"titel": "Mix", "documentdatum": "2026-03-05"},
-        files=[
-            ("bestanden", ("foto.JPG", b"jpg", "image/jpeg")),
-            ("bestanden", ("notitie.docx", b"docx", "application/octet-stream")),
-            ("bestanden", ("foto.heic", b"heic", "image/heic")),
+    r = _upload(
+        client,
+        titel="Mix",
+        datum="2026-03-05",
+        bestanden=[
+            ("foto.JPG", b"jpg", "image/jpeg"),
+            ("notitie.docx", b"docx", "application/octet-stream"),
+            ("foto.heic", b"heic", "image/heic"),  # geen echte heic: lezen in stap 1 mislukt netjes, daarna queue
         ],
     )
+    assert r.status_code == 303
     r = client.get("/doc/2026/2026-03-05_mix")
     assert r.status_code == 200
     assert '<img src="/doc/2026/2026-03-05_mix/bestand/foto.JPG"' in r.text
@@ -483,7 +641,7 @@ def test_document_pagina_afbeelding_en_overig(client: TestClient) -> None:
 def test_document_notities_en_tekstbadge(client: TestClient) -> None:
     _upload(client)
     doc = _root(client) / "2026" / "2026-03-01_test"
-    assert _wacht_op(doc / "a.pdf.txt")
+    assert (doc / "a.pdf.txt").exists()
     meta = lees_meta(doc)
     meta.notities = "Eigen <notitie>"
     from ordner.meta import schrijf_meta
@@ -632,10 +790,10 @@ def test_bestand_toevoegen_zonder_bestanden(client: TestClient) -> None:
 def test_ocr_opnieuw(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
     _upload(client)
     doc = _root(client) / "2026" / "2026-03-01_test"
-    assert _wacht_op(doc / "a.pdf.txt")
-    assert _wacht_op_status(doc, "done")
+    assert (doc / "a.pdf.txt").exists()
+    assert lees_meta(doc).ocr == "done"
     eerste = sum(1 for c in mock_cmd.calls if c[0] == "pdftotext")
-    assert eerste == 1
+    assert eerste == 1  # één keer gelezen, in stap 1 van de upload
 
     r = client.post(f"{_DOC}/ocr", follow_redirects=False)
     assert r.status_code == 303
@@ -647,7 +805,7 @@ def test_ocr_opnieuw(client: TestClient, mock_cmd) -> None:  # type: ignore[no-u
 
 def test_ocr_opnieuw_reset_failed(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
     mock_cmd.register("pdftotext", rc=1, stderr=b"kapot")
-    _upload(client)
+    _upload(client)  # lezen in stap 1 mislukt; na opslaan probeert de worker het nog eens en zet failed
     doc = _root(client) / "2026" / "2026-03-01_test"
     assert _wacht_op_status(doc, "failed")
     mock_cmd.register("pdftotext", stdout=b"y" * 100)
@@ -658,8 +816,9 @@ def test_ocr_opnieuw_reset_failed(client: TestClient, mock_cmd) -> None:  # type
 
 
 def test_ocr_opnieuw_zonder_extraheerbare_bestanden(client: TestClient) -> None:
-    client.post("/upload", data={"titel": "Leeg", "documentdatum": "2026-03-01"})
+    _upload(client, titel="Leeg", bestanden=[("notitie.docx", b"docx", "application/octet-stream")])
     doc = _root(client) / "2026" / "2026-03-01_leeg"
+    assert lees_meta(doc).bestanden == ["notitie.docx"]
     r = client.post("/doc/2026/2026-03-01_leeg/ocr", follow_redirects=False)
     assert r.status_code == 303
     assert lees_meta(doc).ocr == "done"

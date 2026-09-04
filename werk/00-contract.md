@@ -23,12 +23,13 @@ Een minimale digitale archiefkast voor privédocumenten (WOZ, facturen, bonnen, 
 | Index | In-memory (`index.Index`), gebouwd bij start, bijgewerkt door app/worker, herbouwd door reconciler. Geen indexbestand op schijf. |
 | Reconciler | Bij start, elke `reconcile_interval` s, en op knop. Synchroniseert `bestanden` met de werkelijke bestanden, queued ontbrekende `.txt`, maakt `meta.md` voor mappen zonder, ingest `_inbox/`. |
 | Inbox | `_inbox/` gepolld elke `inbox_interval` s (default 5); bestand met gelijke grootte in twee opeenvolgende polls → nieuw document (titel = titelsuggestie uit de tekst, anders bestandsnaam zonder extensie met `_`/`-` → spatie; tags = tagsuggestie; datum uit de tekst, anders vandaag; zie "Datum uit tekst" en "Titel en tags uit tekst"). |
-| Datum uit tekst | Alleen als er geen datum is opgegeven (leeg datumveld bij upload, of inbox). De tekst wordt dan *vóór* het aanmaken van de map gelezen (`ingest.maak_document_uit_bestanden`), zodat de map de gevonden datum krijgt en nooit hernoemd hoeft te worden. Sleutelwoorden in prioriteitsvolgorde: factuurdatum, notadatum, orderdatum, dagtekening, datum (optionele spatie, optionele `:`, hoofdletterongevoelig; "vervaldatum" e.d. matchen niet). Per sleutelwoord eerst alle regels met de datum direct achter het woord (max 60 spaties ertussen), daarna kolomlayout: label zonder datum op de eigen regel, datum op de eerstvolgende niet-lege regel waarvan het tekenbereik het dichtst bij dat van het label ligt (afstand hooguit 20 tekens, tabs geëxpandeerd). Notaties dd-mm-jjjj, dd/mm/jjjj, dd.mm.jjjj, jjjj-mm-dd, d maand jjjj (NL/EN maandnamen), tweecijferig jaar. Jaar tussen 1990 en volgend jaar. `meta.datumbron`: `gebruiker` (opgegeven of later handmatig gewijzigd; wordt nooit automatisch overschreven), `tekst`, `upload` (geen treffer → vandaag). Gelezen tekst wordt direct als `.txt` geschreven. |
-| Titel en tags uit tekst | Alleen een suggestie (`suggestie.py`, pure functies); de inbox gebruikt hem direct, het uploadformulier vanaf 15b. Titel = uitsluitend de afzender (bedrijf/instantie), nooit het documenttype of een jaartal; bij twijfel leeg. Heuristiek op prioriteit: (1) bekende archieftitel als heel woord in de tekst (langste wint, dan de vroegste treffer; titels < 3 tekens, `document` en documenttypewoorden overgeslagen), (2) naam achter "t.n.v."/"ten name van" (rest van de cel), (3) eerste kolomcel met rechtsvorm-achtervoegsel (`B.V.`, `BV`, `N.V.`, `NV`, `V.O.F.`, `VOF`, `U.A.`; hoofdlettergevoelig) → cel t/m achtervoegsel, instantie-voorvoegsel (Gemeente, Stichting, Vereniging, Waterschap, Provincie, Coöperatie, Ministerie; alleen met een woord erachter) → vanaf het woord, of los instantiewoord (Belastingdienst, Bank, Verzekeringen, Verzekeraar, Zorgverzekeraar, Ziekenhuis, Universiteit, Hogeschool) → hele cel, (4) bij < 25 niet-lege regels (bon) de eerste cel met ≥ 3 letters die geen documenttype-kopregel of datum(label) is, (5) anders leeg. Cellen = regel gesplitst op 2+ spaties (tabs geëxpandeerd). Opschonen: whitespace samengevoegd, leestekens aan de randen weg (punt van "B.V." blijft), max 60 tekens op woordgrens, hoofdletters zoals in de tekst. Tags = documenttypewoorden die een cel beginnen ("Factuur", "Factuur nr. 123"; niet "Factuurdatum"), lowercase, volgorde van voorkomen, zonder dubbelen; lijst `_DOCUMENTTYPEN` in `suggestie.py`. Meerdere bestanden: teksten aaneengeplakt in uploadvolgorde. Details: `werk/15a-titel-en-tagsuggestie.md`. |
+| Datum uit tekst | Bij elke upload (scherm 1 heeft sinds 15b geen datumveld; de gebruiker corrigeert op scherm 2) en bij de inbox. De tekst wordt *vóór* het aanmaken van de map gelezen (`ingest.lees_vooraf`), zodat de map de gevonden datum krijgt en nooit hernoemd hoeft te worden. Sleutelwoorden in prioriteitsvolgorde: factuurdatum, notadatum, orderdatum, dagtekening, datum (optionele spatie, optionele `:`, hoofdletterongevoelig; "vervaldatum" e.d. matchen niet). Per sleutelwoord eerst alle regels met de datum direct achter het woord (max 60 spaties ertussen), daarna kolomlayout: label zonder datum op de eigen regel, datum op de eerstvolgende niet-lege regel waarvan het tekenbereik het dichtst bij dat van het label ligt (afstand hooguit 20 tekens, tabs geëxpandeerd). Notaties dd-mm-jjjj, dd/mm/jjjj, dd.mm.jjjj, jjjj-mm-dd, d maand jjjj (NL/EN maandnamen), tweecijferig jaar. Jaar tussen 1990 en volgend jaar. `meta.datumbron`: `gebruiker` (opgegeven of later handmatig gewijzigd; wordt nooit automatisch overschreven), `tekst`, `upload` (geen treffer → vandaag). Gelezen tekst wordt direct als `.txt` geschreven. |
+| Titel en tags uit tekst | Alleen een suggestie (`suggestie.py`, pure functies); de inbox gebruikt hem direct, het uploadformulier toont hem voorgevuld op scherm 2 (15b). Titel = uitsluitend de afzender (bedrijf/instantie), nooit het documenttype of een jaartal; bij twijfel leeg. Heuristiek op prioriteit: (1) bekende archieftitel als heel woord in de tekst (langste wint, dan de vroegste treffer; titels < 3 tekens, `document` en documenttypewoorden overgeslagen), (2) naam achter "t.n.v."/"ten name van" (rest van de cel), (3) eerste kolomcel met rechtsvorm-achtervoegsel (`B.V.`, `BV`, `N.V.`, `NV`, `V.O.F.`, `VOF`, `U.A.`; hoofdlettergevoelig) → cel t/m achtervoegsel, instantie-voorvoegsel (Gemeente, Stichting, Vereniging, Waterschap, Provincie, Coöperatie, Ministerie; alleen met een woord erachter) → vanaf het woord, of los instantiewoord (Belastingdienst, Bank, Verzekeringen, Verzekeraar, Zorgverzekeraar, Ziekenhuis, Universiteit, Hogeschool) → hele cel, (4) bij < 25 niet-lege regels (bon) de eerste cel met ≥ 3 letters die geen documenttype-kopregel of datum(label) is, (5) anders leeg. Cellen = regel gesplitst op 2+ spaties (tabs geëxpandeerd). Opschonen: whitespace samengevoegd, leestekens aan de randen weg (punt van "B.V." blijft), max 60 tekens op woordgrens, hoofdletters zoals in de tekst. Tags = documenttypewoorden die een cel beginnen ("Factuur", "Factuur nr. 123"; niet "Factuurdatum"), lowercase, volgorde van voorkomen, zonder dubbelen; lijst `_DOCUMENTTYPEN` in `suggestie.py`. Meerdere bestanden: teksten aaneengeplakt in uploadvolgorde. Details: `werk/15a-titel-en-tagsuggestie.md`. |
 | Zoeken | Alle woorden moeten voorkomen (AND over het hele document), hoofdletterongevoelig, over titel, omschrijving, tags, documentdatum (ISO-string), notities en alle `.txt`-teksten. Snippet ±80 tekens rond de eerste treffer + bron (veldnaam of bestandsnaam). Sortering documentdatum desc. `_inbox`/`_prullenbak` nooit in de index. |
 | Prullenbak | `_prullenbak/<mapnaam>`; bij conflict `<mapnaam>_<JJJJMMDD-HHMMSS>`. |
 | Schrijven | `meta.md` en `.txt` altijd via tempbestand in dezelfde map + `os.replace()`. |
 | Web | FastAPI + Jinja2, geen JS-framework, geen build-stap. Vanilla JS alleen voor upload-voortgang en status-polling. Alle links/actions via `request.url_for` (Ingress `root_path`). |
+| Tweestaps upload | Scherm 1 (`GET/POST /upload`) alleen bestanden (minstens één, anders 400). `POST /upload` leest de tekst (`lees_vooraf`, in een thread), bepaalt datum en suggestie (`stel_voor` met de titels uit de index) en zet een *openstaande upload* klaar in het geheugen (`web/openstaand.py`, `app.state.openstaand`, token `secrets.token_urlsafe(16)`, TTL 60 min, max 10, opruimen alleen bij aanmaken), dan 303 naar scherm 2 (`GET /upload/{token}`): bestandslijst en alle velden voorgevuld (titel = suggestie, datum = gevonden of vandaag, tags = suggestie, omschrijving leeg). `POST /upload/{token}` valideert (titel, datum; 400 met formulier), haalt de upload uit de store, maakt het document (`maak_document_uit_voorbereid`; datum gelijk aan de voorgevulde → bron uit `lees_vooraf`, anders `gebruiker`), 303 naar het document met `m=Opgeslagen`. `POST /upload/{token}/annuleer` gooit weg. Onbekend/verlopen token → 303 naar scherm 1 met melding; misvormd token (niet `^[A-Za-z0-9_-]{8,64}$`) → 404. Niets komt op schijf vóór Opslaan; een openstaande upload is weg bij herstart. Details: `werk/15b-tweestaps-upload.md`. |
 | Base image | HA Debian-base bookworm; apt: `python3 python3-venv ocrmypdf tesseract-ocr-nld tesseract-ocr-eng poppler-utils libheif1`. |
 | Niet in v1 | Meerdere gebruikers, versiebeheer, autoclassificatie, tag-beheer, map-hernoemen, MCP-server, "alles opnieuw OCR'en", prullenbak legen/terugzetten. Ideeën → `IDEAS.md`. |
 
@@ -49,8 +50,8 @@ ordner/                       # repo-root = add-on-repository (Add-on store › 
     requirements.txt
     ordner/                   # Python-package
       __init__.py config.py slug.py meta.py storage.py extract.py datum.py suggestie.py ingest.py index.py search.py worker.py
-      web/ __init__.py app.py routes.py
-        templates/ base.html zoeken.html upload.html document.html beheer.html
+      web/ __init__.py app.py routes.py openstaand.py
+        templates/ base.html zoeken.html upload.html upload_gegevens.html document.html beheer.html
         static/ style.css app.js
 ```
 
@@ -291,8 +292,27 @@ def maak_document_uit_voorbereid(archief: Archief, titel: str, vb: Voorbereid, *
 def maak_document_uit_bestanden(archief: Archief, titel: str, bestanden: list[tuple[str, bytes]], *,
                                 documentdatum: date | None, omschrijving: str = "", tags: list[str] | None = None,
                                 lees_tekst: LeesTekst | None, queue_fn: QueueFn, vandaag: date | None = None) -> Path
-    # = lees_vooraf + maak_document_uit_voorbereid; ongewijzigde signatuur, gebruikt door POST /upload tot 15b.
+    # = lees_vooraf + maak_document_uit_voorbereid; ongewijzigde signatuur. Sinds 15b door niets in de app
+    # aangeroepen (upload en inbox gebruiken de twee fasen apart); blijft bestaan voor tests en scripts.
 ```
+
+### `ordner/web/openstaand.py` (pakket 15b)
+```python
+@dataclass
+class OpenstaandeUpload:
+    token: str
+    voorbereid: Voorbereid          # uit ingest.lees_vooraf: bestanden, teksten, datum, datumbron
+    suggestie: Suggestie            # uit suggestie.stel_voor
+    aangemaakt: datetime
+
+class OpenstaandeUploads:
+    def __init__(self, ttl: timedelta = timedelta(minutes=60), maximum: int = 10, nu: Callable[[], datetime] = datetime.now)
+    def maak(self, voorbereid: Voorbereid, suggestie: Suggestie) -> OpenstaandeUpload   # gooit eerst verlopen/overtollige (oudste eerst) weg; nieuw token
+    def haal(self, token: str) -> OpenstaandeUpload | None                              # None als onbekend of verlopen (verlopen wordt daarbij verwijderd)
+    def verwijder(self, token: str) -> None                                             # idempotent
+    def __len__(self) -> int
+```
+`app.state.openstaand = OpenstaandeUploads()` in `create_app`. Alleen geheugen; geen bestand, geen map, niets in `Settings`. Geen locking: alle toegang gebeurt op de event loop (de thread doet alleen `lees_vooraf`/`stel_voor` en `maak_document_uit_voorbereid`, niet de store).
 
 ### `ordner/search.py`
 ```python
@@ -326,7 +346,7 @@ async def inbox_lus(reconciler: Reconciler, queue: OcrQueue, settings: Settings,
 ### `ordner/web/app.py`
 ```python
 def create_app(settings: Settings | None = None) -> FastAPI
-    # app.state.settings / archief / index / queue / reconciler
+    # app.state.settings / archief / index / queue / reconciler / lees_tekst / openstaand (15b)
     # lifespan: bouw_index, queue.start, lussen starten; bij afsluiten stop-event zetten en queue.stop
     # Ingress-middleware; static mount op /static
 
@@ -338,7 +358,9 @@ app = create_app()
 | Naam | Methode + pad |
 |---|---|
 | `zoeken` | `GET /` |
-| `upload` | `GET /upload`, `POST /upload` |
+| `upload` | `GET /upload` (scherm 1: bestanden), `POST /upload` (bestanden → openstaande upload → 303 naar `upload_gegevens`) |
+| `upload_gegevens` | `GET /upload/{token}` (scherm 2: gegevens voorgevuld), `POST /upload/{token}` (opslaan) |
+| `upload_annuleer` | `POST /upload/{token}/annuleer` |
 | `document` | `GET /doc/{jaar}/{map}` |
 | `document_meta` | `POST /doc/{jaar}/{map}/meta` |
 | `document_bestanden` | `POST /doc/{jaar}/{map}/bestanden` |
@@ -379,3 +401,4 @@ _(agents voegen hier regels toe: pakket · wat · waarom)_
 - 15c · `routes.Kaart` krijgt een veld `tags: list[str]` (default lege lijst), gevuld uit `DocEntry.meta.tags` in beide takken van de route `zoeken`; `search.Treffer` ongewijzigd · tags worden klikbare labels in de resultatenlijst en op de documentpagina (link naar `url_for('zoeken')?q=<tag>`); de route heeft de `DocEntry` al bij de hand, dus de zoeklaag hoeft niets te weten van tags-als-labels. Zie `werk/15c-tags-als-labels.md`.
 - 13 · Add-on-bestanden en het Python-package verhuisd naar `addon/`; `repository.yaml` in de root; `pythonpath = ["addon", "."]` in `pyproject.toml` · de Supervisor accepteert een git-URL alleen als add-on-repository (elke add-on in een eigen submap met `config.yaml`), zodat installeren en updaten via de Add-on store kan i.p.v. kopiëren naar `/addons/` via Samba.
 - 15a · Nieuwe module `suggestie.py` (`Suggestie`, `stel_voor`, `stel_titel_voor`, `stel_tags_voor`, `cellen`); `ingest.py` gesplitst in `Voorbereid`, `lees_vooraf` en `maak_document_uit_voorbereid`, met `maak_document_uit_bestanden` als ongewijzigde wrapper; `Reconciler._ingest` gebruikt de suggestie voor titel en tags van inboxdocumenten · de titel is pas na het lezen bekend en 15b zet tussen lezen en aanmaken een tweede scherm. Twee kleine aanscherpingen t.o.v. `werk/15a-titel-en-tagsuggestie.md`, beide omdat een verkeerde naam erger is dan geen naam: rechtsvorm-achtervoegsels matchen hoofdlettergevoelig ("b.v." in lopende tekst is "bijvoorbeeld") en een instantie-voorvoegsel telt alleen met minstens één woord erachter ("Gemeente" alleen is geen naam). De bestaande test `test_inbox_met_tekstlezer_haalt_datum_uit_tekst` kreeg een tekst zonder bruikbare naamregel, omdat de korte testtekst anders terecht een bon-titel opleverde.
+- 15b · Nieuwe module `web/openstaand.py` (`OpenstaandeUpload`, `OpenstaandeUploads`), `app.state.openstaand`, routes `upload_gegevens` (`GET/POST /upload/{token}`) en `upload_annuleer`; `POST /upload` accepteert alleen nog bestanden (minstens één) en negeert titel/datum/tags; nieuwe template `upload_gegevens.html`; `maak_document_uit_bestanden` wordt door de app niet meer aangeroepen · uploaden in twee schermen zodat titel, datum en tags uit de tekst voorgevuld zijn vóór het opslaan. Eén afwijking buiten het pakketbestand: `extract._heic_naar_jpg` vertaalt PIL-fouten (`OSError`/`ValueError`, o.a. `UnidentifiedImageError`) naar `ExtractieFout`; interface ongewijzigd. Nodig omdat scherm 1 nu altijd de tekst leest en `maak_tekstlezer` alleen `ExtractieFout` opvangt: een kapotte `.heic` gaf anders een 500 (de worker ving dit al breed op, de inbox en de datumloze upload uit 14 niet). Zie `werk/15b-tweestaps-upload.md`.

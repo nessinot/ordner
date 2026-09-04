@@ -1,6 +1,6 @@
 # Pakket 15b — Tweestaps upload met suggesties
 
-> **Agent-prompt:** Lees `werk/00-contract.md`, `werk/14-datum-uit-tekst.md`, `werk/15a-titel-en-tagsuggestie.md` en `werk/15b-tweestaps-upload.md`. Bouw alleen wat hieronder staat, draai `pytest` en `pytest -m e2e`, bump de versie naar 0.9.0 met release notes in `addon/CHANGELOG.md`, commit als `pakket 15b: tweestaps upload` en vink af in `werk/STATUS.md`. Vereist 15c en 15a.
+> **Agent-prompt:** Lees `werk/00-contract.md`, `werk/14-datum-uit-tekst.md`, `werk/15a-titel-en-tagsuggestie.md` en `werk/15b-tweestaps-upload.md`. Dit pakket is gebouwd en gecommit (release 0.9.0, 2026-09-04); gebruik dit bestand als naslag bij vervolgwerk aan de upload. Afwijkingen bij het bouwen: (1) `extract._heic_naar_jpg` vertaalt PIL-fouten naar `ExtractieFout`, omdat scherm 1 nu altijd leest en een kapotte `.heic` anders een 500 gaf; (2) scherm 2 gebruikt één formulier met een tweede knop met `formaction`+`formnovalidate` voor Annuleren; (3) bij Opslaan wordt de openstaande upload *vóór* het aanmaken uit de store gehaald, zodat een dubbel verzoek nooit een tweede document maakt. Zie `werk/00-contract.md` › Wijzigingen.
 
 **Doel:** Uploaden wordt twee schermen. Scherm 1: alleen bestanden kiezen. Ordner leest dan de tekst, bepaalt datum, titel- en tagsuggestie. Scherm 2: alle velden van het document, voorgevuld; de gebruiker corrigeert en slaat op. Zo typt niemand meer een titel over die al in het document staat, en ziet de gebruiker vóór het opslaan wat er in de mapnaam komt (datum en slug worden immers nooit hernoemd).
 

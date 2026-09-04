@@ -4,7 +4,7 @@
 
 Vroeger gingen afschriften, nota's, bonnetjes en andere belangrijke papieren in een ordner. Een map per jaar, een tabblad per onderwerp, en je wist dat alles er lag als je het nodig had. Ordner brengt die eenvoud terug: een digitale ordner voor je documenten.
 
-Je uploadt een pdf of foto, geeft een titel en datum, en Ordner bewaart het document als gewone bestanden in `/share/ordner`. Elk document krijgt een eigen map met het origineel erin. De tekst van pdf's en foto's wordt gelezen (OCR) en als gewoon tekstbestand ernaast gezet, zodat je later op elk woord kunt zoeken. De gegevens over het document staan in één leesbaar `meta.md`.
+Je uploadt een pdf of foto, controleert de titel en datum die Ordner uit de tekst heeft gelezen, en Ordner bewaart het document als gewone bestanden in `/share/ordner`. Elk document krijgt een eigen map met het origineel erin. De tekst van pdf's en foto's wordt gelezen (OCR) en als gewoon tekstbestand ernaast gezet, zodat je later op elk woord kunt zoeken. De gegevens over het document staan in één leesbaar `meta.md`.
 
 Kernprincipe: **de bestanden op schijf zijn de waarheid**. Er is geen database, niets om te ontcijferen. Alles wat Ordner weet staat in mappen en tekstbestanden die je ook zonder de add-on kunt lezen, kopiëren en back-uppen, bijvoorbeeld via Samba of de Verkenner.
 
@@ -60,11 +60,22 @@ Alles onder de tweede `---` is vrije tekst voor eigen notities en wordt meegezoc
 
 Je mag `meta.md` zelf bewerken in een teksteditor. Houd de drie streepjes en de veldnamen intact. Een map zonder `meta.md` krijgt er bij de volgende verversing automatisch een, met de mapnaam als titel.
 
+## Uploaden
+
+Uploaden gaat in twee stappen.
+
+1. **Bestanden kiezen.** Kies een of meer pdf's of foto's; samen vormen ze één document. Minstens één bestand is verplicht. Na "Verder" leest Ordner de tekst van de bestanden (bij foto's en scans kan dat even duren; de pagina meldt "tekst lezen…").
+2. **Gegevens controleren.** Je ziet de gekozen bestanden en een formulier dat al is ingevuld: de titel (de naam van het bedrijf of de instantie uit de tekst; leeg als er geen herkenbare naam in staat), de documentdatum (uit de tekst, anders vandaag; een label eronder zegt welke van de twee), en de tags (het documenttype, zoals `factuur`). De omschrijving is altijd leeg. Pas aan wat niet klopt en kies **Opslaan**. Let op de datum en de titel: samen bepalen ze de mapnaam, en die verandert daarna niet meer.
+
+Tot je op Opslaan drukt wordt er niets bewaard. **Annuleren** gooit de gekozen bestanden weg; het tabblad sluiten of de add-on herstarten heeft hetzelfde effect. Een niet afgemaakte upload verloopt na een uur; kom je daarna terug, dan vraagt Ordner je de bestanden opnieuw te kiezen. Na Opslaan kom je op de documentpagina met de bevestiging "Opgeslagen".
+
+Een bestand toevoegen aan een bestaand document doe je op de documentpagina.
+
 ## Documentdatum
 
-Vul je bij het uploaden een datum in, dan is dat de documentdatum. Laat je het veld leeg, dan leest Ordner eerst de tekst van het document en zoekt daarin naar een datum achter een van deze woorden, in deze volgorde: **factuurdatum**, **notadatum**, **orderdatum**, **dagtekening**, **datum**. Het woord mag met of zonder spatie geschreven zijn ("factuur datum") en er mag een dubbele punt achter staan. De datum staat direct achter het woord op dezelfde regel, of, zoals in tabellen op facturen, in dezelfde kolom op de regel eronder; "vervaldatum" of "betaaldatum" tellen niet mee. Herkende notaties: `12-03-2024`, `12/03/2024`, `12.03.2024`, `2024-03-12`, `12 maart 2024`, `12 mrt 2024` en een tweecijferig jaar. Staat er geen bruikbare datum in, dan wordt het de dag van uploaden.
+In de tweede stap van het uploaden staat de documentdatum al ingevuld. Ordner leest daarvoor de tekst van het document en zoekt daarin naar een datum achter een van deze woorden, in deze volgorde: **factuurdatum**, **notadatum**, **orderdatum**, **dagtekening**, **datum**. Het woord mag met of zonder spatie geschreven zijn ("factuur datum") en er mag een dubbele punt achter staan. De datum staat direct achter het woord op dezelfde regel, of, zoals in tabellen op facturen, in dezelfde kolom op de regel eronder; "vervaldatum" of "betaaldatum" tellen niet mee. Herkende notaties: `12-03-2024`, `12/03/2024`, `12.03.2024`, `2024-03-12`, `12 maart 2024`, `12 mrt 2024` en een tweecijferig jaar. Staat er geen bruikbare datum in, dan wordt het de dag van uploaden.
 
-De gevonden datum bepaalt ook de mapnaam, dus een oude factuur die je nu inscant komt in de juiste jaarmap terecht. Omdat de tekst hiervoor eerst gelezen moet worden, duurt opslaan zonder datum bij foto's en scans wat langer; de uploadpagina meldt "tekst lezen…".
+De gevonden datum bepaalt ook de mapnaam, dus een oude factuur die je nu inscant komt in de juiste jaarmap terecht. Laat je de voorgestelde datum staan, dan onthoudt Ordner dat hij uit de tekst komt (of van de dag van uploaden, als er niets gevonden is); wijzig je hem, dan geldt hij als door jou ingevuld.
 
 Op de documentpagina zie je achter de datum een label **datum uit tekst** of **datum van upload** als de datum niet door jou is ingevuld. Wijzig je de datum zelf, dan verdwijnt het label en wordt hij nooit meer automatisch aangepast. Documenten uit de inbox krijgen altijd op deze manier hun datum.
 
@@ -91,7 +102,7 @@ Handig voor scanners, e-mailregels of een gedeelde map op de telefoon. Controlee
 
 ## Titel en tags uit de tekst
 
-Ordner probeert uit de gelezen tekst af te leiden van wie een document komt en wat voor document het is. Op dit moment gebeurt dat alleen voor de inbox; bij uploaden via het formulier typ je de titel nog zelf.
+Ordner probeert uit de gelezen tekst af te leiden van wie een document komt en wat voor document het is. Bij uploaden staan die als voorstel in het formulier van de tweede stap (onder de titel staat dan "voorstel uit het document"); de inbox gebruikt ze direct.
 
 De **titel** is alleen de naam van de afzender, dus "Eneco Services B.V." of "Gemeente Amsterdam", nooit het soort document of een jaartal. Ordner kijkt in deze volgorde en neemt het eerste wat lukt:
 
@@ -100,11 +111,11 @@ De **titel** is alleen de naam van de afzender, dus "Eneco Services B.V." of "Ge
 3. De eerste regel met een rechtsvorm (B.V., N.V., VOF, U.A.) of een instantiewoord (Gemeente, Stichting, Vereniging, Waterschap, Provincie, Coöperatie, Ministerie, Belastingdienst, Bank, Verzekeraar, Ziekenhuis, Universiteit, Hogeschool).
 4. Bij een korte tekst, zoals een kassabon, de eerste regel met tekst.
 
-Bij een langere brief zonder zo'n aanknopingspunt blijft de titel leeg (in de inbox: de bestandsnaam), want de bovenste regel van een brief is meestal de ontvanger. Hoofdletters blijven zoals ze in de tekst staan.
+Bij een langere brief zonder zo'n aanknopingspunt blijft de titel leeg (bij uploaden: een leeg veld dat je zelf invult; in de inbox: de bestandsnaam), want de bovenste regel van een brief is meestal de ontvanger. Hoofdletters blijven zoals ze in de tekst staan.
 
 De **tags** zijn de documenttypen die als kopje in de tekst staan: factuur, creditnota, offerte, polis, beschikking, nota, bon (ook kassabon), herinnering (ook betalingsherinnering), aanmaning, contract, overeenkomst, aanslag, jaaroverzicht, jaarafrekening en garantie (garantiebewijs). Het woord moet een regel of kolom beginnen ("Factuur nr. 123" telt, "Factuurdatum" of "deze factuur" niet).
 
-De omschrijving wordt nooit automatisch ingevuld. Klopt een titel of tag niet, pas hem dan aan op de documentpagina; de mapnaam verandert daardoor niet.
+De omschrijving wordt nooit automatisch ingevuld. Klopt een voorstel niet, pas het dan aan vóór het opslaan, of later op de documentpagina; de mapnaam verandert door een latere wijziging niet.
 
 ## Prullenbak
 

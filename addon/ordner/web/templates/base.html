@@ -21,7 +21,7 @@
     </div>
   </header>
   <main class="wrap">
-    {% if request.query_params.get('m') %}<p class="melding" role="status">{{ request.query_params.get('m') }}</p>{% endif %}
+    {% if request.query_params.get('m') %}<p class="melding" role="status"><svg class="icoon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>{{ request.query_params.get('m') }}</p>{% endif %}
     {% block content %}{% endblock %}
   </main>
   <script src="{{ url_for('static', path='app.js') }}"></script>

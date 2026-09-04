@@ -2,6 +2,14 @@
 
 Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. Nieuwste versie bovenaan; de bovenste kop moet gelijk zijn aan `version` in `config.yaml` (dat controleert `tests/test_addon_config.py`).
 
+## 0.9.0 (2026-09-04)
+
+- Uploaden gaat nu in twee stappen. Eerst kies je alleen de bestanden; Ordner leest de tekst en vult daarna de titel (de naam van het bedrijf of de instantie), de documentdatum en de tags (het documenttype) voor je in. In de tweede stap controleer je die gegevens, past ze zo nodig aan en kiest Opslaan. Zo hoef je niet meer over te typen wat al in het document staat, en zie je vóór het opslaan welke datum en titel de mapnaam krijgt.
+- Tot je op Opslaan drukt wordt er niets bewaard: Annuleren, het tabblad sluiten of een herstart van de add-on laat geen half document achter. Een niet afgemaakte upload verloopt na een uur; dan kies je de bestanden gewoon opnieuw.
+- Een document aanmaken zonder bestanden kan via het uploadformulier niet meer; minstens één bestand is verplicht.
+- De bevestiging "Opgeslagen" is duidelijker (vinkje, opvallender kader).
+- Een onleesbaar `.heic`-bestand laat de upload niet meer vastlopen; het document krijgt dan de OCR-status `failed`, zoals bij andere onleesbare bestanden.
+
 ## 0.8.0 (2026-09-04)
 
 - Documenten uit de inbox krijgen hun titel uit de tekst: de naam van het bedrijf of de instantie (bijvoorbeeld "Eneco Services B.V." of "Gemeente Amsterdam"). Staat er geen herkenbare naam in, dan blijft de bestandsnaam de titel. Titels die je al eerder in het archief gebruikt hebt, worden het eerst herkend.
