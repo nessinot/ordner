@@ -1,0 +1,5 @@
+-r addon/requirements.txt
+pytest
+pytest-asyncio
+pytest-playwright
+httpx

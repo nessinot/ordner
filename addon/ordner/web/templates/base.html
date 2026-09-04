@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% if paginatitel %}{{ paginatitel }} · {% endif %}Ordner</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+</head>
+<body data-status-url="{{ url_for('status') }}">
+  <header class="top">
+    <div class="wrap">
+      <a href="{{ url_for('zoeken') }}" class="merk">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+        Ordner
+      </a>
+      <nav class="hoofd" aria-label="Hoofdmenu">
+        <a href="{{ url_for('zoeken') }}"{% if nav == 'zoeken' %} aria-current="page"{% endif %}>Zoeken</a>
+        <a href="{{ url_for('upload') }}"{% if nav == 'upload' %} aria-current="page"{% endif %}>Uploaden</a>
+        <a href="{{ url_for('beheer') }}"{% if nav == 'beheer' %} aria-current="page"{% endif %}>Beheer</a>
+      </nav>
+    </div>
+  </header>
+  <main class="wrap">
+    {% if request.query_params.get('m') %}<p class="melding" role="status">{{ request.query_params.get('m') }}</p>{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+  <script src="{{ url_for('static', path='app.js') }}"></script>
+</body>
+</html>

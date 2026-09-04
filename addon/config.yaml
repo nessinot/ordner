@@ -1,0 +1,23 @@
+name: Ordner
+version: "0.4.0"
+slug: ordner
+description: "Digitale ordner voor je documenten: mappen, originelen en leesbare tekst, geen database"
+url: https://github.com/nessinot/ordner
+arch:
+  - amd64
+  - aarch64
+init: false
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:archive
+panel_title: Ordner
+map:
+  - share:rw
+options:
+  ocr_talen: "nld+eng"
+  ocr_parallel: 2
+  reconcile_interval: 300
+schema:
+  ocr_talen: str
+  ocr_parallel: int(1,8)
+  reconcile_interval: int(30,86400)

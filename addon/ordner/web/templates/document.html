@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% set paginatitel = meta.titel %}
+{% block content %}
+<section class="document" data-ocr="{{ meta.ocr }}" data-rel="{{ rel }}">
+  <div class="dockop">
+  <div class="kop">
+    <h2>{{ meta.titel }}</h2>
+    <span class="datum">{{ meta.documentdatum.isoformat() }}</span>
+    {% if meta.ocr != 'done' %}<span class="badge badge-{{ meta.ocr }}">OCR {{ meta.ocr }}</span>{% endif %}
+  </div>
+  {% if meta.omschrijving %}<p class="omschrijving">{{ meta.omschrijving }}</p>{% endif %}
+  {% if meta.tags %}
+  <p class="badges">{% for tag in meta.tags %}<span class="badge badge-tag">{{ tag }}</span>{% endfor %}</p>
+  {% endif %}
+  </div>
+
+  <section class="paneel">
+    <h3>Bestanden</h3>
+    {% if not bestanden %}<p class="leeg">Geen bestanden.</p>{% endif %}
+    {% for b in bestanden %}
+    {% set url = url_for('bestand', jaar=jaar, map=map, naam=b.naam) %}
+    <div class="bestand">
+      <div class="bestand-kop">
+        <span class="bestand-naam">{{ b.naam }}</span>
+        {% if b.tekst_aanwezig %}<span class="badge">tekst aanwezig</span>{% endif %}
+        <a class="knop" href="{{ url }}" target="_blank" rel="noopener">Open</a>
+      </div>
+      {% if b.soort == 'afbeelding' %}
+      <img src="{{ url }}" alt="{{ b.naam }}" loading="lazy">
+      {% elif b.soort == 'pdf' %}
+      <object type="application/pdf" data="{{ url }}">Kan de pdf hier niet tonen. <a href="{{ url }}" target="_blank" rel="noopener">Open de pdf</a>.</object>
+      {% endif %}
+    </div>
+    {% endfor %}
+
+    <form method="post" action="{{ url_for('document_bestanden', jaar=jaar, map=map) }}" enctype="multipart/form-data" class="bestand-toevoegen">
+      <label class="veld">
+        <span>Bestand toevoegen</span>
+        <input type="file" name="bestanden" multiple accept="image/*,application/pdf">
+      </label>
+      <div class="knoppen">
+        <button type="submit" class="secundair">Toevoegen</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="paneel">
+    <h3>Gegevens</h3>
+    {% if fout %}<p class="fout" role="alert">{{ fout }}</p>{% endif %}
+    <form method="post" action="{{ url_for('document_meta', jaar=jaar, map=map) }}">
+      <label class="veld">
+        <span>Titel</span>
+        <input type="text" name="titel" value="{{ meta.titel }}" required autocomplete="off">
+      </label>
+      <label class="veld">
+        <span>Omschrijving <small>optioneel</small></span>
+        <textarea name="omschrijving" rows="3">{{ meta.omschrijving }}</textarea>
+      </label>
+      <div class="velden-rij">
+        <label class="veld">
+          <span>Documentdatum</span>
+          <input type="date" name="documentdatum" value="{{ meta.documentdatum.isoformat() }}" required>
+        </label>
+        <label class="veld">
+          <span>Tags <small>komma-gescheiden</small></span>
+          <input type="text" name="tags" value="{{ meta.tags|join(', ') }}" autocomplete="off">
+        </label>
+      </div>
+      <div class="knoppen">
+        <button type="submit">Opslaan</button>
+        <span class="hint">De mapnaam verandert niet.</span>
+      </div>
+    </form>
+  </section>
+
+  {% if meta.notities %}
+  <section class="paneel">
+    <h3>Notities</h3>
+    <pre class="notities">{{ meta.notities }}</pre>
+  </section>
+  {% endif %}
+
+  <section class="paneel">
+    <h3>Acties</h3>
+    <div class="knoppen">
+      <form method="post" action="{{ url_for('document_ocr', jaar=jaar, map=map) }}">
+        <button type="submit" class="secundair">OCR opnieuw</button>
+      </form>
+      <form method="post" action="{{ url_for('document_verwijder', jaar=jaar, map=map) }}">
+        <button type="submit" class="gevaar" onclick="return confirm('Naar de prullenbak?')">Verwijderen</button>
+      </form>
+    </div>
+    <p class="mapinfo">Map <code>{{ rel }}</code> · geüpload {{ meta.uploaddatum.strftime('%Y-%m-%d %H:%M') }}</p>
+  </section>
+</section>
+{% endblock %}

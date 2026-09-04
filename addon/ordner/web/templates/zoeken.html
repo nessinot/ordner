@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% set nav = 'zoeken' %}
+{% set paginatitel = 'Zoeken' if q else '' %}
+{% block content %}
+<form method="get" action="{{ url_for('zoeken') }}" class="zoek" role="search">
+  <svg class="icoon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+  <input type="search" name="q" value="{{ q }}" placeholder="Zoek in titel, tags, notities en tekst" aria-label="Zoeken" autofocus>
+  <button type="submit">Zoek</button>
+</form>
+
+<div class="kop">
+  {% if q %}
+  <h2>{{ totaal }} {% if totaal == 1 %}resultaat{% else %}resultaten{% endif %}</h2>
+  <span class="gedempt">voor “{{ q }}”{% if afgekapt %} · de {{ kaarten|length }} nieuwste getoond{% endif %} · <a href="{{ url_for('zoeken') }}">wis</a></span>
+  {% else %}
+  <h2>Recent</h2>
+  <span class="gedempt">{{ tellingen.totaal }} document{% if tellingen.totaal != 1 %}en{% endif %} in het archief</span>
+  {% endif %}
+</div>
+
+<ul class="kaarten">
+{% for k in kaarten %}
+  <li class="kaart">
+    <a class="rij" href="{{ url_for('document', jaar=k.jaar, map=k.map) }}">
+      {% if k.soort == 'pdf' %}
+      <svg class="icoon pdf" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zM8 12h8v1.5H8V12zm0 3h8v1.5H8V15zm0 3h5v1.5H8V18z"/></svg>
+      {% elif k.soort == 'afbeelding' %}
+      <svg class="icoon afbeelding" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+      {% else %}
+      <svg class="icoon overig" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/></svg>
+      {% endif %}
+      <span class="tekst">
+        <span class="titel-rij">
+          <span class="titel">{{ k.titel }}</span>
+          {% if k.ocr != 'done' %}<span class="badge badge-{{ k.ocr }}">OCR {{ k.ocr }}</span>{% endif %}
+        </span>
+        {% if k.omschrijving %}<span class="omschrijving">{{ k.omschrijving }}</span>{% endif %}
+      </span>
+      <span class="datum">{{ k.documentdatum.isoformat() }}</span>
+    </a>
+    {% if q and k.snippet %}<p class="snippet">{{ k.snippet }} <span class="bron">({{ k.bron }})</span></p>{% endif %}
+  </li>
+{% else %}
+  <li class="leeg">{% if q %}Niets gevonden.{% else %}Nog geen documenten. <a href="{{ url_for('upload') }}">Upload het eerste document.</a>{% endif %}</li>
+{% endfor %}
+{% if afgekapt %}
+  <li class="leeg voetnoot">
+    {% if q %}
+    De {{ kaarten|length }} nieuwste van {{ totaal }} resultaten.
+    <a href="{{ url_for('zoeken') }}?q={{ q|urlencode }}&amp;alles=1">Toon alle {{ totaal }}</a> of verfijn je zoekopdracht.
+    {% else %}
+    De {{ kaarten|length }} nieuwste van {{ totaal }} documenten. Zoek om oudere te vinden.
+    {% endif %}
+  </li>
+{% endif %}
+</ul>
+{% endblock %}
