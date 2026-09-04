@@ -22,7 +22,8 @@ Een minimale digitale archiefkast voor privédocumenten (WOZ, facturen, bonnen, 
 | Subprocess | Uitsluitend via `extract.run_cmd` (asyncio subprocess, timeout 600 s). Tests mocken alleen deze functie. |
 | Index | In-memory (`index.Index`), gebouwd bij start, bijgewerkt door app/worker, herbouwd door reconciler. Geen indexbestand op schijf. |
 | Reconciler | Bij start, elke `reconcile_interval` s, en op knop. Synchroniseert `bestanden` met de werkelijke bestanden, queued ontbrekende `.txt`, maakt `meta.md` voor mappen zonder, ingest `_inbox/`. |
-| Inbox | `_inbox/` gepolld elke `inbox_interval` s (default 5); bestand met gelijke grootte in twee opeenvolgende polls → nieuw document (titel = bestandsnaam zonder extensie, `_`/`-` → spatie; datum = vandaag). |
+| Inbox | `_inbox/` gepolld elke `inbox_interval` s (default 5); bestand met gelijke grootte in twee opeenvolgende polls → nieuw document (titel = bestandsnaam zonder extensie, `_`/`-` → spatie; datum uit de tekst, anders vandaag; zie "Datum uit tekst"). |
+| Datum uit tekst | Alleen als er geen datum is opgegeven (leeg datumveld bij upload, of inbox). De tekst wordt dan *vóór* het aanmaken van de map gelezen (`ingest.maak_document_uit_bestanden`), zodat de map de gevonden datum krijgt en nooit hernoemd hoeft te worden. Sleutelwoorden in prioriteitsvolgorde: factuurdatum, notadatum, orderdatum, dagtekening, datum (optionele spatie, optionele `:`, hoofdletterongevoelig; "vervaldatum" e.d. matchen niet). De datum moet op dezelfde regel direct achter het woord staan (max 60 spaties ertussen). Notaties dd-mm-jjjj, dd/mm/jjjj, dd.mm.jjjj, jjjj-mm-dd, d maand jjjj (NL/EN maandnamen), tweecijferig jaar. Jaar tussen 1990 en volgend jaar. `meta.datumbron`: `gebruiker` (opgegeven of later handmatig gewijzigd; wordt nooit automatisch overschreven), `tekst`, `upload` (geen treffer → vandaag). Gelezen tekst wordt direct als `.txt` geschreven. |
 | Zoeken | Alle woorden moeten voorkomen (AND over het hele document), hoofdletterongevoelig, over titel, omschrijving, tags, documentdatum (ISO-string), notities en alle `.txt`-teksten. Snippet ±80 tekens rond de eerste treffer + bron (veldnaam of bestandsnaam). Sortering documentdatum desc. `_inbox`/`_prullenbak` nooit in de index. |
 | Prullenbak | `_prullenbak/<mapnaam>`; bij conflict `<mapnaam>_<JJJJMMDD-HHMMSS>`. |
 | Schrijven | `meta.md` en `.txt` altijd via tempbestand in dezelfde map + `os.replace()`. |
@@ -45,7 +46,7 @@ ordner/                       # repo-root = add-on-repository (Add-on store › 
     DOCS.md                   # tabblad "Documentatie" in de add-on
     requirements.txt
     ordner/                   # Python-package
-      __init__.py config.py slug.py meta.py storage.py extract.py index.py search.py worker.py
+      __init__.py config.py slug.py meta.py storage.py extract.py datum.py ingest.py index.py search.py worker.py
       web/ __init__.py app.py routes.py
         templates/ base.html zoeken.html upload.html document.html beheer.html
         static/ style.css app.js
@@ -76,6 +77,7 @@ uploaddatum: '2026-09-03T14:12'
 tags: [woz, gemeente]
 bestanden: [beschikking.pdf, foto.heic]
 ocr: done
+datumbron: gebruiker
 ---
 Eventuele eigen notities (worden meegezocht).
 ```
@@ -122,6 +124,7 @@ def maak_slug(titel: str) -> str
 ### `ordner/meta.py`
 ```python
 OcrStatus = Literal["pending", "done", "failed"]
+DatumBron = Literal["gebruiker", "tekst", "upload"]   # pakket 14
 
 class MetaFout(Exception): ...
 
@@ -135,14 +138,16 @@ class Meta:
     bestanden: list[str] = field(default_factory=list)
     ocr: OcrStatus = "done"
     notities: str = ""               # body onder de frontmatter
+    datumbron: DatumBron = "gebruiker"   # ontbreekt in oude meta.md → "gebruiker"; onbekende waarde → "gebruiker" + warning
 
 def parse_meta(tekst: str) -> Meta          # raises MetaFout bij ontbrekende frontmatter/titel/datum
-def render_meta(meta: Meta) -> str          # frontmatter (keys in bovenstaande volgorde, tags/bestanden als flow-lijst [a, b]) + notities
+def render_meta(meta: Meta) -> str          # frontmatter (keys: titel, omschrijving, documentdatum, uploaddatum, tags, bestanden, ocr, datumbron; tags/bestanden als flow-lijst [a, b]) + notities
 def lees_meta(map: Path) -> Meta            # leest map/meta.md
 def schrijf_meta(map: Path, meta: Meta) -> None   # atomic
 def bepaal_ocr_status(map: Path, meta: Meta) -> OcrStatus
     # "failed" blijft "failed"; anders "pending" als een extraheerbaar bestand uit meta.bestanden geen .txt heeft, anders "done"
 def txt_pad(bestand: Path) -> Path          # bestand.with_name(bestand.name + ".txt")
+def schrijf_txt(bestand: Path, tekst: str) -> None   # atomic naar txt_pad(bestand); gebruikt door worker en ingest
 def is_extraheerbaar(naam: str) -> bool
 ```
 
@@ -157,8 +162,10 @@ class Archief:
     trash_dir: Path
 
     def maak_document(self, titel: str, documentdatum: date, omschrijving: str = "",
-                      tags: list[str] | None = None, nu: datetime | None = None) -> Path
+                      tags: list[str] | None = None, nu: datetime | None = None,
+                      datumbron: DatumBron = "gebruiker") -> Path
         # map JJJJ/JJJJ-MM-DD_slug[_N]; schrijft meta.md (bestanden=[], ocr="done"); geeft absolute map terug
+        # web en inbox roepen dit niet direct aan maar via ingest.maak_document_uit_bestanden
 
     def voeg_bestand_toe(self, doc: Path, naam: str, data: bytes) -> str
         # naam saneren; conflict → stam_2.ext; schrijft bestand atomic;
@@ -210,9 +217,41 @@ class ReconcileRapport:
     inbox_verwerkt: int
 
 class Reconciler:
-    def __init__(self, archief: Archief, index: Index, queue_fn: Callable[[Path, str], None])
+    def __init__(self, archief: Archief, index: Index, queue_fn: Callable[[Path, str], None],
+                 lees_tekst: LeesTekst | None = None)   # lees_tekst: voor de inbox (datum uit tekst); None = gedrag van vóór pakket 14
     def run(self) -> ReconcileRapport       # synchroon; de app roept aan via asyncio.to_thread
     def verwerk_inbox(self) -> list[Path]   # houdt self._inbox_groottes bij voor de stabiliteitscheck
+```
+
+### `ordner/datum.py` (pakket 14)
+```python
+MIN_JAAR = 1990
+
+@dataclass(frozen=True)
+class DatumTreffer:
+    datum: date
+    sleutelwoord: str               # "factuurdatum" | "notadatum" | "orderdatum" | "dagtekening" | "datum"
+    regel: str                      # de regel waarin de datum stond (voor logging)
+
+def vind_datum(tekst: str, vandaag: date | None = None) -> DatumTreffer | None
+    # per sleutelwoord in prioriteitsvolgorde over alle regels; eerste geldige datum wint. Pure functie.
+```
+
+### `ordner/ingest.py` (pakket 14)
+```python
+LeesTekst = Callable[[Path], str | None]     # synchroon; None als extractie mislukt
+QueueFn = Callable[[Path, str], None]
+
+def maak_tekstlezer(talen: str) -> LeesTekst
+    # wrapper om extract.extract_bestand met asyncio.run; ExtractieFout → None + warning. Draaien in een thread.
+
+def maak_document_uit_bestanden(archief: Archief, titel: str, bestanden: list[tuple[str, bytes]], *,
+                                documentdatum: date | None, omschrijving: str = "", tags: list[str] | None = None,
+                                lees_tekst: LeesTekst | None, queue_fn: QueueFn, vandaag: date | None = None) -> Path
+    # documentdatum gegeven → datumbron "gebruiker", extraheerbare bestanden naar queue_fn.
+    # None → extraheerbare bestanden eerst lezen via lees_tekst (tempbestand met originele extensie);
+    #   eerste treffer van vind_datum bepaalt datum ("tekst"), anders vandaag ("upload").
+    #   Gelezen tekst → .txt direct geschreven; niet gelezen → queue_fn. Eén codepad voor upload en inbox.
 ```
 
 ### `ordner/search.py`
@@ -295,4 +334,5 @@ _(agents voegen hier regels toe: pakket · wat · waarom)_
 - 08 · Templates gebruiken de Jinja-global `url_for(naam, **params)` (in `web/app.py`, wrapper om `request.url_for(...).path`) in plaats van `request.url_for` direct; redirects via `routes._redirect` · `request.url_for` levert een absolute URL met scheme+host uit de ASGI-scope; achter Ingress/https zou dat `http://…`-links geven (mixed content) en de ingress-test uit pakket 08 verwacht paden die met `/api/hassio_ingress/...` beginnen. De global geeft het pad inclusief `root_path` terug.
 - 08 · `POST /upload` gebruikt `titel: str = Form("")` i.p.v. `Form(...)` · een ontbrekende titel moet 400 met het formulier opleveren, niet FastAPI's 422.
 - 08 · `app.state.templates` toegevoegd · routes in `routes.py` hebben de `Jinja2Templates`-instantie nodig zonder globale state.
+- 14 · `Meta.datumbron` toegevoegd (laatste frontmatter-sleutel), `meta.schrijf_txt`, `Archief.maak_document(datumbron=)`, `Reconciler(lees_tekst=)`, nieuwe modules `datum.py` en `ingest.py`; het uploadformulier heeft geen voorgevulde datum meer · documenten zonder opgegeven datum krijgen de datum uit de tekst (factuurdatum enz.), en omdat de map nooit hernoemd wordt moet die datum vóór het aanmaken bekend zijn. Zie `werk/14-datum-uit-tekst.md`.
 - 13 · Add-on-bestanden en het Python-package verhuisd naar `addon/`; `repository.yaml` in de root; `pythonpath = ["addon", "."]` in `pyproject.toml` · de Supervisor accepteert een git-URL alleen als add-on-repository (elke add-on in een eigen submap met `config.yaml`), zodat installeren en updaten via de Add-on store kan i.p.v. kopiëren naar `/addons/` via Samba.

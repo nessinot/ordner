@@ -10,7 +10,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 from ordner.config import INBOX_DIR, META_NAAM, TRASH_DIR
-from ordner.meta import Meta, bepaal_ocr_status, is_extraheerbaar, lees_meta, schrijf_meta
+from ordner.meta import DatumBron, Meta, bepaal_ocr_status, is_extraheerbaar, lees_meta, schrijf_meta
 from ordner.slug import maak_slug
 
 log = logging.getLogger(__name__)
@@ -79,6 +79,7 @@ class Archief:
         omschrijving: str = "",
         tags: list[str] | None = None,
         nu: datetime | None = None,
+        datumbron: DatumBron = "gebruiker",
     ) -> Path:
         """Maakt JJJJ/JJJJ-MM-DD_slug[_N] met meta.md aan en geeft de absolute map terug."""
         jaarmap = self.root / str(documentdatum.year)
@@ -97,6 +98,7 @@ class Archief:
             tags=list(tags or []),
             bestanden=[],
             ocr="done",
+            datumbron=datumbron,
         )
         schrijf_meta(doc, meta)
         log.info("document aangemaakt: %s", self.relatief(doc))

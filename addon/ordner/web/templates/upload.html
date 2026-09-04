@@ -20,7 +20,7 @@
   </label>
   <div class="velden-rij">
     <label class="veld">
-      <span>Documentdatum</span>
+      <span>Documentdatum <small>optioneel</small></span>
       <input type="date" name="documentdatum" value="{{ documentdatum }}">
     </label>
     <label class="veld">
@@ -28,7 +28,9 @@
       <input type="text" name="tags" value="{{ tags }}" autocomplete="off" placeholder="woz, gemeente">
     </label>
   </div>
+  <p class="hint">Laat de datum leeg en Ordner leest hem uit het document (factuurdatum, notadatum, orderdatum, dagtekening of datum); staat er geen, dan wordt het vandaag. Bij foto's en scans duurt opslaan dan wat langer.</p>
   <progress hidden></progress>
+  <p class="hint" data-bezig hidden>Bestanden ontvangen, tekst lezen…</p>
   <div class="knoppen vol">
     <button type="submit">Opslaan</button>
   </div>

@@ -174,6 +174,68 @@ def test_upload_zonder_datum_gebruikt_vandaag(client: TestClient) -> None:
     assert f"/doc/{date.today().year}/{date.today().isoformat()}_zonder-datum" in r.headers["location"]
 
 
+def test_upload_zonder_datum_haalt_datum_uit_tekst(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
+    mock_cmd.register("pdftotext", stdout=b"Energie BV\nFactuurdatum: 12-03-2024\nVervaldatum: 12-04-2024" + b" x" * 30)
+    r = client.post(
+        "/upload",
+        data={"titel": "Energie"},
+        files={"bestanden": ("factuur.pdf", _PDF, "application/pdf")},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    assert r.headers["location"] == "/doc/2024/2024-03-12_energie?m=Opgeslagen"
+    doc = _root(client) / "2024" / "2024-03-12_energie"
+    meta = lees_meta(doc)
+    assert meta.documentdatum.isoformat() == "2024-03-12"
+    assert meta.datumbron == "tekst"
+    assert meta.ocr == "done"  # tekst is al tijdens de upload geschreven
+    assert (doc / "factuur.pdf.txt").exists()
+    # het uploadformulier heeft geen voorgevulde datum meer
+    assert 'name="documentdatum" value=""' in client.get("/upload").text
+    # label op de documentpagina
+    r = client.get("/doc/2024/2024-03-12_energie")
+    assert "datum uit tekst" in r.text
+
+
+def test_upload_zonder_datum_zonder_treffer_label_van_upload(client: TestClient) -> None:
+    r = client.post(
+        "/upload",
+        data={"titel": "Bon"},
+        files={"bestanden": ("bon.pdf", _PDF, "application/pdf")},
+        follow_redirects=False,
+    )
+    doc = f"/doc/{_vandaag().year}/{_vandaag().isoformat()}_bon"
+    assert r.headers["location"] == f"{doc}?m=Opgeslagen"
+    assert lees_meta(_root(client) / str(_vandaag().year) / f"{_vandaag().isoformat()}_bon").datumbron == "upload"
+    assert "datum van upload" in client.get(doc).text
+
+
+def test_upload_met_datum_toont_geen_label_en_queued(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
+    mock_cmd.register("pdftotext", stdout=b"Factuurdatum: 12-03-2024" + b" x" * 30)
+    _upload(client)  # datum 2026-03-01 ingevuld
+    meta = lees_meta(_root(client) / "2026" / "2026-03-01_test")
+    assert meta.datumbron == "gebruiker"
+    assert meta.documentdatum.isoformat() == "2026-03-01"
+    r = client.get(_DOC)
+    assert "datum uit tekst" not in r.text and "datum van upload" not in r.text
+
+
+def test_meta_bewerken_zet_datumbron_op_gebruiker(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
+    mock_cmd.register("pdftotext", stdout=b"Datum: 12-03-2024" + b" x" * 30)
+    client.post("/upload", data={"titel": "Brief"}, files={"bestanden": ("b.pdf", _PDF, "application/pdf")})
+    doc = _root(client) / "2024" / "2024-03-12_brief"
+    assert lees_meta(doc).datumbron == "tekst"
+    # alleen tags wijzigen: datum blijft uit tekst
+    client.post("/doc/2024/2024-03-12_brief/meta", data={"titel": "Brief", "documentdatum": "2024-03-12", "tags": "x"})
+    assert lees_meta(doc).datumbron == "tekst"
+    # datum wijzigen: bron wordt gebruiker, map blijft
+    client.post("/doc/2024/2024-03-12_brief/meta", data={"titel": "Brief", "documentdatum": "2024-03-13"})
+    meta = lees_meta(doc)
+    assert meta.datumbron == "gebruiker"
+    assert meta.documentdatum.isoformat() == "2024-03-13"
+    assert doc.is_dir()
+
+
 def test_upload_zonder_bestanden(client: TestClient) -> None:
     r = client.post("/upload", data={"titel": "Leeg"}, follow_redirects=False)
     assert r.status_code == 303

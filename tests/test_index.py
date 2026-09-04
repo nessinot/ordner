@@ -275,6 +275,30 @@ def test_inbox_stabiel_na_twee_polls(archief: Archief, reconciler: Reconciler, q
     assert reconciler._inbox_groottes == {}
 
 
+def test_inbox_met_tekstlezer_haalt_datum_uit_tekst(archief: Archief, queue: Queue) -> None:
+    def lees(pad: Path) -> str | None:
+        return "Factuurdatum: 15-06-2023\nBedrag 12,50" if pad.suffix == ".pdf" else None
+
+    reconciler = Reconciler(archief, bouw_index(archief), queue, lees_tekst=lees)
+    (archief.inbox_dir / "energie.pdf").write_bytes(b"%PDF")
+    (archief.inbox_dir / "bon.jpg").write_bytes(b"jpg")
+    reconciler.verwerk_inbox()
+    docs = reconciler.verwerk_inbox()
+    assert [d.name for d in docs] == [f"{date.today():%Y-%m-%d}_bon", "2023-06-15_energie"]
+
+    energie = lees_meta(docs[1])
+    assert energie.documentdatum == date(2023, 6, 15)
+    assert energie.datumbron == "tekst"
+    assert energie.ocr == "done"
+    assert (docs[1] / "energie.pdf.txt").read_text(encoding="utf-8").startswith("Factuurdatum")
+    bon = lees_meta(docs[0])
+    assert bon.datumbron == "upload"
+    assert bon.ocr == "pending"  # lezen mislukt -> naar de queue, worker probeert het opnieuw
+    assert queue.calls == [(docs[0], "bon.jpg")]
+    assert list(archief.inbox_dir.iterdir()) == []
+    assert all(archief.relatief(d) in reconciler.index.docs for d in docs)
+
+
 def test_inbox_groeiend_bestand_wacht(archief: Archief, reconciler: Reconciler) -> None:
     pad = archief.inbox_dir / "scan.pdf"
     pad.write_bytes(b"1")

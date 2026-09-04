@@ -20,7 +20,8 @@ Werkpakketten en het bindende interface-contract staan in `werk/`. Houd het klei
 | Subprocess | Uitsluitend via `extract.run_cmd` (asyncio subprocess, timeout 600 s). Tests mocken alleen deze functie. |
 | Index | In-memory (`index.Index`), gebouwd bij start, bijgewerkt door app/worker, herbouwd door reconciler. Geen indexbestand op schijf. |
 | Reconciler | Bij start, elke `reconcile_interval` s, en op knop. Synchroniseert `bestanden`, queued ontbrekende `.txt`, maakt `meta.md` voor mappen zonder, ingest `_inbox/`. |
-| Inbox | `_inbox/` gepolld elke `inbox_interval` s; bestand met gelijke grootte in twee opeenvolgende polls → nieuw document. |
+| Inbox | `_inbox/` gepolld elke `inbox_interval` s; bestand met gelijke grootte in twee opeenvolgende polls → nieuw document (datum uit de tekst, anders vandaag). |
+| Datum uit tekst | Alleen zonder opgegeven datum (leeg datumveld of inbox). Tekst wordt *vóór* het aanmaken van de map gelezen (`ingest.py`), zodat de mapnaam klopt en niets hernoemd wordt. Sleutelwoorden op prioriteit: factuurdatum, notadatum, orderdatum, dagtekening, datum; datum op dezelfde regel direct achter het woord (`datum.py`). `meta.datumbron`: `gebruiker` (nooit automatisch overschreven), `tekst`, `upload`. Details: `werk/14-datum-uit-tekst.md`. |
 | Zoeken | AND over alle woorden, hoofdletterongevoelig, over titel, omschrijving, tags, documentdatum, notities en alle `.txt`-teksten. Snippet ±80 tekens. Sortering documentdatum desc. `_inbox`/`_prullenbak` nooit in de index. |
 | Prullenbak | `_prullenbak/<mapnaam>`; bij conflict `<mapnaam>_<JJJJMMDD-HHMMSS>`. |
 | Schrijven | `meta.md` en `.txt` altijd via tempbestand in dezelfde map + `os.replace()`. |

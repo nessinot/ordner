@@ -8,3 +8,4 @@
 - SQLite FTS5 als de in-memory index te groot wordt (>5000 documenten)
 - Prullenbak legen / terugzetten
 - PDF/A-kopie met tekstlaag bewaren naast het origineel
+- Datumherkenning: kolomlayout (label boven waarde) via kolomposities uit `pdftotext -layout`; Engelse sleutelwoorden; knop "datum opnieuw bepalen" voor bestaande documenten

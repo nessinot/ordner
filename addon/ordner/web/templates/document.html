@@ -16,6 +16,8 @@
   <div class="kop">
     <h2>{{ meta.titel }}</h2>
     <span class="datum">{{ meta.documentdatum.isoformat() }}</span>
+    {% if meta.datumbron == 'tekst' %}<span class="badge" title="De documentdatum is uit de tekst van het document gelezen.">datum uit tekst</span>
+    {% elif meta.datumbron == 'upload' %}<span class="badge" title="Geen datum in het document gevonden; de uploaddatum is gebruikt.">datum van upload</span>{% endif %}
     {% if meta.ocr != 'done' %}<span class="badge badge-{{ meta.ocr }}">OCR {{ meta.ocr }}</span>{% endif %}
   </div>
   {% if meta.omschrijving %}<p class="omschrijving">{{ meta.omschrijving }}</p>{% endif %}

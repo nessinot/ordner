@@ -17,6 +17,8 @@ log = logging.getLogger(__name__)
 
 OcrStatus = Literal["pending", "done", "failed"]
 _OCR_STATUSSEN: tuple[str, ...] = get_args(OcrStatus)
+DatumBron = Literal["gebruiker", "tekst", "upload"]
+_DATUMBRONNEN: tuple[str, ...] = get_args(DatumBron)
 
 _SCHEIDER = "---"
 _TMP_NAAM = ".meta.md.tmp"
@@ -51,6 +53,7 @@ class Meta:
     bestanden: list[str] = field(default_factory=list)
     ocr: OcrStatus = "done"
     notities: str = ""  # body onder de frontmatter
+    datumbron: DatumBron = "gebruiker"  # waar documentdatum vandaan komt; ontbreekt in oude meta.md -> gebruiker
 
 
 # --- parsen ---------------------------------------------------------------
@@ -137,6 +140,12 @@ def parse_meta(tekst: str) -> Meta:
             log.warning("onbekende ocr-status %r, gebruik 'done'", ocr)
         ocr = "done"
 
+    datumbron = data.get("datumbron")
+    if datumbron not in _DATUMBRONNEN:
+        if datumbron is not None:
+            log.warning("onbekende datumbron %r, gebruik 'gebruiker'", datumbron)
+        datumbron = "gebruiker"
+
     if notities.startswith("\n"):
         notities = notities[1:]
 
@@ -149,6 +158,7 @@ def parse_meta(tekst: str) -> Meta:
         bestanden=_parse_lijst(data.get("bestanden"), "bestanden"),
         ocr=ocr,  # type: ignore[arg-type]
         notities=notities,
+        datumbron=datumbron,  # type: ignore[arg-type]
     )
 
 
@@ -165,6 +175,7 @@ def render_meta(meta: Meta) -> str:
         "tags": list(meta.tags),
         "bestanden": list(meta.bestanden),
         "ocr": meta.ocr,
+        "datumbron": meta.datumbron,
     }
     yaml_tekst = yaml.dump(
         data,
@@ -209,6 +220,15 @@ def schrijf_meta(map: Path, meta: Meta) -> None:
 def txt_pad(bestand: Path) -> Path:
     """Pad van de OCR-tekst naast een bronbestand: factuur.pdf -> factuur.pdf.txt."""
     return bestand.with_name(bestand.name + ".txt")
+
+
+def schrijf_txt(bestand: Path, tekst: str) -> None:
+    """Schrijft de OCR-tekst van `bestand` atomic naar txt_pad(bestand) via een tempbestand in dezelfde map."""
+    doel = txt_pad(bestand)
+    tmp = doel.with_name("." + doel.name + ".tmp")
+    with open(tmp, "w", encoding="utf-8", newline="\n") as f:
+        f.write(tekst)
+    os.replace(tmp, doel)
 
 
 def is_extraheerbaar(naam: str) -> bool:

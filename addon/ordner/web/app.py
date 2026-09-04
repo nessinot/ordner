@@ -15,6 +15,7 @@ from jinja2 import pass_context
 
 from ordner.config import Settings
 from ordner.index import Index, Reconciler, bouw_index
+from ordner.ingest import maak_tekstlezer
 from ordner.storage import Archief
 from ordner.web.routes import router
 from ordner.worker import OcrQueue, inbox_lus, reconcile_lus
@@ -49,7 +50,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     archief = Archief(settings.data_root)
     index = Index()  # leeg; gevuld in de lifespan, één instantie die overal gedeeld wordt
     queue = OcrQueue(archief, index, settings)
-    reconciler = Reconciler(archief, index, queue.enqueue)
+    lees_tekst = maak_tekstlezer(settings.ocr_talen)
+    reconciler = Reconciler(archief, index, queue.enqueue, lees_tekst=lees_tekst)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -75,6 +77,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.archief = archief
     app.state.index = index
     app.state.queue = queue
+    app.state.lees_tekst = lees_tekst
     app.state.reconciler = reconciler
     app.state.laatste_rapport = None
     app.state.reconcile_bezig = False

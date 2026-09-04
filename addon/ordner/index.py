@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Callable
 
 from ordner.config import META_NAAM
+from ordner.ingest import LeesTekst, maak_document_uit_bestanden
 from ordner.meta import Meta, MetaFout, bepaal_ocr_status, is_extraheerbaar, lees_meta, schrijf_meta, txt_pad
 from ordner.storage import Archief
 
@@ -120,10 +121,13 @@ def _werkelijke_bestanden(map: Path, bekend: set[str]) -> list[str]:
 class Reconciler:
     """Brengt schijf, meta.md en index met elkaar in overeenstemming en ingest de inbox."""
 
-    def __init__(self, archief: Archief, index: Index, queue_fn: QueueFn) -> None:
+    def __init__(
+        self, archief: Archief, index: Index, queue_fn: QueueFn, lees_tekst: LeesTekst | None = None
+    ) -> None:
         self.archief = archief
         self.index = index
         self.queue_fn = queue_fn
+        self.lees_tekst = lees_tekst  # voor de inbox: tekst vooraf lezen om de documentdatum te bepalen
         self._inbox_groottes: dict[Path, int] = {}
 
     def run(self) -> ReconcileRapport:
@@ -225,11 +229,15 @@ class Reconciler:
 
     def _ingest(self, pad: Path) -> Path:
         titel = pad.stem.replace("_", " ").replace("-", " ").strip() or _FALLBACK_TITEL
-        doc = self.archief.maak_document(titel, date.today())
-        naam = self.archief.voeg_bestand_toe(doc, pad.name, pad.read_bytes())
+        doc = maak_document_uit_bestanden(
+            self.archief,
+            titel,
+            [(pad.name, pad.read_bytes())],
+            documentdatum=None,
+            lees_tekst=self.lees_tekst,
+            queue_fn=self.queue_fn,
+        )
         pad.unlink()
-        if is_extraheerbaar(naam):
-            self.queue_fn(doc, naam)
         self.index.herlaad(self.archief, doc)
         log.info("inbox verwerkt: %s -> %s", pad.name, self.archief.relatief(doc))
         return doc

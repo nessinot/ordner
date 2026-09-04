@@ -64,9 +64,9 @@ def test_render_formaat_en_volgorde() -> None:
     tekst = render_meta(_volle_meta())
     assert tekst.startswith("---\ntitel:")
     regels = tekst.split("\n")
-    keys = [r.split(":")[0] for r in regels[1:8]]
-    assert keys == ["titel", "omschrijving", "documentdatum", "uploaddatum", "tags", "bestanden", "ocr"]
-    assert regels[8] == "---"
+    keys = [r.split(":")[0] for r in regels[1:9]]
+    assert keys == ["titel", "omschrijving", "documentdatum", "uploaddatum", "tags", "bestanden", "ocr", "datumbron"]
+    assert regels[9] == "---"
     assert "documentdatum: 2026-03-01" in tekst
     assert "uploaddatum: '2026-09-03T14:12'" in tekst
     assert "tags: [woz, gemeente]" in tekst
@@ -92,9 +92,22 @@ def test_render_voorbeeld_uit_contract() -> None:
         "tags: [woz, gemeente]\n"
         "bestanden: [beschikking.pdf]\n"
         "ocr: done\n"
+        "datumbron: gebruiker\n"
         "---\n"
     )
     assert render_meta(m) == verwacht
+
+
+def test_datumbron_parsen_en_default() -> None:
+    m = _minimale_meta()
+    assert m.datumbron == "gebruiker"
+    m.datumbron = "tekst"
+    assert parse_meta(render_meta(m)).datumbron == "tekst"
+    # oude meta.md zonder veld en een onbekende waarde -> gebruiker
+    zonder = render_meta(_minimale_meta()).replace("datumbron: gebruiker\n", "")
+    assert "datumbron" not in zonder
+    assert parse_meta(zonder).datumbron == "gebruiker"
+    assert parse_meta(zonder.replace("ocr: done", "ocr: done\ndatumbron: raar")).datumbron == "gebruiker"
 
 
 # --- parse_meta -----------------------------------------------------------

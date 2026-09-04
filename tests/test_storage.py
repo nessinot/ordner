@@ -54,6 +54,11 @@ def test_maak_document_meta(archief: Archief) -> None:
     assert "uploaddatum: '2026-09-03T14:12'" in (doc / META_NAAM).read_text(encoding="utf-8")
 
 
+def test_maak_document_datumbron(archief: Archief) -> None:
+    assert lees_meta(archief.maak_document("A", date(2026, 3, 1))).datumbron == "gebruiker"
+    assert lees_meta(archief.maak_document("B", date(2026, 3, 1), datumbron="tekst")).datumbron == "tekst"
+
+
 def test_maak_document_zonder_nu(archief: Archief) -> None:
     voor = datetime.now().replace(second=0, microsecond=0)
     meta = lees_meta(archief.maak_document("x", DATUM))

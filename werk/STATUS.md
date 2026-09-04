@@ -15,9 +15,11 @@ Vink af zodra het pakket gecommit is. Noteer afwijkingen of open punten kort ach
 - [x] 12 end-to-end — browser-laag groen (10 tests, zonder OCR-tools dus `failed`-pad); container-laag nog niet gedraaid: draai `pytest -m container` zodra Docker beschikbaar is. Fixture-pdf gebruikt 20pt i.p.v. 24pt (24pt liep over de paginarand). `pythonpath = ["."]` in `pyproject.toml` zodat `tests.e2e.conftest` importeerbaar is
 - [x] 13 add-on-repository — installeren via GitHub-URL i.p.v. Samba (keuze 2026-09-04). Add-on en package naar `addon/`, `repository.yaml` in de root; `pythonpath = ["addon", "."]` (absolute `tests.e2e.conftest`-imports blijven werken). Container-laag nog steeds geskipt (geen Docker). Repo is publiek en de add-on installeert vanuit de store
 - [ ] 11 HA-checklist (handmatig, na 13)
+- [x] 14 datum uit tekst — release 0.5.0. `datumbron` als laatste frontmatter-sleutel; `schrijf_txt` verhuisd naar `meta.py`; upload en inbox delen `ingest.maak_document_uit_bestanden` (tekst lezen vóór aanmaak zodat de mapnaam klopt); het uploadformulier heeft geen voorgevulde datum meer. Kolomlayout (label boven waarde) nog niet herkend, zie `werk/14-datum-uit-tekst.md`
 
 ## Releases na de werkpakketten
 
 - 0.3.0 (2026-09-04): Ingress-fix voor static files; UI in Drive-stijl
 - 0.4.0 (2026-09-04): zoeklijst eerlijk afgekapt. Startscherm toont de 20 nieuwste met voetnoot "De 20 nieuwste van N documenten"; zoeken toont het echte totaal, kapt af op 50 en biedt "Toon alle N" (`?alles=1`). `zoek()` heeft geen `limiet` meer
 - 0.4.1 (2026-09-04): terugknop op de documentpagina. De zoekopdracht (`q`, `alles`) reist mee in de documentlink en als verborgen veld in de formulieren; redirects na opslaan/OCR/toevoegen/verwijderen behouden hem (`_redirect(..., query=...)`)
+- 0.5.0 (2026-09-04): documentdatum uit de tekst bij leeg datumveld of inbox (pakket 14); label "datum uit tekst"/"datum van upload" op de documentpagina
