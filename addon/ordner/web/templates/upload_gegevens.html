@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% set nav = 'upload' %}
+{% set paginatitel = 'Uploaden' %}
+{% block content %}
+<div class="kop"><h2>Nieuw document</h2><span class="gedempt">stap 2 van 2: gegevens</span></div>
+{% if fout %}<p class="fout" role="alert">{{ fout }}</p>{% endif %}
+
+<section class="paneel">
+  <h3>Bestanden</h3>
+  <ul class="bestandslijst">
+    {% for b in bestanden %}
+    <li><span class="bestand-naam">{{ b.naam }}</span> <span class="gedempt klein">{{ b.grootte }}</span></li>
+    {% endfor %}
+  </ul>
+  <p class="hint">Nog niets is opgeslagen. Controleer de gegevens hieronder en kies Opslaan; de datum en de titel bepalen de mapnaam.</p>
+</section>
+
+<section class="paneel">
+  <h3>Gegevens</h3>
+  <form method="post" action="{{ url_for('upload_gegevens', token=token) }}" class="upload-gegevens">
+    <label class="veld">
+      <span>Titel</span>
+      <input type="text" name="titel" value="{{ titel }}" required autocomplete="off" placeholder="Bijv. Eneco of Gemeente Amsterdam">
+      {% if titelbron != 'geen' %}<span class="hint">voorstel uit het document</span>{% endif %}
+    </label>
+    <label class="veld">
+      <span>Omschrijving <small>optioneel</small></span>
+      <textarea name="omschrijving" rows="3">{{ omschrijving }}</textarea>
+    </label>
+    <div class="velden-rij">
+      <label class="veld">
+        <span>Documentdatum</span>
+        <input type="date" name="documentdatum" value="{{ documentdatum }}" required>
+        {% if datumbron == 'tekst' %}<span class="hint"><span class="badge" title="De documentdatum is uit de tekst van het document gelezen.">datum uit tekst</span></span>
+        {% else %}<span class="hint"><span class="badge" title="Geen datum in het document gevonden; de datum van vandaag is ingevuld.">geen datum gevonden, vandaag</span></span>{% endif %}
+      </label>
+      <label class="veld">
+        <span>Tags <small>komma-gescheiden</small></span>
+        <input type="text" name="tags" value="{{ tags }}" autocomplete="off" placeholder="factuur, energie">
+      </label>
+    </div>
+    <div class="knoppen vol">
+      <button type="submit">Opslaan</button>
+      <button type="submit" class="secundair" formaction="{{ url_for('upload_annuleer', token=token) }}" formnovalidate>Annuleren</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

@@ -2,7 +2,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const statusUrl = document.body.dataset.statusUrl;
   const POLL_MS = 3000;
 
-  // --- upload met voortgangsbalk ---------------------------------------
+  // --- upload, scherm 1 (bestanden) met voortgangsbalk ---------------------
+  // Na de upload leest de server de tekst en antwoordt met een redirect naar scherm 2 (gegevens);
+  // responseURL bevat dat adres, inclusief het Ingress-prefix. Scherm 2 is een gewoon formulier zonder JS.
   const form = document.querySelector("form[data-upload]");
   if (form && window.XMLHttpRequest) {
     form.addEventListener("submit", (e) => {
@@ -15,15 +17,15 @@ document.addEventListener("DOMContentLoaded", () => {
         if (bar && ev.lengthComputable) { bar.max = ev.total; bar.value = ev.loaded; }
       };
       xhr.upload.onload = () => {
-        // Upload klaar; zonder datum leest de server nu eerst de tekst (kan even duren).
+        // Upload klaar; de server leest nu eerst de tekst (kan even duren): "Bestanden ontvangen, tekst lezen…".
         if (bar) bar.removeAttribute("value");
         const bezig = form.querySelector("[data-bezig]");
         if (bezig) bezig.hidden = false;
         form.querySelectorAll("button[type=submit]").forEach((b) => { b.disabled = true; });
       };
       xhr.onload = () => {
-        if (xhr.status < 400 && xhr.responseURL) { window.location = xhr.responseURL; return; }
-        // Validatiefout (400): toon het teruggestuurde formulier zoals bij een gewone POST.
+        if (xhr.status < 400 && xhr.responseURL) { window.location = xhr.responseURL; return; }  // door naar scherm 2
+        // Validatiefout (400, geen bestanden): toon het teruggestuurde formulier zoals bij een gewone POST.
         document.open(); document.write(xhr.responseText); document.close();
       };
       xhr.onerror = () => form.submit();

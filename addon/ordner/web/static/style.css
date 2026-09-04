@@ -104,7 +104,9 @@ nav.hoofd a[aria-current="page"] { background: var(--actief); color: var(--actie
 
 /* --- meldingen --------------------------------------------------------- */
 .melding, .fout { padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1rem; font-weight: 500; }
-.melding { background: var(--ok-tint); color: var(--ok); }
+/* Bevestiging na opslaan e.d.: vinkje, iets groter en met een rand, blijft staan (geen toast, geen JS). */
+.melding { display: flex; align-items: center; gap: 0.6rem; background: var(--ok-tint); color: var(--ok); border: 1px solid var(--ok); font-size: 1.05rem; }
+.melding .icoon { width: 1.4rem; height: 1.4rem; }
 .fout { background: var(--failed-tint); color: var(--failed); }
 
 /* --- koppen en panelen ----------------------------------------------------- */
@@ -192,6 +194,7 @@ input[type="file"]::file-selector-button {
 .veld > span { display: block; font-weight: 500; margin-bottom: 0.35rem; }
 .veld > span small { font-weight: 400; color: var(--gedempt); margin-left: 0.25rem; }
 .hint { color: var(--gedempt); font-size: 0.85rem; margin-top: 0.3rem; }
+.veld > span.hint { font-weight: 400; margin: 0.3rem 0 0; }  /* hint onder een invoerveld (scherm 2 van de upload) */
 .hint-bestanden { margin: -0.6rem 0 1rem; }
 .velden-rij { display: grid; gap: 0 1rem; }
 @media (min-width: 560px) { .velden-rij { grid-template-columns: 1fr 1fr; } }
@@ -233,6 +236,10 @@ button[disabled] { opacity: 0.5; cursor: default; filter: none; }
 .bestand object { display: block; width: 100%; height: min(70vh, 720px); margin-top: 0.75rem; border-radius: 8px; border: 1px solid var(--hairline); }
 @media (max-width: 640px) { .bestand object { display: none; } }
 .bestand-toevoegen { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--hairline); }
+/* Tweestaps upload, scherm 2: de gekozen bestanden (niet wijzigbaar) */
+ul.bestandslijst { list-style: none; margin: 0 0 0.75rem; padding: 0; }
+ul.bestandslijst li { display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem; align-items: baseline; padding: 0.4rem 0; border-bottom: 1px solid var(--hairline); }
+ul.bestandslijst li:last-child { border-bottom: 0; }
 .bestand-toevoegen .veld { margin-bottom: 0.75rem; }
 pre.notities { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; margin: 0; }
 .mapinfo { color: var(--gedempt); font-size: 0.85rem; margin-top: 0.75rem; overflow-wrap: anywhere; }

@@ -144,6 +144,17 @@ async def test_heic_wordt_eerst_jpg(
     assert bron.parent != tmp_path
 
 
+async def test_kapotte_heic_geeft_extractiefout(mock_cmd: CmdMock, tmp_path: Path) -> None:
+    """Onleesbare heic-data (PIL: UnidentifiedImageError) wordt een ExtractieFout, geen crash (15b: stap 1 leest altijd)."""
+    mock_cmd.register("tesseract", stdout=b"foto")
+    heic = tmp_path / "kapot.heic"
+    heic.write_bytes(b"dit is geen heic")
+
+    with pytest.raises(ExtractieFout, match="heic niet leesbaar"):
+        await extract_afbeelding(heic, TALEN)
+    assert mock_cmd.calls == []  # tesseract is niet aangeroepen
+
+
 async def test_tesseract_faalt(mock_cmd: CmdMock, tmp_path: Path) -> None:
     mock_cmd.register("tesseract", rc=1, stderr=b"Error opening data file")
     png = tmp_path / "x.png"

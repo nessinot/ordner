@@ -93,7 +93,10 @@ def _heic_naar_jpg(pad: Path, tmpdir: Path) -> Path:
 
     pillow_heif.register_heif_opener()
     doel = tmpdir / (pad.stem + ".jpg")
-    Image.open(pad).convert("RGB").save(doel, quality=90)
+    try:
+        Image.open(pad).convert("RGB").save(doel, quality=90)
+    except (OSError, ValueError) as e:  # PIL: UnidentifiedImageError (OSError), kapotte of lege data
+        raise ExtractieFout(f"heic niet leesbaar: {pad.name}: {e}") from e
     return doel
 
 

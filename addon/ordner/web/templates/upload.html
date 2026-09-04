@@ -2,37 +2,18 @@
 {% set nav = 'upload' %}
 {% set paginatitel = 'Uploaden' %}
 {% block content %}
-<div class="kop"><h2>Nieuw document</h2></div>
+<div class="kop"><h2>Nieuw document</h2><span class="gedempt">stap 1 van 2: bestanden</span></div>
 {% if fout %}<p class="fout" role="alert">{{ fout }}</p>{% endif %}
 <form method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data" data-upload class="paneel">
   <label class="veld">
     <span>Bestanden</span>
-    <input type="file" name="bestanden" multiple accept="image/*,application/pdf">
+    <input type="file" name="bestanden" multiple accept="image/*,application/pdf" required>
   </label>
-  <p class="hint hint-bestanden">Pdf's en foto's; meerdere tegelijk mag. De tekst wordt daarna automatisch herkend.</p>
-  <label class="veld">
-    <span>Titel</span>
-    <input type="text" name="titel" value="{{ titel }}" required autocomplete="off" placeholder="Bijv. WOZ-beschikking 2026">
-  </label>
-  <label class="veld">
-    <span>Omschrijving <small>optioneel</small></span>
-    <textarea name="omschrijving" rows="3">{{ omschrijving }}</textarea>
-  </label>
-  <div class="velden-rij">
-    <label class="veld">
-      <span>Documentdatum <small>optioneel</small></span>
-      <input type="date" name="documentdatum" value="{{ documentdatum }}">
-    </label>
-    <label class="veld">
-      <span>Tags <small>komma-gescheiden</small></span>
-      <input type="text" name="tags" value="{{ tags }}" autocomplete="off" placeholder="woz, gemeente">
-    </label>
-  </div>
-  <p class="hint">Laat de datum leeg en Ordner leest hem uit het document (factuurdatum, notadatum, orderdatum, dagtekening of datum); staat er geen, dan wordt het vandaag. Bij foto's en scans duurt opslaan dan wat langer.</p>
+  <p class="hint hint-bestanden">Pdf's en foto's; meerdere tegelijk mag, ze vormen samen één document. Ordner leest de tekst en vult daarna titel, datum en tags voor je in; die kun je in de volgende stap nog aanpassen.</p>
   <progress hidden></progress>
   <p class="hint" data-bezig hidden>Bestanden ontvangen, tekst lezen…</p>
   <div class="knoppen vol">
-    <button type="submit">Opslaan</button>
+    <button type="submit">Verder</button>
   </div>
 </form>
 {% endblock %}

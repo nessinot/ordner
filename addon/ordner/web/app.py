@@ -17,6 +17,7 @@ from ordner.config import Settings
 from ordner.index import Index, Reconciler, bouw_index
 from ordner.ingest import maak_tekstlezer
 from ordner.storage import Archief
+from ordner.web.openstaand import OpenstaandeUploads
 from ordner.web.routes import router
 from ordner.worker import OcrQueue, inbox_lus, reconcile_lus
 
@@ -82,6 +83,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.laatste_rapport = None
     app.state.reconcile_bezig = False
     app.state.templates = maak_templates()
+    app.state.openstaand = OpenstaandeUploads()  # tweestaps upload (15b): alleen geheugen, weg bij herstart
 
     @app.middleware("http")
     async def ingress(request: Request, call_next):  # type: ignore[no-untyped-def]

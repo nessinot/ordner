@@ -49,13 +49,24 @@ def _wacht_tot_ocr_klaar(page: Page) -> str:
 
 
 def test_upload_via_formulier(page: Page, server: Server) -> None:
+    """Tweestaps upload (pakket 15b): scherm 1 alleen bestanden, scherm 2 de voorgevulde gegevens."""
     page.goto(server.url + "/upload")
+    expect(page.locator("input[name=titel]")).to_have_count(0)  # scherm 1 heeft geen titelveld
     page.locator("input[name=bestanden]").set_input_files([str(FIXTURES / "tekst.pdf"), str(FIXTURES / "foto.jpg")])
+    page.get_by_role("button", name="Verder").click()
+
+    # scherm 2: bestandslijst en voorgevulde velden (zonder OCR-tools: titel leeg, datum vandaag)
+    page.wait_for_url(re.compile(r"/upload/[A-Za-z0-9_-]{8,}$"), timeout=OCR_TIMEOUT_MS)
+    expect(page.locator("ul.bestandslijst .bestand-naam")).to_have_text(["tekst.pdf", "foto.jpg"])
+    expect(page.locator("input[name=documentdatum]")).not_to_have_value("")
+    assert not (server.archief / date.today().strftime("%Y")).exists(), "scherm 1 mag niets in het archief schrijven"
     page.fill("input[name=titel]", TITEL)
+    page.fill("input[name=documentdatum]", date.today().isoformat())
     page.fill("input[name=tags]", ", ".join(TAGS))
     page.get_by_role("button", name="Opslaan").click()
 
     page.wait_for_url(re.compile(r"/doc/"))
+    expect(page.locator(".melding")).to_have_text("Opgeslagen")
     expect(page.locator("h2").first).to_contain_text(TITEL)
 
     pad = page.url.removeprefix(server.url).split("?")[0]  # /doc/<jaar>/<map>

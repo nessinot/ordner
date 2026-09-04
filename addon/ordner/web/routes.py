@@ -1,10 +1,11 @@
-"""Routes van de webapp (pakket 08: zoeken, upload, bestand-serving; pakket 09: document, beheer, status)."""
+"""Routes van de webapp (pakket 08: zoeken, upload, bestand-serving; pakket 09: document, beheer, status; pakket 15b: tweestaps upload)."""
 
 from __future__ import annotations
 
 import asyncio
 import logging
 import mimetypes
+import re
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -14,10 +15,12 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Resp
 from fastapi.templating import Jinja2Templates
 
 from ordner.index import DocEntry, Index, Reconciler
-from ordner.ingest import LeesTekst, maak_document_uit_bestanden
+from ordner.ingest import LeesTekst, Voorbereid, lees_vooraf, maak_document_uit_voorbereid
 from ordner.meta import MetaFout, OcrStatus, is_extraheerbaar, schrijf_meta, txt_pad
 from ordner.search import zoek
 from ordner.storage import Archief, OngeldigPad
+from ordner.suggestie import Suggestie, stel_voor
+from ordner.web.openstaand import OpenstaandeUpload, OpenstaandeUploads
 from ordner.worker import OcrQueue
 
 log = logging.getLogger(__name__)
@@ -163,65 +166,161 @@ async def zoeken(request: Request) -> Response:
 # --- upload ---------------------------------------------------------------
 
 
-def _upload_context(**velden: str) -> dict[str, str]:
-    ctx = {"titel": "", "omschrijving": "", "documentdatum": "", "tags": "", "fout": ""}
+_TOKEN_RE = re.compile(r"[A-Za-z0-9_-]{8,64}")
+_UPLOAD_VERLOPEN = "Deze upload is verlopen; kies de bestanden opnieuw."
+
+
+def _openstaand(request: Request) -> OpenstaandeUploads:
+    return request.app.state.openstaand
+
+
+def _grootte(aantal: int) -> str:
+    """Leesbare bestandsgrootte voor de bestandslijst op scherm 2 ("12 kB", "3,4 MB")."""
+    if aantal < 1000:
+        return f"{aantal} B"
+    if aantal < 1_000_000:
+        return f"{aantal / 1000:.0f} kB"
+    return f"{aantal / 1_000_000:.1f}".replace(".", ",") + " MB"
+
+
+@dataclass
+class UploadBestand:
+    """Eén bestand in de (niet wijzigbare) bestandslijst op scherm 2."""
+
+    naam: str
+    grootte: str
+
+
+def _gegevens_context(upload: OpenstaandeUpload, fout: str = "", **velden: str) -> dict[str, object]:
+    """Context voor scherm 2: bestandslijst en de voorgevulde velden; `velden` overschrijft de suggestie (bij 400)."""
+    vb, sug = upload.voorbereid, upload.suggestie
+    ctx: dict[str, object] = {
+        "token": upload.token,
+        "bestanden": [UploadBestand(naam, _grootte(len(data))) for naam, data in vb.bestanden],
+        "titel": sug.titel,
+        "omschrijving": "",
+        "documentdatum": vb.documentdatum.isoformat(),
+        "tags": ", ".join(sug.tags),
+        "datumbron": vb.datumbron,
+        "titelbron": sug.titelbron,
+        "fout": fout,
+    }
     ctx.update(velden)
     return ctx
 
 
+def _haal_openstaand(request: Request, token: str) -> OpenstaandeUpload | None:
+    """De openstaande upload bij `token`; 404 bij een misvormd token, None als onbekend of verlopen."""
+    if not _TOKEN_RE.fullmatch(token):
+        raise HTTPException(status_code=404, detail="Upload niet gevonden")
+    return _openstaand(request).haal(token)
+
+
 @router.get("/upload", name="upload")
 async def upload_formulier(request: Request) -> Response:
-    return _templates(request).TemplateResponse(request, "upload.html", _upload_context())
+    """Scherm 1: alleen bestanden kiezen."""
+    return _templates(request).TemplateResponse(request, "upload.html", {"fout": ""})
 
 
 @router.post("/upload")
-async def upload(
+async def upload(request: Request, bestanden: list[UploadFile] = File(default=[])) -> Response:
+    """Scherm 1 ingezonden: tekst lezen, datum en suggesties bepalen, openstaande upload klaarzetten, door naar scherm 2.
+
+    Er komt niets op schijf: geen map in het archief, niets in `_inbox/`. Andere formuliervelden
+    (titel, datum, ...) worden genegeerd; die horen bij scherm 2.
+    """
+    uploads = [(f.filename, await f.read()) for f in bestanden if f.filename]
+    if not uploads:
+        ctx = {"fout": "Kies minstens één bestand."}
+        return _templates(request).TemplateResponse(request, "upload.html", ctx, status_code=400)
+
+    bekende_titels = {e.meta.titel for e in _index(request).alle()}
+    lees_tekst = _lees_tekst(request)
+
+    def lees_en_stel_voor() -> tuple[Voorbereid, Suggestie]:
+        vb = lees_vooraf(uploads, documentdatum=None, lees_tekst=lees_tekst)
+        return vb, stel_voor(vb.tekst, bekende_titels)
+
+    # Tekst lezen kan tientallen seconden duren (OCR): in een thread, zodat de event loop en de
+    # status-polls van andere pagina's niet blokkeren. De store wordt alleen op de event loop aangeraakt.
+    vb, sug = await asyncio.to_thread(lees_en_stel_voor)
+    openstaand = _openstaand(request).maak(vb, sug)
+    log.info(
+        "upload ontvangen: %d bestand(en), datum %s (%s), titel %r (%s), tags %s; token %s",
+        len(uploads), vb.documentdatum, vb.datumbron, sug.titel, sug.titelbron, sug.tags, openstaand.token,
+    )
+    return _redirect(request, "upload_gegevens", token=openstaand.token)
+
+
+@router.get("/upload/{token}", name="upload_gegevens")
+async def upload_gegevens(request: Request, token: str) -> Response:
+    """Scherm 2: alle velden voorgevuld."""
+    upload = _haal_openstaand(request, token)
+    if upload is None:
+        return _redirect(request, "upload", _UPLOAD_VERLOPEN)
+    return _templates(request).TemplateResponse(request, "upload_gegevens.html", _gegevens_context(upload))
+
+
+@router.post("/upload/{token}")
+async def upload_opslaan(
     request: Request,
-    bestanden: list[UploadFile] = File(default=[]),
+    token: str,
     titel: str = Form(""),
     omschrijving: str = Form(""),
     documentdatum: str = Form(""),
     tags: str = Form(""),
 ) -> Response:
+    """Scherm 2 ingezonden: valideren, document aanmaken, openstaande upload weggooien."""
+    upload = _haal_openstaand(request, token)
+    if upload is None:
+        return _redirect(request, "upload", _UPLOAD_VERLOPEN)
     titel = titel.strip()
     omschrijving = omschrijving.strip()
     documentdatum = documentdatum.strip()
     ingevuld = dict(titel=titel, omschrijving=omschrijving, documentdatum=documentdatum, tags=tags)
 
     def fout(melding: str) -> Response:
-        ctx = _upload_context(**ingevuld, fout=melding)
-        return _templates(request).TemplateResponse(request, "upload.html", ctx, status_code=400)
+        ctx = _gegevens_context(upload, melding, **ingevuld)
+        return _templates(request).TemplateResponse(request, "upload_gegevens.html", ctx, status_code=400)
 
     if not titel:
         return fout("Titel is verplicht.")
-    datum: date | None = None
-    if documentdatum:
-        try:
-            datum = date.fromisoformat(documentdatum)
-        except ValueError:
-            return fout("Ongeldige documentdatum; gebruik JJJJ-MM-DD.")
-    taglijst = _splits_tags(tags)
+    try:
+        datum = date.fromisoformat(documentdatum)
+    except ValueError:
+        return fout("Ongeldige documentdatum; gebruik JJJJ-MM-DD.")
 
     archief = _archief(request)
-    uploads = [(f.filename, await f.read()) for f in bestanden if f.filename]
-    # Zonder datum wordt de tekst eerst gelezen (OCR kan tientallen seconden duren): in een thread,
-    # zodat de event loop en de status-polls van andere pagina's niet blokkeren.
+    vb = upload.voorbereid
+    # Ongewijzigde datum: bron uit lees_vooraf (tekst/upload). Gewijzigd: bron gebruiker.
+    gewijzigde_datum = None if datum == vb.documentdatum else datum
+    # Eerst uit de store, dan pas aanmaken: een tweede verzoek met hetzelfde token (dubbelklik, twee tabs)
+    # vindt niets meer en kan geen tweede document maken.
+    _openstaand(request).verwijder(token)
     doc = await asyncio.to_thread(
-        maak_document_uit_bestanden,
+        maak_document_uit_voorbereid,
         archief,
         titel,
-        uploads,
-        documentdatum=datum,
+        vb,
         omschrijving=omschrijving,
-        tags=taglijst,
-        lees_tekst=_lees_tekst(request),
+        tags=_splits_tags(tags),
         queue_fn=_queue(request).enqueue,
+        documentdatum=gewijzigde_datum,
     )
     _index(request).herlaad(archief, doc)
-    log.info("upload: %s (%d bestand(en))", archief.relatief(doc), len(uploads))
+    log.info("upload opgeslagen: %s (%d bestand(en))", archief.relatief(doc), len(vb.bestanden))
 
     jaar, map = _splits_rel(archief.relatief(doc))
     return _redirect(request, "document", "Opgeslagen", jaar=jaar, map=map)
+
+
+@router.post("/upload/{token}/annuleer", name="upload_annuleer")
+async def upload_annuleer(request: Request, token: str) -> Response:
+    """Openstaande upload weggooien; er is niets op schijf gekomen."""
+    if not _TOKEN_RE.fullmatch(token):
+        raise HTTPException(status_code=404, detail="Upload niet gevonden")
+    _openstaand(request).verwijder(token)
+    return _redirect(request, "upload", "Upload geannuleerd")
 
 
 def _splits_tags(tags: str) -> list[str]:
