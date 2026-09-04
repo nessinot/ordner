@@ -206,6 +206,10 @@ button[disabled] { opacity: 0.5; cursor: default; filter: none; }
 }
 
 /* --- documentpagina --------------------------------------------------------- */
+.terug { margin: 0 0 0.75rem; font-size: 0.9rem; }
+.terug a { display: inline-flex; align-items: center; gap: 0.25rem; color: var(--gedempt); text-decoration: none; }
+.terug a:hover { color: var(--accent); text-decoration: underline; }
+.terug .icoon { width: 18px; height: 18px; fill: currentColor; }
 .dockop { margin-bottom: 1.25rem; }
 .document .kop { margin-top: 0; }
 .document .kop .datum { color: var(--gedempt); }
