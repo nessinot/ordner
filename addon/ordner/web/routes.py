@@ -71,9 +71,18 @@ def _queue(request: Request) -> OcrQueue:
     return request.app.state.queue
 
 
-def _redirect(request: Request, naam: str, melding: str | None = None, /, **path_params: str) -> RedirectResponse:
-    """303-redirect via url_for (Ingress-prefix); pad zonder scheme/host."""
+def _redirect(
+    request: Request,
+    naam: str,
+    melding: str | None = None,
+    /,
+    query: dict[str, str] | None = None,
+    **path_params: str,
+) -> RedirectResponse:
+    """303-redirect via url_for (Ingress-prefix); pad zonder scheme/host. `query` (bv. de zoekopdracht) gaat mee."""
     url = request.url_for(naam, **path_params)
+    if query:
+        url = url.include_query_params(**{k: v for k, v in query.items() if v})
     if melding:
         url = url.include_query_params(m=melding)
     doel = url.path + (f"?{url.query}" if url.query else "")
@@ -131,7 +140,14 @@ async def zoeken(request: Request) -> Response:
     return _templates(request).TemplateResponse(
         request,
         "zoeken.html",
-        {"q": q, "kaarten": kaarten, "totaal": totaal, "afgekapt": len(kaarten) < totaal, "tellingen": index.tellingen()},
+        {
+            "q": q,
+            "alles": alles,
+            "kaarten": kaarten,
+            "totaal": totaal,
+            "afgekapt": len(kaarten) < totaal,
+            "tellingen": index.tellingen(),
+        },
     )
 
 
@@ -231,8 +247,20 @@ def _bestandsweergaven(entry: DocEntry) -> list[Bestandsweergave]:
     return weergaven
 
 
+def _herkomst(q: str, alles: str) -> dict[str, str]:
+    """Zoekopdracht waarmee de gebruiker bij het document kwam; reist mee in URL's en formulieren voor de terugknop."""
+    q = q.strip()
+    return {"q": q, "alles": "1" if q and alles == "1" else ""}
+
+
 def _document_pagina(
-    request: Request, entry: DocEntry, jaar: str, map: str, fout: str = "", status_code: int = 200
+    request: Request,
+    entry: DocEntry,
+    jaar: str,
+    map: str,
+    fout: str = "",
+    status_code: int = 200,
+    herkomst: dict[str, str] | None = None,
 ) -> Response:
     ctx = {
         "entry": entry,
@@ -242,6 +270,7 @@ def _document_pagina(
         "map": map,
         "bestanden": _bestandsweergaven(entry),
         "fout": fout,
+        "herkomst": herkomst or _herkomst("", ""),
     }
     return _templates(request).TemplateResponse(request, "document.html", ctx, status_code=status_code)
 
@@ -249,7 +278,8 @@ def _document_pagina(
 @router.get("/doc/{jaar}/{map}", name="document")
 async def document(request: Request, jaar: str, map: str) -> Response:
     entry = _entry(request, jaar, map)
-    return _document_pagina(request, entry, jaar, map)
+    herkomst = _herkomst(request.query_params.get("q", ""), request.query_params.get("alles", ""))
+    return _document_pagina(request, entry, jaar, map, herkomst=herkomst)
 
 
 @router.post("/doc/{jaar}/{map}/meta", name="document_meta")
@@ -261,16 +291,21 @@ async def document_meta(
     omschrijving: str = Form(""),
     documentdatum: str = Form(""),
     tags: str = Form(""),
+    q: str = Form(""),
+    alles: str = Form(""),
 ) -> Response:
     entry = _entry(request, jaar, map)
+    herkomst = _herkomst(q, alles)
     titel = titel.strip()
     if not titel:
-        return _document_pagina(request, entry, jaar, map, fout="Titel is verplicht.", status_code=400)
+        return _document_pagina(
+            request, entry, jaar, map, fout="Titel is verplicht.", status_code=400, herkomst=herkomst
+        )
     try:
         datum = date.fromisoformat(documentdatum.strip())
     except ValueError:
         fout = "Ongeldige documentdatum; gebruik JJJJ-MM-DD."
-        return _document_pagina(request, entry, jaar, map, fout=fout, status_code=400)
+        return _document_pagina(request, entry, jaar, map, fout=fout, status_code=400, herkomst=herkomst)
     meta = entry.meta
     meta.titel = titel
     meta.omschrijving = omschrijving.strip()
@@ -279,12 +314,17 @@ async def document_meta(
     schrijf_meta(entry.map, meta)  # de map wordt nooit hernoemd
     _index(request).herlaad(_archief(request), entry.map)
     log.info("meta bijgewerkt: %s", entry.rel)
-    return _redirect(request, "document", "Opgeslagen", jaar=jaar, map=map)
+    return _redirect(request, "document", "Opgeslagen", query=herkomst, jaar=jaar, map=map)
 
 
 @router.post("/doc/{jaar}/{map}/bestanden", name="document_bestanden")
 async def document_bestanden(
-    request: Request, jaar: str, map: str, bestanden: list[UploadFile] = File(default=[])
+    request: Request,
+    jaar: str,
+    map: str,
+    bestanden: list[UploadFile] = File(default=[]),
+    q: str = Form(""),
+    alles: str = Form(""),
 ) -> Response:
     entry = _entry(request, jaar, map)
     archief = _archief(request)
@@ -292,11 +332,13 @@ async def document_bestanden(
     aantal = _sla_bestanden_op(archief, _queue(request), entry.map, uploads)
     _index(request).herlaad(archief, entry.map)
     log.info("bestanden toegevoegd aan %s: %d", entry.rel, aantal)
-    return _redirect(request, "document", "Toegevoegd", jaar=jaar, map=map)
+    return _redirect(request, "document", "Toegevoegd", query=_herkomst(q, alles), jaar=jaar, map=map)
 
 
 @router.post("/doc/{jaar}/{map}/ocr", name="document_ocr")
-async def document_ocr(request: Request, jaar: str, map: str) -> Response:
+async def document_ocr(
+    request: Request, jaar: str, map: str, q: str = Form(""), alles: str = Form("")
+) -> Response:
     entry = _entry(request, jaar, map)
     queue = _queue(request)
     meta = entry.meta
@@ -311,17 +353,19 @@ async def document_ocr(request: Request, jaar: str, map: str) -> Response:
         queue.enqueue(entry.map, naam)
     _index(request).herlaad(_archief(request), entry.map)
     log.info("OCR opnieuw gestart voor %s (%d bestand(en))", entry.rel, len(extraheerbaar))
-    return _redirect(request, "document", "OCR gestart", jaar=jaar, map=map)
+    return _redirect(request, "document", "OCR gestart", query=_herkomst(q, alles), jaar=jaar, map=map)
 
 
 @router.post("/doc/{jaar}/{map}/verwijder", name="document_verwijder")
-async def document_verwijder(request: Request, jaar: str, map: str) -> Response:
+async def document_verwijder(
+    request: Request, jaar: str, map: str, q: str = Form(""), alles: str = Form("")
+) -> Response:
     entry = _entry(request, jaar, map)
     archief = _archief(request)
     rel = archief.relatief(entry.map)
     archief.naar_prullenbak(entry.map)
     _index(request).verwijder(rel)
-    return _redirect(request, "zoeken", "Verplaatst naar prullenbak")
+    return _redirect(request, "zoeken", "Verplaatst naar prullenbak", query=_herkomst(q, alles))
 
 
 @router.get("/doc/{jaar}/{map}/bestand/{naam}", name="bestand")

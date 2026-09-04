@@ -401,6 +401,63 @@ def test_meta_ongeldige_datum_400(client: TestClient) -> None:
     assert r.status_code == 400
 
 
+# --- terugknop (herkomst) ---------------------------------------------------
+
+
+def test_terugknop_zonder_zoekopdracht(client: TestClient) -> None:
+    _upload(client)
+    r = client.get("/")
+    assert f'href="{_DOC}"' in r.text  # geen q meegegeven vanuit Recent
+    r = client.get(_DOC)
+    assert "Terug naar overzicht" in r.text
+    assert 'class="terug"' in r.text
+    assert 'name="q"' not in r.text
+
+
+def test_terugknop_met_zoekopdracht(client: TestClient) -> None:
+    _upload(client, titel="WOZ beschikking")
+    doc = "/doc/2026/2026-03-01_woz-beschikking"
+    r = client.get("/?q=woz+2026")
+    assert f'href="{doc}?q=woz%202026"' in r.text
+    r = client.get(f"{doc}?q=woz 2026")
+    assert "Terug naar zoekresultaten voor “woz 2026”" in r.text
+    assert 'href="/?q=woz%202026"' in r.text
+    assert r.text.count('<input type="hidden" name="q" value="woz 2026">') == 4  # alle vier formulieren
+
+
+def test_terugknop_met_toon_alles(client: TestClient) -> None:
+    _upload(client)
+    r = client.get("/?q=test&alles=1")
+    assert f'href="{_DOC}?q=test&amp;alles=1"' in r.text
+    r = client.get(f"{_DOC}?q=test&alles=1")
+    assert 'href="/?q=test&amp;alles=1"' in r.text
+    assert '<input type="hidden" name="alles" value="1">' in r.text
+    # alles zonder q wordt genegeerd
+    r = client.get(f"{_DOC}?alles=1")
+    assert "Terug naar overzicht" in r.text
+    assert 'name="alles"' not in r.text
+
+
+def test_acties_behouden_zoekopdracht(client: TestClient) -> None:
+    _upload(client)
+    r = client.post(
+        f"{_DOC}/meta",
+        data={"titel": "Test", "documentdatum": "2026-03-01", "q": "test", "alles": "1"},
+        follow_redirects=False,
+    )
+    assert r.headers["location"] == f"{_DOC}?q=test&alles=1&m=Opgeslagen"
+    r = client.post(f"{_DOC}/ocr", data={"q": "test"}, follow_redirects=False)
+    assert r.headers["location"] == f"{_DOC}?q=test&m=OCR+gestart"
+    r = client.post(f"{_DOC}/bestanden", data={"q": "test"}, follow_redirects=False)
+    assert r.headers["location"] == f"{_DOC}?q=test&m=Toegevoegd"
+    # validatiefout: formulier opnieuw getoond, herkomst blijft in de verborgen velden
+    r = client.post(f"{_DOC}/meta", data={"titel": "", "documentdatum": "2026-03-01", "q": "test"})
+    assert r.status_code == 400
+    assert '<input type="hidden" name="q" value="test">' in r.text
+    r = client.post(f"{_DOC}/verwijder", data={"q": "test"}, follow_redirects=False)
+    assert r.headers["location"] == "/?q=test&m=Verplaatst+naar+prullenbak"
+
+
 def test_meta_nietbestaand_404(client: TestClient) -> None:
     assert client.post("/doc/2026/niets/meta", data={"titel": "x", "documentdatum": "2026-01-01"}).status_code == 404
     assert client.post("/doc/2026/../meta", data={"titel": "x"}).status_code == 404

@@ -18,10 +18,11 @@
   {% endif %}
 </div>
 
+{% set herkomst = ('?q=' ~ (q|urlencode) ~ ('&alles=1' if alles else '')) if q else '' %}
 <ul class="kaarten">
 {% for k in kaarten %}
   <li class="kaart">
-    <a class="rij" href="{{ url_for('document', jaar=k.jaar, map=k.map) }}">
+    <a class="rij" href="{{ url_for('document', jaar=k.jaar, map=k.map) }}{{ herkomst }}">
       {% if k.soort == 'pdf' %}
       <svg class="icoon pdf" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zM8 12h8v1.5H8V12zm0 3h8v1.5H8V15zm0 3h5v1.5H8V18z"/></svg>
       {% elif k.soort == 'afbeelding' %}

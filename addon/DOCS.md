@@ -64,6 +64,8 @@ Het startscherm toont de 20 nieuwste documenten. Staan er meer in het archief, d
 
 Zoeken werkt op alle woorden tegelijk (elk woord moet voorkomen), zonder onderscheid in hoofdletters, over titel, omschrijving, tags, documentdatum, notities en de gelezen tekst van de bestanden. Een datum of jaartal (`2024`, `2024-03`) telt als zoekwoord, dus `energie 2024` vindt alleen energiedocumenten uit 2024. Bij meer dan 50 treffers worden de 50 nieuwste getoond; de kop noemt het echte aantal en onder de lijst staat een link **Toon alle** voor de volledige lijst. Meestal is een extra zoekwoord sneller.
 
+Open je een document vanuit de resultaten, dan staat bovenaan de documentpagina **Terug naar zoekresultaten**; die brengt je terug bij dezelfde zoekopdracht, ook na opslaan of verwijderen. Vanuit het startscherm heet die link **Terug naar overzicht**.
+
 ## Inbox
 
 Bestanden die je in `/share/ordner/_inbox/` zet worden automatisch opgenomen: elke vijf seconden kijkt Ordner of er een bestand ligt dat niet meer groeit (twee keer achter elkaar dezelfde grootte). Dan wordt er een nieuw document van gemaakt:
