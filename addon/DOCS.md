@@ -71,6 +71,10 @@ Tot je op Opslaan drukt wordt er niets bewaard. **Annuleren** gooit de gekozen b
 
 Een bestand toevoegen aan een bestaand document doe je op de documentpagina.
 
+## Bestanden bekijken
+
+Op de documentpagina staan de bestanden van het document. Foto's zie je meteen; een pdf wordt op een breed scherm ook op de pagina zelf getoond. Met **Open** bij een bestand krijg je het op een eigen pagina, groot en met een terugknop naar het document, ook in de Home Assistant-app op de telefoon. Kan de browser een pdf niet zelf tonen (sommige Android-browsers), dan staat onder het lege vlak een link om het bestand los te openen of te downloaden.
+
 ## Documentdatum
 
 In de tweede stap van het uploaden staat de documentdatum al ingevuld. Ordner leest daarvoor de tekst van het document en zoekt daarin naar een datum achter een van deze woorden, in deze volgorde: **factuurdatum**, **notadatum**, **orderdatum**, **dagtekening**, **datum**. Het woord mag met of zonder spatie geschreven zijn ("factuur datum") en er mag een dubbele punt achter staan. De datum staat direct achter het woord op dezelfde regel, of, zoals in tabellen op facturen, in dezelfde kolom op de regel eronder; "vervaldatum" of "betaaldatum" tellen niet mee. Herkende notaties: `12-03-2024`, `12/03/2024`, `12.03.2024`, `2024-03-12`, `12 maart 2024`, `12 mrt 2024` en een tweecijferig jaar. Staat er geen bruikbare datum in, dan wordt het de dag van uploaden.

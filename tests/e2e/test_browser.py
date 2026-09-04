@@ -130,6 +130,19 @@ def test_tag_label_zoekt(page: Page, server: Server) -> None:
     expect(page.locator(".terug a")).to_contain_text("e2e-tag")
 
 
+def test_open_toont_kijkpagina_met_terugknop(page: Page, server: Server) -> None:
+    """"Open" bij een bestand toont het op een eigen pagina met de app-kop en een terugknop (0.9.2)."""
+    _open_doc(page, server)
+    page.locator(".bestand", has_text="tekst.pdf").get_by_role("link", name="Open").click()
+    page.wait_for_url(re.compile(r"/bekijk/tekst\.pdf$"))
+    expect(page.locator("header.top")).to_be_visible()
+    expect(page.locator("h2")).to_have_text("tekst.pdf")
+    expect(page.locator("iframe.bekijk-vlak")).to_have_attribute("src", re.compile(r"/bestand/tekst\.pdf$"))
+    page.locator(".terug a").click()
+    page.wait_for_url(re.compile(r"/doc/[^/]+/[^/]+$"))
+    expect(page.locator("h2").first).to_have_text(TITEL)
+
+
 def test_bewerken_zonder_hernoemen(page: Page, server: Server) -> None:
     doc = _doc_map(server)
     _open_doc(page, server)

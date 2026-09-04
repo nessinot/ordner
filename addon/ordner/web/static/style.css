@@ -236,6 +236,12 @@ button[disabled] { opacity: 0.5; cursor: default; filter: none; }
 .bestand object { display: block; width: 100%; height: min(70vh, 720px); margin-top: 0.75rem; border-radius: 8px; border: 1px solid var(--hairline); }
 @media (max-width: 640px) { .bestand object { display: none; } }
 .bestand-toevoegen { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--hairline); }
+
+/* kijkpagina: kop en terugknop van de app blijven staan, het bestand vult de rest van het scherm */
+.bekijk .kop { margin-bottom: 0.75rem; }
+.bekijk .hint { margin: 0.5rem 0 0; font-size: 0.85rem; color: var(--gedempt); }
+iframe.bekijk-vlak { display: block; width: 100%; border: 1px solid var(--hairline); border-radius: 8px; background: var(--vlak); height: calc(100vh - 11rem); height: calc(100dvh - 11rem); min-height: 20rem; }
+img.bekijk-vlak { display: block; max-width: 100%; height: auto; margin: 0 auto; border-radius: 8px; }
 /* Tweestaps upload, scherm 2: de gekozen bestanden (niet wijzigbaar) */
 ul.bestandslijst { list-style: none; margin: 0 0 0.75rem; padding: 0; }
 ul.bestandslijst li { display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem; align-items: baseline; padding: 0.4rem 0; border-bottom: 1px solid var(--hairline); }

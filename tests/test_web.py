@@ -532,6 +532,39 @@ def test_bestand_serveren(client: TestClient) -> None:
     assert "a.pdf" in r.headers["content-disposition"]
 
 
+def test_bekijk_pagina(client: TestClient) -> None:
+    r = _upload(client, bestanden=[_A_PDF, ("b.png", b"png", "image/png"), ("c.docx", b"docx", "application/octet-stream")])
+    doc = "/doc/2026/2026-03-01_test"
+    r = client.get(f"{doc}/bekijk/a.pdf")
+    assert r.status_code == 200
+    assert f'<iframe class="bekijk-vlak" src="{doc}/bestand/a.pdf"' in r.text
+    assert f'href="{doc}">' in r.text  # terug naar het document
+    assert "<title>a.pdf · Ordner</title>" in r.text
+    assert 'target="_blank"' not in r.text
+
+    r = client.get(f"{doc}/bekijk/b.png")
+    assert f'<img class="bekijk-vlak" src="{doc}/bestand/b.png"' in r.text
+    assert "<iframe" not in r.text
+
+    r = client.get(f"{doc}/bekijk/c.docx")
+    assert "kan hier niet getoond worden" in r.text
+    assert f'<a href="{doc}/bestand/c.docx">' in r.text
+    assert "<iframe" not in r.text and "<img class" not in r.text
+
+    # de zoekopdracht reist mee: Open-knop → kijkpagina → terug naar document, alles met ?q=
+    r = client.get(f"{doc}?q=woz&alles=1")
+    assert f'href="{doc}/bekijk/a.pdf?q=woz&amp;alles=1">Open</a>' in r.text
+    r = client.get(f"{doc}/bekijk/a.pdf?q=woz&alles=1")
+    assert f'href="{doc}?q=woz&amp;alles=1">' in r.text
+
+
+def test_bekijk_404(client: TestClient) -> None:
+    _upload(client)
+    assert client.get("/doc/2026/2026-03-01_test/bekijk/nietbestaand.pdf").status_code == 404
+    assert client.get("/doc/2026/2026-03-01_test/bekijk/..%5Cmeta.md").status_code == 404
+    assert client.get("/doc/2026/nietbestaand/bekijk/a.pdf").status_code == 404
+
+
 def test_bestand_buiten_archief_404(client: TestClient) -> None:
     _upload(client)
     assert client.get("/doc/2026/../x/bestand/a.pdf").status_code == 404
@@ -610,8 +643,11 @@ def test_document_pagina_volledig(client: TestClient) -> None:
     for actie in ("meta", "bestanden", "ocr", "verwijder"):
         assert f'action="{_DOC}/{actie}"' in r.text, actie
     assert f'<object type="application/pdf" data="{_DOC}/bestand/a.pdf"' in r.text
-    # Geen target="_blank": de HA-app opent zo'n link in een externe browser zonder Ingress-sessie (404/401).
-    assert f'<a class="knop" href="{_DOC}/bestand/a.pdf">Open</a>' in r.text
+    # "Open" wijst naar de kijkpagina (0.9.2), nooit naar het kale bestand en nooit met target="_blank":
+    # de HA-app opent zo'n link in een externe browser zonder Ingress-sessie (404/401), en een los
+    # geopend bestand vult het hele scherm zonder weg terug.
+    assert f'<a class="knop" href="{_DOC}/bekijk/a.pdf">Open</a>' in r.text
+    assert f'<a href="{_DOC}/bekijk/a.pdf">Open de pdf</a>' in r.text
     assert 'target="_blank"' not in r.text
     assert "De mapnaam verandert niet." in r.text
     assert "confirm('Naar de prullenbak?')" in r.text
@@ -634,8 +670,8 @@ def test_document_pagina_afbeelding_en_overig(client: TestClient) -> None:
     assert r.status_code == 200
     assert '<img src="/doc/2026/2026-03-05_mix/bestand/foto.JPG"' in r.text
     assert 'loading="lazy"' in r.text
-    assert "/bestand/notitie.docx" in r.text
-    assert "/bestand/foto.heic" in r.text
+    assert "/bekijk/notitie.docx" in r.text  # Open → kijkpagina, ook voor overige bestanden (0.9.2)
+    assert "/bekijk/foto.heic" in r.text
     assert "<object" not in r.text
     assert r.text.count("<img ") == 1  # heic en docx niet inline
 
@@ -935,6 +971,11 @@ def test_ingress_prefix_op_documentpagina(client: TestClient) -> None:
         assert f'data-status-url="{_PREFIX}/api/status"' in r.text
         if pad == _DOC:
             assert f'data="{_PREFIX}{_DOC}/bestand/a.pdf"' in r.text
+            assert f'href="{_PREFIX}{_DOC}/bekijk/a.pdf">Open</a>' in r.text
+    r = client.get(f"{_DOC}/bekijk/a.pdf", headers={"X-Ingress-Path": _PREFIX})
+    assert r.status_code == 200
+    assert f'src="{_PREFIX}{_DOC}/bestand/a.pdf"' in r.text
+    assert f'href="{_PREFIX}{_DOC}">' in r.text
 
     r = client.post(
         f"{_DOC}/meta",
