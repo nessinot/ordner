@@ -277,7 +277,8 @@ def test_inbox_stabiel_na_twee_polls(archief: Archief, reconciler: Reconciler, q
 
 def test_inbox_met_tekstlezer_haalt_datum_uit_tekst(archief: Archief, queue: Queue) -> None:
     def lees(pad: Path) -> str | None:
-        return "Factuurdatum: 15-06-2023\nBedrag 12,50" if pad.suffix == ".pdf" else None
+        # korte tekst zonder naam: de titel blijft de bestandsnaam (pakket 15a)
+        return "Factuurdatum: 15-06-2023\n12,50" if pad.suffix == ".pdf" else None
 
     reconciler = Reconciler(archief, bouw_index(archief), queue, lees_tekst=lees)
     (archief.inbox_dir / "energie.pdf").write_bytes(b"%PDF")
@@ -297,6 +298,53 @@ def test_inbox_met_tekstlezer_haalt_datum_uit_tekst(archief: Archief, queue: Que
     assert queue.calls == [(docs[0], "bon.jpg")]
     assert list(archief.inbox_dir.iterdir()) == []
     assert all(archief.relatief(d) in reconciler.index.docs for d in docs)
+
+
+def test_inbox_titel_en_tags_uit_tekst(archief: Archief, queue: Queue) -> None:
+    """Pakket 15a: de titel komt uit de tekst (hier de rechtsvorm), het documenttype wordt een tag."""
+
+    def lees(pad: Path) -> str | None:
+        return "Eneco B.V.        Factuur\nFactuurnummer 123\nFactuurdatum: 01-02-2024\n" + "regel\n" * 30
+
+    reconciler = Reconciler(archief, bouw_index(archief), queue, lees_tekst=lees)
+    (archief.inbox_dir / "scan_0001.pdf").write_bytes(b"%PDF")
+    reconciler.verwerk_inbox()
+    docs = reconciler.verwerk_inbox()
+    assert [d.name for d in docs] == ["2024-02-01_eneco-b-v"]
+    meta = lees_meta(docs[0])
+    assert meta.titel == "Eneco B.V."
+    assert meta.tags == ["factuur"]
+    assert meta.datumbron == "tekst"
+    assert meta.bestanden == ["scan_0001.pdf"]
+    assert queue.calls == []
+
+
+def test_inbox_bekende_titel_uit_index_wint(archief: Archief, queue: Queue) -> None:
+    _doc(archief, "Gemeente Utrecht", DATUM)
+
+    def lees(pad: Path) -> str | None:
+        return "Aanslag\nGEMEENTE UTRECHT\nBelastingen B.V.\n" + "regel\n" * 30
+
+    reconciler = Reconciler(archief, bouw_index(archief), queue, lees_tekst=lees)
+    (archief.inbox_dir / "x.pdf").write_bytes(b"%PDF")
+    reconciler.verwerk_inbox()
+    docs = reconciler.verwerk_inbox()
+    meta = lees_meta(docs[0])
+    assert meta.titel == "Gemeente Utrecht"  # de archieftitel zoals getypt, niet de hoofdletters uit de tekst
+    assert meta.tags == ["aanslag"]
+
+
+def test_inbox_zonder_treffer_houdt_bestandsnaam(archief: Archief, queue: Queue) -> None:
+    def lees(pad: Path) -> str | None:
+        return "Geachte heer,\n" + "lopende tekst zonder afzender\n" * 30
+
+    reconciler = Reconciler(archief, bouw_index(archief), queue, lees_tekst=lees)
+    (archief.inbox_dir / "brief_van-2024.pdf").write_bytes(b"%PDF")
+    reconciler.verwerk_inbox()
+    docs = reconciler.verwerk_inbox()
+    meta = lees_meta(docs[0])
+    assert meta.titel == "brief van 2024"
+    assert meta.tags == []
 
 
 def test_inbox_groeiend_bestand_wacht(archief: Archief, reconciler: Reconciler) -> None:

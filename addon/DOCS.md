@@ -82,11 +82,29 @@ Open je een document vanuit de resultaten, dan staat bovenaan de documentpagina 
 
 Bestanden die je in `/share/ordner/_inbox/` zet worden automatisch opgenomen: elke vijf seconden kijkt Ordner of er een bestand ligt dat niet meer groeit (twee keer achter elkaar dezelfde grootte). Dan wordt er een nieuw document van gemaakt:
 
-- titel = bestandsnaam zonder extensie, waarbij `_` en `-` spaties worden;
-- documentdatum = vandaag;
-- het bestand wordt verplaatst naar de nieuwe documentmap en de OCR start.
+- titel = de naam van het bedrijf of de instantie uit de tekst (zie "Titel en tags uit de tekst"); is die niet te vinden, dan de bestandsnaam zonder extensie, waarbij `_` en `-` spaties worden;
+- tags = het documenttype uit de tekst, bijvoorbeeld `factuur` of `polis`;
+- documentdatum = de datum uit de tekst, anders vandaag (zie "Documentdatum");
+- het bestand wordt verplaatst naar de nieuwe documentmap; is de tekst al gelezen, dan hoeft er geen OCR meer te draaien.
 
-Handig voor scanners, e-mailregels of een gedeelde map op de telefoon. Pas na opname de titel en datum aan op de documentpagina.
+Handig voor scanners, e-mailregels of een gedeelde map op de telefoon. Controleer na opname de titel, tags en datum op de documentpagina; de naam uit de tekst is een gok, en bij een bankafschrift kan dat je eigen naam zijn.
+
+## Titel en tags uit de tekst
+
+Ordner probeert uit de gelezen tekst af te leiden van wie een document komt en wat voor document het is. Op dit moment gebeurt dat alleen voor de inbox; bij uploaden via het formulier typ je de titel nog zelf.
+
+De **titel** is alleen de naam van de afzender, dus "Eneco Services B.V." of "Gemeente Amsterdam", nooit het soort document of een jaartal. Ordner kijkt in deze volgorde en neemt het eerste wat lukt:
+
+1. Een titel die je al eerder in het archief hebt gebruikt en die letterlijk in de tekst voorkomt. Heb je eenmaal "Eneco" getypt, dan wordt dat bij de volgende Eneco-factuur herkend.
+2. De naam achter "t.n.v." of "ten name van", zoals bij de betaalgegevens op een factuur.
+3. De eerste regel met een rechtsvorm (B.V., N.V., VOF, U.A.) of een instantiewoord (Gemeente, Stichting, Vereniging, Waterschap, Provincie, Coöperatie, Ministerie, Belastingdienst, Bank, Verzekeraar, Ziekenhuis, Universiteit, Hogeschool).
+4. Bij een korte tekst, zoals een kassabon, de eerste regel met tekst.
+
+Bij een langere brief zonder zo'n aanknopingspunt blijft de titel leeg (in de inbox: de bestandsnaam), want de bovenste regel van een brief is meestal de ontvanger. Hoofdletters blijven zoals ze in de tekst staan.
+
+De **tags** zijn de documenttypen die als kopje in de tekst staan: factuur, creditnota, offerte, polis, beschikking, nota, bon (ook kassabon), herinnering (ook betalingsherinnering), aanmaning, contract, overeenkomst, aanslag, jaaroverzicht, jaarafrekening en garantie (garantiebewijs). Het woord moet een regel of kolom beginnen ("Factuur nr. 123" telt, "Factuurdatum" of "deze factuur" niet).
+
+De omschrijving wordt nooit automatisch ingevuld. Klopt een titel of tag niet, pas hem dan aan op de documentpagina; de mapnaam verandert daardoor niet.
 
 ## Prullenbak
 
