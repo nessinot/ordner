@@ -44,6 +44,7 @@ ordner/                       # repo-root = add-on-repository (Add-on store › 
   addon/                      # de add-on; dit is de Docker-build-context
     config.yaml build.yaml Dockerfile run.sh .dockerignore
     DOCS.md                   # tabblad "Documentatie" in de add-on
+    CHANGELOG.md              # tabblad "Changelog" in de add-on; bovenste kop = version in config.yaml (test)
     requirements.txt
     ordner/                   # Python-package
       __init__.py config.py slug.py meta.py storage.py extract.py datum.py ingest.py index.py search.py worker.py

@@ -1,7 +1,8 @@
-"""Controle van de add-on-bestanden (pakket 10) en de add-on-repository (pakket 13)."""
+"""Controle van de add-on-bestanden (pakket 10), de add-on-repository (pakket 13) en de changelog."""
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import yaml
@@ -30,6 +31,14 @@ def test_run_sh_lf() -> None:
     assert b"\r" not in inhoud
     assert inhoud.startswith(b"#!/usr/bin/with-contenv bashio\n")
     assert b"ORDNER_DATA=/share/ordner" in inhoud
+
+
+def test_changelog_bovenste_kop_is_de_huidige_versie() -> None:
+    """Elke versiebump krijgt release notes: de bovenste `## x.y.z`-kop in CHANGELOG.md is de versie uit config.yaml."""
+    config = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
+    koppen = re.findall(r"^## (\d+\.\d+\.\d+)\b", (ROOT / "CHANGELOG.md").read_text(encoding="utf-8"), re.M)
+    assert koppen, "CHANGELOG.md heeft geen versiekoppen"
+    assert koppen[0] == config["version"], f"CHANGELOG.md begint met {koppen[0]}, config.yaml staat op {config['version']}"
 
 
 def test_repository_yaml() -> None:
