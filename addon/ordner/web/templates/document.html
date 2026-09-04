@@ -22,7 +22,7 @@
   </div>
   {% if meta.omschrijving %}<p class="omschrijving">{{ meta.omschrijving }}</p>{% endif %}
   {% if meta.tags %}
-  <p class="badges">{% for tag in meta.tags %}<span class="badge badge-tag">{{ tag }}</span>{% endfor %}</p>
+  <p class="badges">{% for tag in meta.tags %}<a class="badge badge-tag" href="{{ url_for('zoeken') }}?q={{ tag|urlencode }}">{{ tag }}</a>{% endfor %}</p>
   {% endif %}
   </div>
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import time
+from html.parser import HTMLParser
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -103,6 +104,78 @@ def test_zoeken_zonder_afkapping_geen_voetnoot(client: TestClient) -> None:
     r = client.get("/?q=factuur")
     assert "5 resultaten" in r.text
     assert "nieuwste" not in r.text
+
+
+# --- tags als labels (pakket 15c) -------------------------------------------
+
+
+class _LinkParser(HTMLParser):
+    """Telt geneste <a>-elementen; ongeldige HTML zodra een <a> binnen een <a> opent."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.diepte = 0
+        self.genest = 0
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag == "a":
+            if self.diepte:
+                self.genest += 1
+            self.diepte += 1
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "a" and self.diepte:
+            self.diepte -= 1
+
+
+def _geneste_links(html: str) -> int:
+    parser = _LinkParser()
+    parser.feed(html)
+    return parser.genest
+
+
+def test_tags_als_labels_in_resultatenlijst(client: TestClient) -> None:
+    _upload(client, titel="WOZ beschikking", tags="woz, gemeente amsterdam")
+    for pad in ("/", "/?q=woz"):
+        r = client.get(pad)
+        assert r.status_code == 200, pad
+        assert '<span class="tags">' in r.text, pad
+        assert '<a class="badge badge-tag" href="/?q=woz">woz</a>' in r.text, pad
+        assert '<a class="badge badge-tag" href="/?q=gemeente%20amsterdam">gemeente amsterdam</a>' in r.text, pad
+        # titel blijft een link naar het document; de kaartrij zelf is geen link meer
+        assert '<a class="titel" href="/doc/2026/2026-03-01_woz-beschikking' in r.text, pad
+        assert '<a class="rij"' not in r.text, pad
+        assert _geneste_links(r.text) == 0, pad
+    # volgorde zoals in meta.md
+    r = client.get("/")
+    assert r.text.index("?q=woz") < r.text.index("?q=gemeente%20amsterdam")
+
+
+def test_tags_labels_met_ingress_prefix(client: TestClient) -> None:
+    _upload(client, titel="WOZ beschikking", tags="woz")
+    for pad in ("/?q=woz", "/doc/2026/2026-03-01_woz-beschikking"):
+        r = client.get(pad, headers={"X-Ingress-Path": _PREFIX})
+        assert f'<a class="badge badge-tag" href="{_PREFIX}/?q=woz">woz</a>' in r.text, pad
+
+
+def test_kaart_zonder_tags_heeft_geen_tags_span(client: TestClient) -> None:
+    _upload(client, titel="Zonder tags")
+    r = client.get("/?q=zonder")
+    assert 'class="kaart"' in r.text
+    assert 'class="tags"' not in r.text
+    assert "badge-tag" not in r.text
+
+
+def test_tag_label_op_documentpagina(client: TestClient) -> None:
+    _upload(client, tags="woz, gemeente amsterdam")
+    r = client.get(_DOC)
+    assert '<a class="badge badge-tag" href="/?q=woz">woz</a>' in r.text
+    assert '<a class="badge badge-tag" href="/?q=gemeente%20amsterdam">gemeente amsterdam</a>' in r.text
+    assert _geneste_links(r.text) == 0
+    # de tag-zoekopdracht vindt het document
+    r = client.get("/?q=gemeente amsterdam")
+    assert "1 resultaat" in r.text
+    assert f'href="{_DOC}?q=gemeente%20amsterdam"' in r.text
 
 
 # --- upload ---------------------------------------------------------------
@@ -377,7 +450,7 @@ def test_document_pagina_volledig(client: TestClient) -> None:
     assert 'data-rel="2026/2026-03-01_test"' in r.text
     assert 'data-ocr="' in r.text
     assert 'data-status-url="/api/status"' in r.text
-    assert 'class="badge badge-tag">woz<' in r.text
+    assert 'class="badge badge-tag" href="/?q=woz">woz<' in r.text
     for actie in ("meta", "bestanden", "ocr", "verwijder"):
         assert f'action="{_DOC}/{actie}"' in r.text, actie
     assert f'<object type="application/pdf" data="{_DOC}/bestand/a.pdf"' in r.text

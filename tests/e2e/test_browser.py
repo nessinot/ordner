@@ -23,6 +23,7 @@ pytestmark = pytest.mark.e2e
 
 TITEL = "E2E factuur"
 TITEL_BEWERKT = "E2E factuur bewerkt"
+TAGS = ("e2e-tag", "energie 2026")  # tweede tag met spatie: wordt een AND-zoekopdracht
 OCR_TIMEOUT_MS = 90_000
 
 staat: dict[str, str] = {}  # "doc_url" en "doc_map" na de upload-test
@@ -51,6 +52,7 @@ def test_upload_via_formulier(page: Page, server: Server) -> None:
     page.goto(server.url + "/upload")
     page.locator("input[name=bestanden]").set_input_files([str(FIXTURES / "tekst.pdf"), str(FIXTURES / "foto.jpg")])
     page.fill("input[name=titel]", TITEL)
+    page.fill("input[name=tags]", ", ".join(TAGS))
     page.get_by_role("button", name="Opslaan").click()
 
     page.wait_for_url(re.compile(r"/doc/"))
@@ -67,6 +69,7 @@ def test_upload_via_formulier(page: Page, server: Server) -> None:
     assert (doc / "tekst.pdf").is_file()
     assert (doc / "foto.jpg").is_file()
     assert lees_meta(doc).bestanden == ["tekst.pdf", "foto.jpg"]
+    assert lees_meta(doc).tags == list(TAGS)
 
 
 def test_status_polling(page: Page, server: Server, ocr_beschikbaar: bool) -> None:
@@ -85,6 +88,35 @@ def test_zoeken(page: Page, server: Server, ocr_beschikbaar: bool) -> None:
         kaart = page.locator(".kaart").first
         expect(kaart.locator(".titel")).to_have_text(TITEL)
         expect(kaart.locator(".snippet")).to_contain_text("tekst.pdf")
+
+
+def test_tag_label_zoekt(page: Page, server: Server) -> None:
+    """Klik op een tag-label (pakket 15c): in de resultatenlijst en op de documentpagina."""
+    page.goto(server.url + "/?q=e2e")
+    kaart = page.locator(".kaart").first
+    expect(kaart.locator(".tags a.badge-tag")).to_have_text(list(TAGS))
+    kaart.locator(".tags a.badge-tag", has_text=TAGS[1]).click()
+
+    page.wait_for_url(re.compile(r"\?q=energie(%20|\+)2026"))
+    expect(page.locator("input[name=q]")).to_have_value(TAGS[1])
+    expect(page.locator(".kaart .titel")).to_contain_text([TITEL])
+
+    # vanaf de documentpagina; de terugknop wijst daarna naar de tag-zoekopdracht
+    kaart = page.locator(".kaart").first
+    kaart.locator("a.titel").click()
+    page.wait_for_url(re.compile(r"/doc/"))
+    page.locator(".badges a.badge-tag", has_text=TAGS[0]).click()
+    page.wait_for_url(re.compile(r"\?q=e2e-tag$"))
+    expect(page.locator("input[name=q]")).to_have_value(TAGS[0])
+    expect(page.locator(".kaart .titel")).to_contain_text([TITEL])
+
+    # klik naast het label (op de datum) opent het document: de titel-link dekt de hele kaart, dus
+    # via muiscoördinaten, anders weigert Playwright omdat de link "in de weg" ligt
+    vak = page.locator(".kaart .datum").first.bounding_box()
+    assert vak is not None
+    page.mouse.click(vak["x"] + vak["width"] / 2, vak["y"] + vak["height"] / 2)
+    page.wait_for_url(re.compile(r"/doc/.*\?q=e2e-tag"))
+    expect(page.locator(".terug a")).to_contain_text("e2e-tag")
 
 
 def test_bewerken_zonder_hernoemen(page: Page, server: Server) -> None:
