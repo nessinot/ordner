@@ -42,10 +42,11 @@ Meerdere gebruikers, versiebeheer, autoclassificatie, tag-beheer, map-hernoemen,
 - Tests: pytest, `tmp_path`, geen netwerk, geen echte OCR-tools. Fixtures in `tests/conftest.py`. `pytest` moet groen zijn bij afronden van elk pakket.
 - Windows-dev: paden via `pathlib`, `os.replace` voor atomic writes, tekstbestanden altijd `encoding="utf-8"`.
 - Commit per pakket met bericht `pakket NN: <titel>`; daarna afvinken in `werk/STATUS.md`.
+- **Vóór elke push:** release notes in `addon/CHANGELOG.md` (gebruikerstaal, nieuwste bovenaan, kop `## x.y.z (datum)`) en de regel in `werk/STATUS.md` › Releases (technisch, voor de volgende sessie). Bij nieuw gedrag een versiebump. `tests/test_addon_config.py` faalt als de bovenste changelog-kop niet gelijk is aan `version` in `config.yaml`.
 - Lokaal draaien: `$env:ORDNER_DATA="./data"; uvicorn --app-dir addon ordner.web.app:app --reload`.
 
 ## Draaien
 
 - **Lokaal**: `ORDNER_DATA=./data uvicorn --app-dir addon ordner.web.app:app --reload` (PowerShell: `$env:ORDNER_DATA="./data"; uvicorn ...`). Zonder OCR-tools op het pad worden documenten `failed`.
-- **Add-on**: Add-on store › ⋮ › Repositories › `https://github.com/nessinot/ordner` toevoegen › Ordner › Installeren (repo moet publiek zijn). Updaten = `version` in `addon/config.yaml` ophogen en pushen. `run.sh` zet `ORDNER_DATA=/share/ordner` en de opties uit `config.yaml` als `ORDNER_*`-omgevingsvariabelen; uvicorn luistert op 8099 voor Ingress. `run.sh` en `Dockerfile` moeten LF-regeleinden houden (`.gitattributes`).
-- Gebruikersdocumentatie in `addon/DOCS.md`, installatie in `README.md`.
+- **Add-on**: Add-on store › ⋮ › Repositories › `https://github.com/nessinot/ordner` toevoegen › Ordner › Installeren (repo moet publiek zijn). Updaten = `version` in `addon/config.yaml` ophogen, `addon/CHANGELOG.md` aanvullen (tabblad Changelog in HA) en pushen. `run.sh` zet `ORDNER_DATA=/share/ordner` en de opties uit `config.yaml` als `ORDNER_*`-omgevingsvariabelen; uvicorn luistert op 8099 voor Ingress. `run.sh` en `Dockerfile` moeten LF-regeleinden houden (`.gitattributes`).
+- Gebruikersdocumentatie in `addon/DOCS.md`, release notes in `addon/CHANGELOG.md`, installatie in `README.md`.
