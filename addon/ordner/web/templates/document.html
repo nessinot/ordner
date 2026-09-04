@@ -31,16 +31,17 @@
     {% if not bestanden %}<p class="leeg">Geen bestanden.</p>{% endif %}
     {% for b in bestanden %}
     {% set url = url_for('bestand', jaar=jaar, map=map, naam=b.naam) %}
+    {% set kijk_url = url_for('bekijk', jaar=jaar, map=map, naam=b.naam) ~ herkomst_qs %}
     <div class="bestand">
       <div class="bestand-kop">
         <span class="bestand-naam">{{ b.naam }}</span>
         {% if b.tekst_aanwezig %}<span class="badge">tekst aanwezig</span>{% endif %}
-        <a class="knop" href="{{ url }}">Open</a>
+        <a class="knop" href="{{ kijk_url }}">Open</a>
       </div>
       {% if b.soort == 'afbeelding' %}
       <img src="{{ url }}" alt="{{ b.naam }}" loading="lazy">
       {% elif b.soort == 'pdf' %}
-      <object type="application/pdf" data="{{ url }}">Kan de pdf hier niet tonen. <a href="{{ url }}">Open de pdf</a>.</object>
+      <object type="application/pdf" data="{{ url }}">Kan de pdf hier niet tonen. <a href="{{ kijk_url }}">Open de pdf</a>.</object>
       {% endif %}
     </div>
     {% endfor %}

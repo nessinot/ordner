@@ -47,12 +47,15 @@ class Kaart:
     tags: list[str] = field(default_factory=list)  # klikbare labels, volgorde zoals in meta.md (pakket 15c)
 
 
+def _soort(naam: str) -> str:
+    """Weergavesoort van een bestand: "afbeelding" (jpg/png), "pdf" of "overig"."""
+    ext = Path(naam).suffix.lower()
+    return "afbeelding" if ext in _INLINE_AFBEELDING else "pdf" if ext == ".pdf" else "overig"
+
+
 def _kaart_soort(bestanden: list[str]) -> str:
     """Soort van het eerste bestand; "overig" als er geen bestanden zijn."""
-    for naam in bestanden[:1]:
-        ext = Path(naam).suffix.lower()
-        return "afbeelding" if ext in _INLINE_AFBEELDING else "pdf" if ext == ".pdf" else "overig"
-    return "overig"
+    return _soort(bestanden[0]) if bestanden else "overig"
 
 
 def _splits_rel(rel: str) -> tuple[str, str]:
@@ -359,9 +362,7 @@ class Bestandsweergave:
 def _bestandsweergaven(entry: DocEntry) -> list[Bestandsweergave]:
     weergaven: list[Bestandsweergave] = []
     for naam in entry.meta.bestanden:
-        ext = Path(naam).suffix.lower()
-        soort = "afbeelding" if ext in _INLINE_AFBEELDING else "pdf" if ext == ".pdf" else "overig"
-        weergaven.append(Bestandsweergave(naam, soort, txt_pad(entry.map / naam).exists()))
+        weergaven.append(Bestandsweergave(naam, _soort(naam), txt_pad(entry.map / naam).exists()))
     return weergaven
 
 
@@ -486,6 +487,31 @@ async def document_verwijder(
     archief.naar_prullenbak(entry.map)
     _index(request).verwijder(rel)
     return _redirect(request, "zoeken", "Verplaatst naar prullenbak", query=_herkomst(q, alles))
+
+
+@router.get("/doc/{jaar}/{map}/bekijk/{naam}", name="bekijk")
+async def bekijk(request: Request, jaar: str, map: str, naam: str) -> Response:
+    """Kijkpagina voor één bestand: eigen kop met terugknop, het bestand (pdf/afbeelding) eronder.
+
+    De "Open"-knop wijst hierheen en niet naar het kale bestand: in de HA-app vult een los geopend
+    bestand het hele scherm zonder weg terug (iOS-webview). Hier blijft de navigatie van de app staan.
+    """
+    entry = _entry(request, jaar, map)
+    try:
+        pad = _archief(request).veilig_pad(jaar, map, naam)
+    except OngeldigPad:
+        raise HTTPException(status_code=404, detail="Bestand niet gevonden") from None
+    if not pad.is_file():
+        raise HTTPException(status_code=404, detail="Bestand niet gevonden")
+    ctx = {
+        "meta": entry.meta,
+        "jaar": jaar,
+        "map": map,
+        "naam": naam,
+        "soort": _soort(naam),
+        "herkomst": _herkomst(request.query_params.get("q", ""), request.query_params.get("alles", "")),
+    }
+    return _templates(request).TemplateResponse(request, "bekijk.html", ctx)
 
 
 @router.get("/doc/{jaar}/{map}/bestand/{naam}", name="bestand")

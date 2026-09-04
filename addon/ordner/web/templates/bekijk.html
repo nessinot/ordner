@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% set paginatitel = naam %}
+{% block content %}
+{% set herkomst_qs = ('?q=' ~ (herkomst.q|urlencode) ~ ('&alles=1' if herkomst.alles else '')) if herkomst.q else '' %}
+{% set url = url_for('bestand', jaar=jaar, map=map, naam=naam) %}
+<section class="bekijk">
+  <p class="terug">
+    <a href="{{ url_for('document', jaar=jaar, map=map) }}{{ herkomst_qs }}">
+      <svg class="icoon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+      Terug naar “{{ meta.titel }}”
+    </a>
+  </p>
+  <div class="kop">
+    <h2>{{ naam }}</h2>
+  </div>
+  {% if soort == 'pdf' %}
+  <iframe class="bekijk-vlak" src="{{ url }}" title="{{ naam }}"></iframe>
+  <p class="hint">Blijft het vlak leeg, dan kan deze browser geen pdf tonen. <a href="{{ url }}">Open het bestand los</a>.</p>
+  {% elif soort == 'afbeelding' %}
+  <img class="bekijk-vlak" src="{{ url }}" alt="{{ naam }}">
+  {% else %}
+  <p class="leeg">Dit bestandstype kan hier niet getoond worden. <a href="{{ url }}">Open het bestand los</a>.</p>
+  {% endif %}
+</section>
+{% endblock %}
