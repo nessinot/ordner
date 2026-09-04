@@ -2,6 +2,10 @@
 
 Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. Nieuwste versie bovenaan; de bovenste kop moet gelijk zijn aan `version` in `config.yaml` (dat controleert `tests/test_addon_config.py`).
 
+## 0.9.1 (2026-09-05)
+
+- De knop "Open" bij een bestand opent het bestand nu in hetzelfde venster. In de Home Assistant-app sprong die link naar een externe browser, die geen toegang tot de add-on heeft en dan een foutmelding (404) gaf, vooral op de telefoon. Met de terugknop kom je weer bij het document.
+
 ## 0.9.0 (2026-09-04)
 
 - Uploaden gaat nu in twee stappen. Eerst kies je alleen de bestanden; Ordner leest de tekst en vult daarna de titel (de naam van het bedrijf of de instantie), de documentdatum en de tags (het documenttype) voor je in. In de tweede stap controleer je die gegevens, past ze zo nodig aan en kiest Opslaan. Zo hoef je niet meer over te typen wat al in het document staat, en zie je vóór het opslaan welke datum en titel de mapnaam krijgt.
