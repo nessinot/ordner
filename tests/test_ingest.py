@@ -13,6 +13,7 @@ from ordner.ingest import (
     maak_document_uit_bestanden,
     maak_document_uit_voorbereid,
     maak_tekstlezer,
+    voorbereid_uit_teksten,
 )
 from ordner.meta import lees_meta
 from ordner.storage import Archief
@@ -243,6 +244,23 @@ def test_maak_document_uit_voorbereid_met_afwijkende_datum_zet_bron_gebruiker(ar
     assert (meta.documentdatum, meta.datumbron, meta.ocr) == (date(2025, 1, 1), "gebruiker", "done")
     assert (doc / "a.pdf.txt").exists()
     assert q.items == []
+
+
+def test_voorbereid_uit_teksten_eerste_datum_wint() -> None:
+    """Pakket 17: de inbox bouwt Voorbereid uit al gelezen tekst (sidecar), zonder lees_vooraf."""
+    bestanden = [("a.pdf", _PDF), ("b.docx", b"x"), ("c.jpg", b"jpg")]
+    vb = voorbereid_uit_teksten(bestanden, {2: "Datum: 01-02-2024", 0: "Factuurdatum: 15-06-2023"}, vandaag=VANDAAG)
+    assert vb.bestanden is bestanden
+    assert (vb.documentdatum, vb.datumbron) == (date(2023, 6, 15), "tekst")  # volgorde van bestanden, niet van teksten
+    assert vb.tekst == "Factuurdatum: 15-06-2023\n\nDatum: 01-02-2024"
+
+
+def test_voorbereid_uit_teksten_zonder_treffer_wordt_vandaag() -> None:
+    vb = voorbereid_uit_teksten([("a.pdf", _PDF)], {0: "geen datum hier"}, vandaag=VANDAAG)
+    assert (vb.documentdatum, vb.datumbron) == (VANDAAG, "upload")
+    leeg = voorbereid_uit_teksten([("a.pdf", _PDF)], {}, vandaag=VANDAAG)
+    assert (leeg.documentdatum, leeg.datumbron, leeg.tekst) == (VANDAAG, "upload", "")
+    assert voorbereid_uit_teksten([("a.pdf", _PDF)], {}).documentdatum == date.today()
 
 
 def test_wrapper_is_samenstelling_van_beide_fasen(archief: Archief) -> None:

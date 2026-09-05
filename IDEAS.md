@@ -2,6 +2,7 @@
 
 - MCP-server (FastMCP) met `zoek_documenten`, `lees_document`, `bewerk_metadata`
 - Claude-geassisteerd titelen van inbox-documenten
+- Inboxpagina (na 17): de eerste tekstregels van een wachtend bestand tonen, zodat je zonder openen ziet wat het is; meerdere wachtende bestanden in één keer dezelfde titel geven (selectie + één titelveld); een wachtend bestand vanaf de inboxpagina bekijken.
 - ~~Tweestaps upload met titel- en tagsuggestie~~ — gedaan in 15c (tags als labels, 0.7.0), 15a (suggestie, 0.8.0) en 15b (tweestaps upload, 0.9.0); keuzes en heuristiek staan in `werk/15a-titel-en-tagsuggestie.md` en `werk/15b-tweestaps-upload.md`.
 - Meerdere documenten in één upload (elk bestand een eigen document, of splitsen op scherm 2); nu wordt alles in scherm 1 één document.
 - Openstaande uploads naar een tempmap buiten het archief als het geheugen ooit knelt (zelfde interface als `OpenstaandeUploads`).

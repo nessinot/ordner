@@ -191,15 +191,28 @@ def test_verwijderen_met_confirm(page: Page, server: Server) -> None:
 
 
 def test_inbox(page: Page, server: Server) -> None:
-    shutil.copy(FIXTURES / "foto.jpg", server.archief / "_inbox" / "foto.jpg")
+    """Pakket 17: zonder herkende afzender wacht het bestand op de inboxpagina; met tesseract (bon-titel) wordt het zelf opgenomen."""
+    inbox = server.archief / "_inbox" / "foto.jpg"
+    shutil.copy(FIXTURES / "foto.jpg", inbox)
 
-    deadline = time.monotonic() + 15
-    page.goto(server.url + "/?q=foto")
-    while page.locator(".kaart").count() == 0 and time.monotonic() < deadline:
+    deadline = time.monotonic() + 30
+    page.goto(server.url + "/inbox")
+    while inbox.exists() and page.locator("ul.inbox li").count() == 0 and time.monotonic() < deadline:
         time.sleep(1)
         page.reload()
-    expect(page.locator(".kaart .titel").first).to_have_text("foto")
-    assert not (server.archief / "_inbox" / "foto.jpg").exists()
+    if inbox.exists():
+        expect(page.locator("ul.inbox .bestand-naam").first).to_have_text("foto.jpg")
+        page.get_by_role("button", name="Opnemen").click()
+        page.wait_for_url(re.compile(r"/upload/[A-Za-z0-9_-]{8,}$"))
+        expect(page.locator("p.herkomst")).to_contain_text("foto.jpg")
+        expect(page.get_by_role("button", name="Terug naar inbox")).to_be_visible()
+        page.fill("input[name=titel]", "E2E inbox")
+        page.get_by_role("button", name="Opslaan").click()
+        page.wait_for_url(re.compile(r"/doc/"))
+        expect(page.locator(".melding")).to_have_text("Opgeslagen")
+        expect(page.locator("h2").first).to_contain_text("E2E inbox")
+    assert not inbox.exists()
+    assert not (server.archief / "_inbox" / ".tekst" / "foto.jpg.txt").exists()
 
 
 def test_beheer(page: Page, server: Server) -> None:

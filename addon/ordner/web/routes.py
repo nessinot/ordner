@@ -1,4 +1,4 @@
-"""Routes van de webapp (pakket 08: zoeken, upload, bestand-serving; pakket 09: document, beheer, status; pakket 15b: tweestaps upload; pakket 16: dubbele bestanden)."""
+"""Routes van de webapp (pakket 08: zoeken, upload, bestand-serving; pakket 09: document, beheer, status; pakket 15b: tweestaps upload; pakket 16: dubbele bestanden; pakket 17: inbox wacht op een titel)."""
 
 from __future__ import annotations
 
@@ -7,14 +7,14 @@ import logging
 import mimetypes
 import re
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
-from ordner.dubbel import Dubbel, zoek_dubbelen
+from ordner.dubbel import Dubbel, sha256_van, zoek_dubbelen
 from ordner.index import DocEntry, Index, Reconciler
 from ordner.ingest import LeesTekst, Voorbereid, lees_vooraf, maak_document_uit_voorbereid
 from ordner.meta import MetaFout, OcrStatus, is_extraheerbaar, schrijf_meta, txt_pad
@@ -82,6 +82,10 @@ def _queue(request: Request) -> OcrQueue:
 
 def _lees_tekst(request: Request) -> LeesTekst | None:
     return getattr(request.app.state, "lees_tekst", None)
+
+
+def _reconciler(request: Request) -> Reconciler:
+    return request.app.state.reconciler
 
 
 def _redirect(
@@ -163,6 +167,8 @@ async def zoeken(request: Request) -> Response:
             "totaal": totaal,
             "afgekapt": len(kaarten) < totaal,
             "tellingen": index.tellingen(),
+            # startpagina (zonder zoekterm): regel met het aantal inboxbestanden dat op een titel wacht (pakket 17)
+            "inbox_wachtend": 0 if q else len(_reconciler(request).wachtend()),
         },
     )
 
@@ -208,6 +214,7 @@ def _gegevens_context(upload: OpenstaandeUpload, fout: str = "", **velden: str) 
         "tags": ", ".join(sug.tags),
         "datumbron": vb.datumbron,
         "titelbron": sug.titelbron,
+        "inbox_naam": upload.inbox_naam,  # pakket 17: herkomst en knoptekst op scherm 2
         "fout": fout,
     }
     ctx.update(velden)
@@ -304,6 +311,10 @@ async def upload_opslaan(
 
     archief = _archief(request)
     vb = upload.voorbereid
+    if upload.inbox_naam is not None:
+        onderschept = _inbox_controle(request, upload)
+        if onderschept is not None:
+            return onderschept
     # Ongewijzigde datum: bron uit lees_vooraf (tekst/upload). Gewijzigd: bron gebruiker.
     gewijzigde_datum = None if datum == vb.documentdatum else datum
     # Eerst uit de store, dan pas aanmaken: een tweede verzoek met hetzelfde token (dubbelklik, twee tabs)
@@ -320,18 +331,54 @@ async def upload_opslaan(
         documentdatum=gewijzigde_datum,
     )
     _index(request).herlaad(archief, doc)
-    log.info("upload opgeslagen: %s (%d bestand(en))", archief.relatief(doc), len(vb.bestanden))
+    if upload.inbox_naam is not None:
+        # Pas ná index.herlaad: de hash van het nieuwe document is dan bekend, zodat een poll die het
+        # inboxbestand nu nog zou zien het als dubbel behandelt en nooit een tweede document maakt.
+        _reconciler(request).verwijder_uit_inbox(upload.inbox_naam)
+        log.info("inbox: %s via de inboxpagina opgenomen als %s", upload.inbox_naam, archief.relatief(doc))
+    else:
+        log.info("upload opgeslagen: %s (%d bestand(en))", archief.relatief(doc), len(vb.bestanden))
 
     jaar, map = _splits_rel(archief.relatief(doc))
     return _redirect(request, "document", "Opgeslagen", jaar=jaar, map=map)
 
 
+def _inbox_controle(request: Request, upload: OpenstaandeUpload) -> Response | None:
+    """Vóór het opslaan van een inboxbestand (pakket 17): is het intussen al opgenomen of verdwenen?
+
+    De poll heeft het bestand tussen Opnemen en Opslaan normaal niet aangeraakt (reservering), maar
+    de gebruiker kan het intussen via de upload hebben opgeslagen of via Samba hebben weggehaald.
+    Geeft een redirect terug als er niets meer op te slaan valt, anders None.
+    """
+    naam = upload.inbox_naam
+    assert naam is not None
+    reconciler = _reconciler(request)
+    treffer = _index(request).zoek_hash(sha256_van(upload.voorbereid.bestanden[0][1]))
+    if treffer is not None:
+        # Al in het archief: geen tweede document. Vrijgeven laat de poll het bestand (als het er nog
+        # ligt) opnieuw beoordelen; die verplaatst het dan als dubbel naar _inbox/_dubbel/ (pakket 16).
+        _openstaand(request).verwijder(upload.token)
+        reconciler.geef_vrij(naam)
+        entry, _ = treffer
+        log.info("inbox: %s niet nogmaals opgeslagen, staat al in %s", naam, entry.rel)
+        jaar, map = _splits_rel(entry.rel)
+        return _redirect(request, "document", "Al opgenomen via de inbox", jaar=jaar, map=map)
+    if not _archief(request).inbox_pad(naam).is_file():
+        _openstaand(request).verwijder(upload.token)
+        reconciler.geef_vrij(naam)
+        log.info("inbox: %s niet opgeslagen, bestand ligt niet meer in de inbox", naam)
+        return _redirect(request, "inbox", "Bestand is niet meer in de inbox")
+    return None
+
+
 @router.post("/upload/{token}/annuleer", name="upload_annuleer")
 async def upload_annuleer(request: Request, token: str) -> Response:
-    """Openstaande upload weggooien; er is niets op schijf gekomen."""
-    if not _TOKEN_RE.fullmatch(token):
-        raise HTTPException(status_code=404, detail="Upload niet gevonden")
+    """Openstaande upload weggooien; er is niets op schijf gekomen. Uit de inbox: het bestand blijft daar liggen."""
+    upload = _haal_openstaand(request, token)
     _openstaand(request).verwijder(token)
+    if upload is not None and upload.inbox_naam is not None:
+        _reconciler(request).geef_vrij(upload.inbox_naam)
+        return _redirect(request, "inbox", "Teruggezet in de inbox")
     return _redirect(request, "upload", "Upload geannuleerd")
 
 
@@ -356,6 +403,52 @@ def _sla_bestanden_op(
         if is_extraheerbaar(naam):
             queue.enqueue(doc, naam)
     return aantal
+
+
+# --- inbox (pakket 17) ------------------------------------------------------
+
+
+@dataclass
+class InboxRegel:
+    """Eén wachtend bestand op de inboxpagina."""
+
+    naam: str
+    grootte: str
+    sinds: datetime
+
+
+@router.get("/inbox", name="inbox")
+async def inbox(request: Request) -> Response:
+    """Inboxbestanden waarvoor de tekst geen afzender opleverde; per bestand een knop Opnemen."""
+    regels = [InboxRegel(w.naam, _grootte(w.grootte), w.sinds) for w in _reconciler(request).wachtend()]
+    ctx = {"wachtend": regels, "inbox_map": str(_archief(request).inbox_dir)}
+    return _templates(request).TemplateResponse(request, "inbox.html", ctx)
+
+
+@router.post("/inbox/opnemen", name="inbox_opnemen")
+async def inbox_opnemen(request: Request, naam: str = Form("")) -> Response:
+    """Eén inboxbestand naar scherm 2 van de upload: reserveren, tekst uit de sidecar, openstaande upload klaarzetten.
+
+    Het bestand blijft in `_inbox/` liggen tot Opslaan; de reservering houdt de poll er intussen vanaf.
+    """
+    try:
+        _archief(request).inbox_pad(naam)
+    except OngeldigPad:
+        raise HTTPException(status_code=404, detail="Bestand niet gevonden") from None
+    reconciler = _reconciler(request)
+    reconciler.reserveer(naam)  # vóór het lezen: een lopende poll mag het bestand nu niet meer opnemen
+    try:
+        # Normaal alleen de sidecar lezen; zonder sidecar kan dit OCR zijn, dus in een thread.
+        vb, sug = await asyncio.to_thread(reconciler.bereid_inbox_voor, naam)
+    except FileNotFoundError:
+        reconciler.geef_vrij(naam)
+        raise HTTPException(status_code=404, detail="Bestand niet gevonden") from None
+    openstaand = _openstaand(request).maak(vb, sug, inbox_naam=naam)
+    log.info(
+        "inbox: %s opgenomen via de inboxpagina, datum %s (%s), tags %s; token %s",
+        naam, vb.documentdatum, vb.datumbron, sug.tags, openstaand.token,
+    )
+    return _redirect(request, "upload_gegevens", token=openstaand.token)
 
 
 # --- document -------------------------------------------------------------
@@ -588,6 +681,7 @@ async def beheer(request: Request) -> Response:
         "reconcile_bezig": bool(request.app.state.reconcile_bezig),
         "rapport": request.app.state.laatste_rapport,
         "interval_minuten": max(1, round(settings.reconcile_interval / 60)),
+        "inbox_wachtend": len(_reconciler(request).wachtend()),
     }
     return _templates(request).TemplateResponse(request, "beheer.html", ctx)
 

@@ -22,9 +22,9 @@ Een minimale digitale archiefkast voor privédocumenten (WOZ, facturen, bonnen, 
 | Subprocess | Uitsluitend via `extract.run_cmd` (asyncio subprocess, timeout 600 s). Tests mocken alleen deze functie. |
 | Index | In-memory (`index.Index`), gebouwd bij start, bijgewerkt door app/worker, herbouwd door reconciler. Geen indexbestand op schijf. |
 | Reconciler | Bij start, elke `reconcile_interval` s, en op knop. Synchroniseert `bestanden` met de werkelijke bestanden, queued ontbrekende `.txt`, maakt `meta.md` voor mappen zonder, ingest `_inbox/`. |
-| Inbox | `_inbox/` gepolld elke `inbox_interval` s (default 5); bestand met gelijke grootte in twee opeenvolgende polls → nieuw document (titel = titelsuggestie uit de tekst, anders bestandsnaam zonder extensie met `_`/`-` → spatie; tags = tagsuggestie; datum uit de tekst, anders vandaag; zie "Datum uit tekst" en "Titel en tags uit tekst"). |
+| Inbox | `_inbox/` gepolld elke `inbox_interval` s (default 5); bestand met gelijke grootte in twee opeenvolgende polls wordt beoordeeld (pakket 17): gereserveerd → overslaan; beoordeeld tegen dezelfde verzameling archieftitels als vorige keer → overslaan; bekend (sha256) → `_inbox/_dubbel/`; tekst uit de sidecar `_inbox/.tekst/<naam>.txt` (als die bestaat en niet ouder is dan het bestand, anders lezen en schrijven; mislukt of niet-extraheerbaar → lege sidecar); `stel_voor` met titel → nieuw document (tags = tagsuggestie, datum uit de tekst anders vandaag; sidecar wordt de `.txt` naast het origineel), zonder titel → *wachtend* (blijft liggen; nooit de bestandsnaam als titel). Verweesde sidecars worden elke poll opgeruimd. Wachtende bestanden krijgen een titel via `GET /inbox` → `POST /inbox/opnemen` → scherm 2 van de upload; reservering `INBOX_RESERVERING` houdt de poll eraf. Zie `werk/17-inbox-wacht-op-titel.md`. |
 | Datum uit tekst | Bij elke upload (scherm 1 heeft sinds 15b geen datumveld; de gebruiker corrigeert op scherm 2) en bij de inbox. De tekst wordt *vóór* het aanmaken van de map gelezen (`ingest.lees_vooraf`), zodat de map de gevonden datum krijgt en nooit hernoemd hoeft te worden. Sleutelwoorden in prioriteitsvolgorde: factuurdatum, notadatum, orderdatum, dagtekening, datum (optionele spatie, optionele `:`, hoofdletterongevoelig; "vervaldatum" e.d. matchen niet). Per sleutelwoord eerst alle regels met de datum direct achter het woord (max 60 spaties ertussen), daarna kolomlayout: label zonder datum op de eigen regel, datum op de eerstvolgende niet-lege regel waarvan het tekenbereik het dichtst bij dat van het label ligt (afstand hooguit 20 tekens, tabs geëxpandeerd). Notaties dd-mm-jjjj, dd/mm/jjjj, dd.mm.jjjj, jjjj-mm-dd, d maand jjjj (NL/EN maandnamen), tweecijferig jaar. Jaar tussen 1990 en volgend jaar. `meta.datumbron`: `gebruiker` (opgegeven of later handmatig gewijzigd; wordt nooit automatisch overschreven), `tekst`, `upload` (geen treffer → vandaag). Gelezen tekst wordt direct als `.txt` geschreven. |
-| Titel en tags uit tekst | Alleen een suggestie (`suggestie.py`, pure functies); de inbox gebruikt hem direct, het uploadformulier toont hem voorgevuld op scherm 2 (15b). Titel = uitsluitend de afzender (bedrijf/instantie), nooit het documenttype of een jaartal; bij twijfel leeg. Heuristiek op prioriteit: (1) bekende archieftitel als heel woord in de tekst (langste wint, dan de vroegste treffer; titels < 3 tekens, `document` en documenttypewoorden overgeslagen), (2) naam achter "t.n.v."/"ten name van" (rest van de cel), (3) eerste kolomcel met rechtsvorm-achtervoegsel (`B.V.`, `BV`, `N.V.`, `NV`, `V.O.F.`, `VOF`, `U.A.`; hoofdlettergevoelig) → cel t/m achtervoegsel, instantie-voorvoegsel (Gemeente, Stichting, Vereniging, Waterschap, Provincie, Coöperatie, Ministerie; alleen met een woord erachter) → vanaf het woord, of los instantiewoord (Belastingdienst, Bank, Verzekeringen, Verzekeraar, Zorgverzekeraar, Ziekenhuis, Universiteit, Hogeschool) → hele cel, (4) bij < 25 niet-lege regels (bon) de eerste cel met ≥ 3 letters die geen documenttype-kopregel of datum(label) is, (5) anders leeg. Cellen = regel gesplitst op 2+ spaties (tabs geëxpandeerd). Opschonen: whitespace samengevoegd, leestekens aan de randen weg (punt van "B.V." blijft), max 60 tekens op woordgrens, hoofdletters zoals in de tekst. Tags = documenttypewoorden die een cel beginnen ("Factuur", "Factuur nr. 123"; niet "Factuurdatum"), lowercase, volgorde van voorkomen, zonder dubbelen; lijst `_DOCUMENTTYPEN` in `suggestie.py`. Meerdere bestanden: teksten aaneengeplakt in uploadvolgorde. Details: `werk/15a-titel-en-tagsuggestie.md`. |
+| Titel en tags uit tekst | Alleen een suggestie (`suggestie.py`, pure functies); de inbox gebruikt hem direct (lege titel → wachten, 17), het uploadformulier toont hem voorgevuld op scherm 2 (15b). Titel = uitsluitend de afzender (bedrijf/instantie), nooit het documenttype of een jaartal; bij twijfel leeg. Heuristiek op prioriteit: (1) bekende archieftitel als heel woord in de tekst (langste wint, dan de vroegste treffer; titels < 3 tekens, `document` en documenttypewoorden overgeslagen), (2) naam achter "t.n.v."/"ten name van" (rest van de cel), (3) eerste kolomcel met rechtsvorm-achtervoegsel (`B.V.`, `BV`, `N.V.`, `NV`, `V.O.F.`, `VOF`, `U.A.`; hoofdlettergevoelig) → cel t/m achtervoegsel, instantie-voorvoegsel (Gemeente, Stichting, Vereniging, Waterschap, Provincie, Coöperatie, Ministerie; alleen met een woord erachter) → vanaf het woord, of los instantiewoord (Belastingdienst, Bank, Verzekeringen, Verzekeraar, Zorgverzekeraar, Ziekenhuis, Universiteit, Hogeschool) → hele cel, (4) bij < 25 niet-lege regels (bon) de eerste cel met ≥ 3 letters die geen documenttype-kopregel of datum(label) is, (5) anders leeg. Cellen = regel gesplitst op 2+ spaties (tabs geëxpandeerd). Opschonen: whitespace samengevoegd, leestekens aan de randen weg (punt van "B.V." blijft), max 60 tekens op woordgrens, hoofdletters zoals in de tekst. Tags = documenttypewoorden die een cel beginnen ("Factuur", "Factuur nr. 123"; niet "Factuurdatum"), lowercase, volgorde van voorkomen, zonder dubbelen; lijst `_DOCUMENTTYPEN` in `suggestie.py`. Meerdere bestanden: teksten aaneengeplakt in uploadvolgorde. Details: `werk/15a-titel-en-tagsuggestie.md`. |
 | Zoeken | Alle woorden moeten voorkomen (AND over het hele document), hoofdletterongevoelig, over titel, omschrijving, tags, documentdatum (ISO-string), notities en alle `.txt`-teksten. Snippet ±80 tekens rond de eerste treffer + bron (veldnaam of bestandsnaam). Sortering documentdatum desc. `_inbox`/`_prullenbak` nooit in de index. |
 | Prullenbak | `_prullenbak/<mapnaam>`; bij conflict `<mapnaam>_<JJJJMMDD-HHMMSS>`. |
 | Schrijven | `meta.md` en `.txt` altijd via tempbestand in dezelfde map + `os.replace()`. |
@@ -52,7 +52,7 @@ ordner/                       # repo-root = add-on-repository (Add-on store › 
     ordner/                   # Python-package
       __init__.py config.py slug.py meta.py storage.py extract.py datum.py suggestie.py ingest.py dubbel.py index.py search.py worker.py
       web/ __init__.py app.py routes.py openstaand.py
-        templates/ base.html zoeken.html upload.html upload_gegevens.html document.html beheer.html bekijk.html _dubbelen.html
+        templates/ base.html zoeken.html upload.html upload_gegevens.html inbox.html document.html beheer.html bekijk.html _dubbelen.html
         static/ style.css app.js
 ```
 
@@ -62,6 +62,7 @@ ordner/                       # repo-root = add-on-repository (Add-on store › 
 /share/ordner/
   _inbox/
     _dubbel/                  # inboxbestanden die al in het archief stonden (pakket 16)
+    .tekst/                   # <naam>.txt: gelezen tekst van een inboxbestand dat op een titel wacht (pakket 17)
   _prullenbak/
   2026/
     2026-09-03_woz-beschikking/
@@ -120,6 +121,8 @@ class Settings:
 
 INBOX_DIR = "_inbox"
 INBOX_DUBBEL_DIR = "_dubbel"        # submap van _inbox voor geweigerde dubbelen (pakket 16)
+INBOX_TEKST_DIR = ".tekst"          # submap van _inbox met de gelezen tekst per wachtend bestand (pakket 17)
+INBOX_RESERVERING = timedelta(minutes=60)   # zo lang blijft een via de inboxpagina opgenomen bestand buiten de poll (pakket 17)
 TRASH_DIR = "_prullenbak"
 META_NAAM = "meta.md"
 EXTRAHEERBAAR = {".pdf", ".jpg", ".jpeg", ".png", ".heic"}
@@ -188,6 +191,8 @@ class Archief:
     def veilig_pad(self, jaar: str, map: str, naam: str | None = None) -> Path
         # raises OngeldigPad als een component "..", een pad-scheider of niets bevat,
         # als het resultaat buiten root ligt, of als het niet bestaat
+    def inbox_pad(self, naam: str) -> Path   # pakket 17: _inbox/<naam>; OngeldigPad als naam geen kale bestandsnaam is
+        # (leeg, ".", "..", pad-scheider) of met "." begint; het bestand hoeft niet te bestaan
 ```
 
 ### `ordner/extract.py`
@@ -245,13 +250,28 @@ class ReconcileRapport:
     meta_aangemaakt: int
     inbox_verwerkt: int
     gehasht: int                    # pakket 16: bestanden waarvoor deze ronde een sha256 is berekend
+    inbox_wachtend: int             # pakket 17: aantal wachtende inboxbestanden na deze ronde
+
+@dataclass(frozen=True)
+class Wachtend:                     # pakket 17
+    naam: str
+    grootte: int
+    sinds: datetime                 # mtime van het bestand, zonder microseconden
 
 class Reconciler:
     def __init__(self, archief: Archief, index: Index, queue_fn: Callable[[Path, str], None],
-                 lees_tekst: LeesTekst | None = None)   # lees_tekst: voor de inbox (datum, titel en tags uit tekst); None = gedrag van vóór pakket 14
-    # _ingest (15a): lees_vooraf → suggestie.stel_voor(vb.tekst, {e.meta.titel for e in index.alle()}) → maak_document_uit_voorbereid
+                 lees_tekst: LeesTekst | None = None)   # lees_tekst: voor de inbox (datum, titel en tags uit tekst); None = niets lezen (alles zonder titel wacht)
     def run(self) -> ReconcileRapport       # synchroon; de app roept aan via asyncio.to_thread. _sync_map (16): verweesde hashes weg, ontbrekende berekenen
-    def verwerk_inbox(self) -> list[Path]   # houdt self._inbox_groottes bij voor de stabiliteitscheck; bekend bestand (zoek_hash) → _inbox/_dubbel/ (16), niet in het resultaat
+    def verwerk_inbox(self) -> list[Path]   # houdt self._inbox_groottes bij voor de stabiliteitscheck; per stabiel bestand (17):
+        # gereserveerd → overslaan · beoordeeld tegen dezelfde titels → overslaan · dubbel → _dubbel/ · tekst uit sidecar of lees_tekst(pad)
+        # · stel_voor(tekst, titels): titel → maak_document_uit_voorbereid (voorbereid_uit_teksten), bestand + sidecar weg, index.herlaad;
+        # geen titel → wachtend (één logregel). Daarna verweesde sidecars weg. Geeft de aangemaakte documentmappen terug.
+    # pakket 17, voor de inboxpagina (alle toegang tot _inbox/ vanuit de routes loopt hierlangs):
+    def wachtend(self) -> list[Wachtend]                                    # beoordeeld, zonder titel, niet gereserveerd, bestaat nog; op naam
+    def bereid_inbox_voor(self, naam: str) -> tuple[Voorbereid, Suggestie]  # bestand + sidecar (leest zo nodig); FileNotFoundError als weg; OngeldigPad via inbox_pad
+    def reserveer(self, naam: str) -> None                                  # buiten de poll tot geef_vrij/verwijder_uit_inbox of na INBOX_RESERVERING
+    def geef_vrij(self, naam: str) -> None                                  # ook: het bestand wordt bij de volgende poll opnieuw beoordeeld
+    def verwijder_uit_inbox(self, naam: str) -> None                        # bestand + sidecar (missing_ok), reservering en geheugenstaat weg
 ```
 
 ### `ordner/datum.py` (pakket 14)
@@ -307,7 +327,12 @@ def lees_vooraf(bestanden: list[tuple[str, bytes]], *, documentdatum: date | Non
                 lees_tekst: LeesTekst | None, vandaag: date | None = None) -> Voorbereid
     # Fase 1, schrijft niets in het archief. documentdatum gegeven → niets lezen, bron "gebruiker".
     # None → extraheerbare bestanden lezen via lees_tekst (tempbestand met originele extensie);
-    #   eerste treffer van vind_datum bepaalt datum ("tekst"), anders vandaag ("upload").
+    #   daarna voorbereid_uit_teksten.
+
+def voorbereid_uit_teksten(bestanden: list[tuple[str, bytes]], teksten: dict[int, str], *,
+                           vandaag: date | None = None) -> Voorbereid
+    # pakket 17: Voorbereid uit al gelezen teksten (inbox-sidecar). Datum = eerste treffer van vind_datum
+    # over de teksten in volgorde van `bestanden` ("tekst"), anders vandaag ("upload").
 
 def maak_document_uit_voorbereid(archief: Archief, titel: str, vb: Voorbereid, *, omschrijving: str = "",
                                  tags: list[str] | None = None, queue_fn: QueueFn,
@@ -331,10 +356,12 @@ class OpenstaandeUpload:
     voorbereid: Voorbereid          # uit ingest.lees_vooraf: bestanden, teksten, datum, datumbron
     suggestie: Suggestie            # uit suggestie.stel_voor
     aangemaakt: datetime
+    inbox_naam: str | None = None   # pakket 17: gevuld als de upload uit de inbox komt; het bestand blijft daar tot Opslaan
 
 class OpenstaandeUploads:
     def __init__(self, ttl: timedelta = timedelta(minutes=60), maximum: int = 10, nu: Callable[[], datetime] = datetime.now)
-    def maak(self, voorbereid: Voorbereid, suggestie: Suggestie) -> OpenstaandeUpload   # gooit eerst verlopen/overtollige (oudste eerst) weg; nieuw token
+    def maak(self, voorbereid: Voorbereid, suggestie: Suggestie, inbox_naam: str | None = None) -> OpenstaandeUpload
+        # gooit eerst verlopen/overtollige (oudste eerst) weg; nieuw token
     def haal(self, token: str) -> OpenstaandeUpload | None                              # None als onbekend of verlopen (verlopen wordt daarbij verwijderd)
     def verwijder(self, token: str) -> None                                             # idempotent
     def __len__(self) -> int
@@ -386,8 +413,10 @@ app = create_app()
 |---|---|
 | `zoeken` | `GET /` |
 | `upload` | `GET /upload` (scherm 1: bestanden), `POST /upload` (bestanden → openstaande upload → 303 naar `upload_gegevens`; 409 + scherm 1 met `dubbelen` bij een bekend bestand, pakket 16) |
-| `upload_gegevens` | `GET /upload/{token}` (scherm 2: gegevens voorgevuld), `POST /upload/{token}` (opslaan) |
-| `upload_annuleer` | `POST /upload/{token}/annuleer` |
+| `upload_gegevens` | `GET /upload/{token}` (scherm 2: gegevens voorgevuld), `POST /upload/{token}` (opslaan; met `inbox_naam` (17): hash al bekend → 303 naar dat document `m=Al opgenomen via de inbox`, bestand weg → 303 `inbox` `m=Bestand is niet meer in de inbox`, anders document aanmaken en `verwijder_uit_inbox`) |
+| `upload_annuleer` | `POST /upload/{token}/annuleer` (met `inbox_naam`: `geef_vrij`, 303 `inbox` `m=Teruggezet in de inbox`) |
+| `inbox` | `GET /inbox` (pakket 17: wachtende bestanden met knop Opnemen; leeg → "De inbox is leeg.") |
+| `inbox_opnemen` | `POST /inbox/opnemen` (veld `naam`; 404 bij ongeldige of onbekende naam; reserveert, `bereid_inbox_voor` in een thread, openstaande upload met `inbox_naam`, 303 naar `upload_gegevens`) |
 | `document` | `GET /doc/{jaar}/{map}` |
 | `document_meta` | `POST /doc/{jaar}/{map}/meta` |
 | `document_bestanden` | `POST /doc/{jaar}/{map}/bestanden` (409 + documentpagina met `dubbelen` bij een bekend bestand, pakket 16) |
@@ -429,4 +458,5 @@ _(agents voegen hier regels toe: pakket · wat · waarom)_
 - 13 · Add-on-bestanden en het Python-package verhuisd naar `addon/`; `repository.yaml` in de root; `pythonpath = ["addon", "."]` in `pyproject.toml` · de Supervisor accepteert een git-URL alleen als add-on-repository (elke add-on in een eigen submap met `config.yaml`), zodat installeren en updaten via de Add-on store kan i.p.v. kopiëren naar `/addons/` via Samba.
 - 15a · Nieuwe module `suggestie.py` (`Suggestie`, `stel_voor`, `stel_titel_voor`, `stel_tags_voor`, `cellen`); `ingest.py` gesplitst in `Voorbereid`, `lees_vooraf` en `maak_document_uit_voorbereid`, met `maak_document_uit_bestanden` als ongewijzigde wrapper; `Reconciler._ingest` gebruikt de suggestie voor titel en tags van inboxdocumenten · de titel is pas na het lezen bekend en 15b zet tussen lezen en aanmaken een tweede scherm. Twee kleine aanscherpingen t.o.v. `werk/15a-titel-en-tagsuggestie.md`, beide omdat een verkeerde naam erger is dan geen naam: rechtsvorm-achtervoegsels matchen hoofdlettergevoelig ("b.v." in lopende tekst is "bijvoorbeeld") en een instantie-voorvoegsel telt alleen met minstens één woord erachter ("Gemeente" alleen is geen naam). De bestaande test `test_inbox_met_tekstlezer_haalt_datum_uit_tekst` kreeg een tekst zonder bruikbare naamregel, omdat de korte testtekst anders terecht een bon-titel opleverde.
 - 15b · Nieuwe module `web/openstaand.py` (`OpenstaandeUpload`, `OpenstaandeUploads`), `app.state.openstaand`, routes `upload_gegevens` (`GET/POST /upload/{token}`) en `upload_annuleer`; `POST /upload` accepteert alleen nog bestanden (minstens één) en negeert titel/datum/tags; nieuwe template `upload_gegevens.html`; `maak_document_uit_bestanden` wordt door de app niet meer aangeroepen · uploaden in twee schermen zodat titel, datum en tags uit de tekst voorgevuld zijn vóór het opslaan. Eén afwijking buiten het pakketbestand: `extract._heic_naar_jpg` vertaalt PIL-fouten (`OSError`/`ValueError`, o.a. `UnidentifiedImageError`) naar `ExtractieFout`; interface ongewijzigd. Nodig omdat scherm 1 nu altijd de tekst leest en `maak_tekstlezer` alleen `ExtractieFout` opvangt: een kapotte `.heic` gaf anders een 500 (de worker ving dit al breed op, de inbox en de datumloze upload uit 14 niet). Zie `werk/15b-tweestaps-upload.md`.
+- 17 · `INBOX_TEKST_DIR`, `INBOX_RESERVERING`, `Archief.inbox_pad`, `ingest.voorbereid_uit_teksten` (door `lees_vooraf` hergebruikt), `Wachtend`, `ReconcileRapport.inbox_wachtend`, `Reconciler.wachtend/bereid_inbox_voor/reserveer/geef_vrij/verwijder_uit_inbox`, `OpenstaandeUpload.inbox_naam`, routes `inbox` en `inbox_opnemen`, template `inbox.html`; de bestandsnaam-fallback voor inboxtitels vervalt · een inboxbestand zonder herkende afzender wacht op een titel van de gebruiker in plaats van een mapnaam te krijgen die nooit meer verandert. Drie kleine afwijkingen van `werk/17-inbox-wacht-op-titel.md`: (1) de volgorde in `verwerk_inbox` is gereserveerd → grootte → *titels ongewijzigd → overslaan* → dubbel → tekst, dus de hashcontrole staat ná de goedkope overslaan-check (anders wordt elke wachtende file elke vijf seconden gehasht); een bestand dat pas ná zijn beoordeling een dubbel wordt gaat daardoor bij de eerstvolgende herbeoordeling naar `_dubbel/`; (2) `geef_vrij` laat het bestand bij de volgende poll opnieuw beoordelen, zodat na "Al opgenomen via de inbox" de poll het als dubbel opruimt in plaats van eindeloos te blijven wachten; (3) de inbox leest het bestand ter plekke (`lees_tekst(pad)`), zonder tempkopie, en gebruikt `lees_vooraf` niet meer. Ook niet-extraheerbare bestanden krijgen een (lege) sidecar, en `.tekst/` blijft staan als hij leeg is. Zie `werk/17-inbox-wacht-op-titel.md`.
 - 16 · `Meta.sha256` (mapping, sleutel direct na `bestanden`, blokstijl), nieuwe module `dubbel.py` (`sha256_van`, `sha256_van_bestand`, `Dubbel`, `zoek_dubbelen`), `Index.zoek_hash` met interne hash-tabel, `ReconcileRapport.gehasht`, `INBOX_DUBBEL_DIR`, `Archief.voeg_bestand_toe` registreert de hash; `POST /upload` en `POST /doc/…/bestanden` antwoorden 409 met de lijst `dubbelen` (template `_dubbelen.html`) · hetzelfde bestand mag niet per ongeluk twee keer in het archief komen; de vingerafdruk staat op schijf omdat er geen indexbestand is. De sleutel staat niet als laatste (zoals `datumbron` in 14) maar bij `bestanden`, omdat het per-bestand-informatie is. Tests die twee keer hetzelfde bestand uploadden (`test_bekende_titel_uit_archief_voorgesteld`, `test_ingress_prefix_in_redirect`, `test_inbox_fout_blokkeert_rest_niet`) kregen andere bytes voor het tweede bestand. Zie `werk/16-dubbele-bestanden.md`.

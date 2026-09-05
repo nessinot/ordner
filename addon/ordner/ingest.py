@@ -70,13 +70,10 @@ def lees_vooraf(
       extensie); de eerste treffer van `vind_datum` bepaalt de datum (bron `tekst`), anders vandaag
       (bron `upload`).
     """
-    vandaag = vandaag or date.today()
     if documentdatum is not None:
         return Voorbereid(bestanden, {}, documentdatum, "gebruiker")
 
     teksten: dict[int, str] = {}
-    datum = vandaag
-    bron: DatumBron = "upload"
     if lees_tekst is not None:
         with tempfile.TemporaryDirectory(prefix="ordner-") as tmp:
             for i, (naam, data) in enumerate(bestanden):
@@ -85,17 +82,28 @@ def lees_vooraf(
                 pad = Path(tmp) / f"{i}_{Path(naam).name}"
                 pad.write_bytes(data)
                 tekst = lees_tekst(pad)
-                if tekst is None:
-                    continue
-                teksten[i] = tekst
-                if bron != "tekst":
-                    treffer = vind_datum(tekst, vandaag)
-                    if treffer is not None:
-                        datum, bron = treffer.datum, "tekst"
-                        log.info("datum uit tekst in %s: %s (%s: %r)", naam, datum, treffer.sleutelwoord, treffer.regel[:80])
-        if bron != "tekst":
-            log.info("geen datum in tekst van %s; documentdatum wordt vandaag", [naam for naam, _ in bestanden])
-    return Voorbereid(bestanden, teksten, datum, bron)
+                if tekst is not None:
+                    teksten[i] = tekst
+    return voorbereid_uit_teksten(bestanden, teksten, vandaag=vandaag)
+
+
+def voorbereid_uit_teksten(
+    bestanden: list[tuple[str, bytes]], teksten: dict[int, str], *, vandaag: date | None = None
+) -> Voorbereid:
+    """`Voorbereid` uit al gelezen teksten (pakket 17: de inbox bewaart de tekst in een sidecar).
+
+    De datum is de eerste treffer van `vind_datum` over de teksten in volgorde van `bestanden`
+    (bron `tekst`), anders vandaag (bron `upload`).
+    """
+    vandaag = vandaag or date.today()
+    for i in sorted(teksten):
+        treffer = vind_datum(teksten[i], vandaag)
+        if treffer is not None:
+            naam = bestanden[i][0]
+            log.info("datum uit tekst in %s: %s (%s: %r)", naam, treffer.datum, treffer.sleutelwoord, treffer.regel[:80])
+            return Voorbereid(bestanden, teksten, treffer.datum, "tekst")
+    log.info("geen datum in tekst van %s; documentdatum wordt vandaag", [naam for naam, _ in bestanden])
+    return Voorbereid(bestanden, teksten, vandaag, "upload")
 
 
 def maak_document_uit_voorbereid(

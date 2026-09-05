@@ -144,6 +144,18 @@ class Archief:
 
     # --- paden ------------------------------------------------------------
 
+    def inbox_pad(self, naam: str) -> Path:
+        """`_inbox/<naam>` voor een kale bestandsnaam uit een formulier (pakket 17).
+
+        Raises OngeldigPad bij een lege naam, een pad-scheider, `.`/`..` of een naam die met `.`
+        begint (verborgen bestanden en de map `.tekst/` horen niet bij de inbox). Het bestand hoeft
+        niet te bestaan; dat controleert de aanroeper.
+        """
+        _controleer_component(naam)
+        if naam.startswith(".") or Path(naam).name != naam:
+            raise OngeldigPad(f"ongeldige inboxnaam: {naam!r}")
+        return self.inbox_dir / naam
+
     def relatief(self, doc: Path) -> str:
         return doc.relative_to(self.root).as_posix()
 

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% set paginatitel = 'Inbox' %}
+{% block content %}
+<div class="kop">
+  <h2>Inbox</h2>
+  <span class="gedempt">{% if wachtend %}{{ wachtend|length }} bestand{% if wachtend|length != 1 %}en wachten{% else %} wacht{% endif %} op een titel{% else %}niets wacht op een titel{% endif %}</span>
+</div>
+
+<section class="paneel">
+{% if wachtend %}
+  <p class="hint hint-inbox">Van deze bestanden kon Ordner geen afzender in de tekst vinden. Kies <strong>Opnemen</strong> om er zelf een titel aan te geven; datum en tags staan dan al ingevuld. Zodra die titel in het archief staat, herkent Ordner de andere bestanden van dezelfde afzender vanzelf.</p>
+  <ul class="bestandslijst inbox">
+    {% for w in wachtend %}
+    <li>
+      <span class="bestand-naam">{{ w.naam }}</span>
+      <span class="gedempt klein">{{ w.grootte }} · sinds {{ w.sinds.strftime('%Y-%m-%d %H:%M') }}</span>
+      <form method="post" action="{{ url_for('inbox_opnemen') }}">
+        <input type="hidden" name="naam" value="{{ w.naam }}">
+        <button type="submit" class="secundair">Opnemen</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p class="leeg">De inbox is leeg.</p>
+  <p class="hint">Bestanden die je in <code>{{ inbox_map }}</code> zet neemt Ordner vanzelf op zodra het de afzender in de tekst herkent. Lukt dat niet, dan verschijnen ze hier zodat je ze zelf een titel kunt geven.</p>
+{% endif %}
+</section>
+{% endblock %}

@@ -389,6 +389,189 @@ def test_annuleren(client: TestClient) -> None:
     assert client.post(f"/upload/{token}/annuleer", follow_redirects=False).status_code == 303
 
 
+# --- inbox wacht op een titel (pakket 17) --------------------------------------
+
+_ZONDER_TITEL = b"Geachte heer,\nDatum: 03-05-2024\nFactuur\n" + b"lopende tekst zonder afzender\n" * 30
+
+
+def _reconciler(client: TestClient):  # type: ignore[no-untyped-def]
+    return client.app.state.reconciler  # type: ignore[attr-defined]
+
+
+def _in_inbox(client: TestClient, naam: str = "scan.pdf", inhoud: bytes = _PDF) -> Path:
+    """Zet een bestand in _inbox en laat de poll het twee keer zien (grootte stabiel -> beoordeeld)."""
+    pad = _root(client) / "_inbox" / naam
+    pad.write_bytes(inhoud)
+    _reconciler(client).verwerk_inbox()
+    _reconciler(client).verwerk_inbox()
+    return pad
+
+
+def _opnemen(client: TestClient, naam: str = "scan.pdf") -> str:
+    r = client.post("/inbox/opnemen", data={"naam": naam}, follow_redirects=False)
+    return _token(r)
+
+
+def test_inboxpagina_leeg(client: TestClient) -> None:
+    r = client.get("/inbox")
+    assert r.status_code == 200
+    assert "De inbox is leeg." in r.text
+    assert "_inbox" in r.text
+    assert "Opnemen" not in r.text
+
+
+def test_inbox_wachtend_op_pagina_startpagina_en_beheer(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
+    mock_cmd.register("pdftotext", stdout=_ZONDER_TITEL)
+    pad = _in_inbox(client)
+    assert pad.exists()
+    assert client.app.state.archief.documentmappen() == []  # type: ignore[attr-defined]
+    assert (pad.parent / ".tekst" / "scan.pdf.txt").read_bytes() == _ZONDER_TITEL
+
+    r = client.get("/inbox")
+    assert r.status_code == 200
+    assert "scan.pdf" in r.text and "1 bestand wacht op een titel" in r.text
+    assert 'action="/inbox/opnemen"' in r.text
+    assert 'name="naam" value="scan.pdf"' in r.text
+    assert "Opnemen" in r.text
+
+    r = client.get("/")
+    assert "1 bestand in de inbox wacht op een titel" in r.text
+    assert 'href="/inbox"' in r.text
+    assert "in de inbox wacht" not in client.get("/?q=iets").text  # alleen op de startpagina
+
+    r = client.get("/beheer")
+    assert 'data-tel="inbox"><a href="/inbox">1</a>' in r.text
+
+    _in_inbox(client, "tweede.pdf", _PDF + b"2")
+    assert "2 bestanden in de inbox wachten op een titel" in client.get("/").text
+    assert "2 bestanden wachten op een titel" in client.get("/inbox").text
+
+
+def test_inbox_opnemen_scherm2_en_opslaan(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
+    mock_cmd.register("pdftotext", stdout=_ZONDER_TITEL)
+    pad = _in_inbox(client)
+    token = _opnemen(client)
+    assert _reconciler(client).wachtend() == []  # gereserveerd: niet meer op de lijst, niet voor de poll
+    assert "in de inbox wacht" not in client.get("/").text
+    assert pad.exists()
+
+    r = client.get(f"/upload/{token}")
+    assert r.status_code == 200
+    assert "Uit de inbox: <strong>scan.pdf</strong>" in r.text
+    assert "scan.pdf" in r.text
+    assert 'name="titel" value=""' in r.text
+    assert 'name="documentdatum" value="2024-05-03"' in r.text and "datum uit tekst" in r.text
+    assert 'name="tags" value="factuur"' in r.text
+    assert "Terug naar inbox" in r.text and "Annuleren" not in r.text
+    assert f'formaction="/upload/{token}/annuleer"' in r.text
+
+    r = client.post(f"/upload/{token}", data={"titel": "BSR", "documentdatum": "2024-05-03", "tags": "factuur"}, follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/doc/2024/2024-05-03_bsr?m=Opgeslagen"
+    doc = _root(client) / "2024" / "2024-05-03_bsr"
+    meta = lees_meta(doc)
+    assert meta.bestanden == ["scan.pdf"] and meta.datumbron == "tekst" and meta.ocr == "done"
+    assert (doc / "scan.pdf").read_bytes() == _PDF
+    assert (doc / "scan.pdf.txt").read_bytes() == _ZONDER_TITEL
+    assert not pad.exists()
+    assert not (pad.parent / ".tekst" / "scan.pdf.txt").exists()
+    assert len(client.app.state.openstaand) == 0  # type: ignore[attr-defined]
+    assert _reconciler(client).wachtend() == []
+    assert client.get("/inbox").text.count("Opnemen") == 0
+
+
+def test_inbox_opnemen_annuleren_zet_terug(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
+    mock_cmd.register("pdftotext", stdout=_ZONDER_TITEL)
+    pad = _in_inbox(client)
+    token = _opnemen(client)
+    r = client.post(f"/upload/{token}/annuleer", follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/inbox?m=Teruggezet+in+de+inbox"
+    assert pad.exists()
+    assert [w.naam for w in _reconciler(client).wachtend()] == ["scan.pdf"]
+    assert client.app.state.archief.documentmappen() == []  # type: ignore[attr-defined]
+    assert "Teruggezet in de inbox" in client.get(r.headers["location"]).text
+    # de poll neemt het nog steeds niet zelf op (geen titel) en leest niet opnieuw
+    assert _reconciler(client).verwerk_inbox() == []
+    assert pad.exists()
+
+
+def test_inbox_opslaan_bestand_inmiddels_weg(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
+    mock_cmd.register("pdftotext", stdout=_ZONDER_TITEL)
+    pad = _in_inbox(client)
+    token = _opnemen(client)
+    pad.unlink()  # via Samba weggehaald
+    r = client.post(f"/upload/{token}", data={"titel": "BSR", "documentdatum": "2024-05-03"}, follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/inbox?m=Bestand+is+niet+meer+in+de+inbox"
+    assert client.app.state.archief.documentmappen() == []  # type: ignore[attr-defined]
+    assert len(client.app.state.openstaand) == 0  # type: ignore[attr-defined]
+    assert _reconciler(client)._reserveringen == {}
+
+
+def test_inbox_opslaan_hash_inmiddels_bekend(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
+    mock_cmd.register("pdftotext", stdout=_ZONDER_TITEL)
+    pad = _in_inbox(client)
+    token = _opnemen(client)
+    # intussen hetzelfde bestand via de gewone upload opgeslagen
+    _upload(client, titel="Eneco", bestanden=[("los.pdf", _PDF, "application/pdf")])
+    r = client.post(f"/upload/{token}", data={"titel": "BSR", "documentdatum": "2024-05-03"}, follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/doc/2026/2026-03-01_eneco?m=Al+opgenomen+via+de+inbox"
+    mappen = client.app.state.archief.documentmappen()  # type: ignore[attr-defined]
+    assert [m.name for m in mappen] == ["2026-03-01_eneco"]
+    assert pad.exists()  # niet stilletjes weggegooid...
+    _reconciler(client).verwerk_inbox()  # ...maar de poll behandelt het na de vrijgave als dubbel (pakket 16)
+    assert not pad.exists()
+    assert (pad.parent / "_dubbel" / "scan.pdf").exists()
+    assert _reconciler(client).wachtend() == []
+
+
+def test_inbox_opnemen_ongeldige_of_onbekende_naam_404(client: TestClient) -> None:
+    for naam in ("", "..", ".tekst", "../meta.md", "sub/x.pdf", "bestaat-niet.pdf"):
+        r = client.post("/inbox/opnemen", data={"naam": naam}, follow_redirects=False)
+        assert r.status_code == 404, naam
+    assert _reconciler(client)._reserveringen == {}
+    assert len(client.app.state.openstaand) == 0  # type: ignore[attr-defined]
+
+
+def test_inbox_mislukte_extractie_na_opname_naar_queue(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
+    mock_cmd.register("pdftotext", rc=1, stderr=b"kapot")
+    pad = _in_inbox(client, "kapot.pdf")
+    assert (pad.parent / ".tekst" / "kapot.pdf.txt").read_bytes() == b""
+    aanroepen = len(mock_cmd.calls)
+    token = _opnemen(client, "kapot.pdf")
+    assert len(mock_cmd.calls) == aanroepen  # opnemen leest de lege sidecar, geen nieuwe OCR
+    r = client.get(f"/upload/{token}")
+    assert "geen datum gevonden, vandaag" in r.text
+    r = client.post(f"/upload/{token}", data={"titel": "Kapot", "documentdatum": "2026-03-01"}, follow_redirects=False)
+    assert r.status_code == 303
+    doc = _root(client) / "2026" / "2026-03-01_kapot"
+    assert _wacht_op_status(doc, "failed")  # gequeued; de worker probeert het (mislukt weer met deze mock)
+    assert not pad.exists()
+
+
+def test_inbox_met_titel_direct_opgenomen(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
+    mock_cmd.register("pdftotext", stdout=_ENECO)
+    pad = _in_inbox(client, "factuur.pdf")
+    assert not pad.exists()
+    assert lees_meta(_root(client) / "2024" / "2024-03-12_eneco-services-b-v").titel == "Eneco Services B.V."
+    assert "De inbox is leeg." in client.get("/inbox").text
+    assert "in de inbox wacht" not in client.get("/").text
+
+
+def test_inbox_links_met_ingress_prefix(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
+    mock_cmd.register("pdftotext", stdout=_ZONDER_TITEL)
+    _in_inbox(client)
+    headers = {"X-Ingress-Path": _PREFIX}
+    r = client.get("/", headers=headers)
+    assert f'href="{_PREFIX}/inbox"' in r.text
+    r = client.get("/inbox", headers=headers)
+    assert f'action="{_PREFIX}/inbox/opnemen"' in r.text
+    r = client.post("/inbox/opnemen", data={"naam": "scan.pdf"}, headers=headers, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"].startswith(f"{_PREFIX}/upload/")
+
+
 # --- dubbele bestanden (pakket 16) -------------------------------------------
 
 

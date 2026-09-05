@@ -2,8 +2,9 @@
 {% set nav = 'upload' %}
 {% set paginatitel = 'Uploaden' %}
 {% block content %}
-<div class="kop"><h2>Nieuw document</h2><span class="gedempt">stap 2 van 2: gegevens</span></div>
+<div class="kop"><h2>Nieuw document</h2><span class="gedempt">{% if inbox_naam %}uit de inbox{% else %}stap 2 van 2: gegevens{% endif %}</span></div>
 {% if fout %}<p class="fout" role="alert">{{ fout }}</p>{% endif %}
+{% if inbox_naam %}<p class="herkomst">Uit de inbox: <strong>{{ inbox_naam }}</strong>. Het bestand blijft in de inbox tot je opslaat.</p>{% endif %}
 
 <section class="paneel">
   <h3>Bestanden</h3>
@@ -41,7 +42,7 @@
     </div>
     <div class="knoppen vol">
       <button type="submit">Opslaan</button>
-      <button type="submit" class="secundair" formaction="{{ url_for('upload_annuleer', token=token) }}" formnovalidate>Annuleren</button>
+      <button type="submit" class="secundair" formaction="{{ url_for('upload_annuleer', token=token) }}" formnovalidate>{% if inbox_naam %}Terug naar inbox{% else %}Annuleren{% endif %}</button>
     </div>
   </form>
 </section>

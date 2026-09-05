@@ -30,6 +30,7 @@ class OpenstaandeUpload:
     voorbereid: Voorbereid  # uit ingest.lees_vooraf: bestanden, teksten, datum, datumbron
     suggestie: Suggestie  # uit suggestie.stel_voor
     aangemaakt: datetime
+    inbox_naam: str | None = None  # gevuld als de upload uit de inbox komt (pakket 17); het bestand blijft daar tot Opslaan
 
 
 class OpenstaandeUploads:
@@ -46,7 +47,9 @@ class OpenstaandeUploads:
         self._nu = nu
         self._uploads: dict[str, OpenstaandeUpload] = {}  # invoegvolgorde = oudste eerst
 
-    def maak(self, voorbereid: Voorbereid, suggestie: Suggestie) -> OpenstaandeUpload:
+    def maak(
+        self, voorbereid: Voorbereid, suggestie: Suggestie, inbox_naam: str | None = None
+    ) -> OpenstaandeUpload:
         """Gooit eerst verlopen en overtollige (oudste eerst) uploads weg; geeft de nieuwe terug."""
         self._ruim_op()
         while len(self._uploads) >= self._maximum:
@@ -55,7 +58,7 @@ class OpenstaandeUploads:
         token = secrets.token_urlsafe(16)
         while token in self._uploads:  # praktisch onmogelijk, maar een botsing mag nooit een upload overschrijven
             token = secrets.token_urlsafe(16)
-        upload = OpenstaandeUpload(token, voorbereid, suggestie, self._nu())
+        upload = OpenstaandeUpload(token, voorbereid, suggestie, self._nu(), inbox_naam)
         self._uploads[token] = upload
         return upload
 

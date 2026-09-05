@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import Path
 
 INBOX_DIR = "_inbox"
 INBOX_DUBBEL_DIR = "_dubbel"  # submap van _inbox voor geweigerde dubbelen (pakket 16)
+INBOX_TEKST_DIR = ".tekst"  # submap van _inbox met de gelezen tekst per wachtend bestand (pakket 17)
+INBOX_RESERVERING = timedelta(minutes=60)  # zo lang blijft een via de inboxpagina opgenomen bestand buiten de poll (pakket 17)
 TRASH_DIR = "_prullenbak"
 META_NAAM = "meta.md"
 EXTRAHEERBAAR = {".pdf", ".jpg", ".jpeg", ".png", ".heic"}
