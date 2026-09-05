@@ -1,7 +1,7 @@
 {# Lijst met geweigerde dubbele bestanden (pakket 16); verwacht `dubbelen: list[Dubbel]` #}
 {% if dubbelen %}
 <div class="fout dubbelen" role="alert">
-  <p>{{ 'Dit bestand staat al' if dubbelen|length == 1 else 'Deze bestanden staan al' }} in het archief; er is niets opgeslagen.</p>
+  <p>{{ 'Dit bestand staat al' if dubbelen|length == 1 else 'Deze bestanden staan al' }} in de ordner; er is niets opgeslagen.</p>
   <ul>
     {% for d in dubbelen %}
     <li><code>{{ d.naam }}</code> staat al in <a href="{{ url_for('document', jaar=d.jaar, map=d.map) }}">{{ d.titel }} ({{ d.documentdatum.isoformat() }})</a>{% if d.bestand != d.naam %} als <code>{{ d.bestand }}</code>{% endif %}</li>

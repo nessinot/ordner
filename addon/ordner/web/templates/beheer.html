@@ -25,7 +25,7 @@
       <tr><th>Wacht op titel</th><td><a data-tel="inbox-wachtend" href="{{ url_for('inbox') }}">{{ inbox.wachtend }}</a></td></tr>
       <tr><th>Dubbel</th><td data-tel="inbox-dubbel">{{ inbox.dubbel }}</td></tr>
     </table>
-    <p class="hint">Bestanden in <code>{{ inbox_map }}</code> neemt Ordner op zodra het de afzender herkent; de rest wacht op een titel. Dubbel: bestanden die al in het archief stonden, in <code>{{ inbox_map }}/_dubbel</code>. Die ruimt Ordner niet op.</p>
+    <p class="hint">Bestanden in <code>{{ inbox_map }}</code> neemt Ordner op zodra het de afzender herkent; de rest wacht op een titel. Dubbel: bestanden die al in de ordner stonden, in <code>{{ inbox_map }}/_dubbel</code>. Die ruimt Ordner niet op.</p>
   </section>
 
   <section class="paneel">
