@@ -5,6 +5,7 @@ Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. 
 ## 0.12.1 (2026-09-05)
 
 - Het eerste tabblad heet **Documenten** in plaats van **Zoeken**. Het is de pagina met je documenten; zoeken doe je in het veld bovenaan. De link bovenaan de documentpagina heet daarom **Terug naar documenten** (na een zoekopdracht nog steeds **Terug naar zoekresultaten**).
+- In de teksten heet de verzameling documenten nu overal "de ordner" in plaats van "het archief", passend bij de naam van de app.
 
 ## 0.12.0 (2026-09-05)
 

@@ -14,7 +14,7 @@
   <span class="gedempt">voor “{{ q }}”{% if afgekapt %} · de {{ kaarten|length }} nieuwste getoond{% endif %} · <a href="{{ url_for('zoeken') }}">wis</a></span>
   {% else %}
   <h2>Recent</h2>
-  <span class="gedempt">{{ tellingen.totaal }} document{% if tellingen.totaal != 1 %}en{% endif %} in het archief</span>
+  <span class="gedempt">{{ tellingen.totaal }} document{% if tellingen.totaal != 1 %}en{% endif %} in de ordner</span>
   {% endif %}
 </div>
 {% if not q and inbox_wachtend %}

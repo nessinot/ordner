@@ -584,7 +584,7 @@ def test_upload_dubbel_geweigerd_met_link(client: TestClient) -> None:
     mappen_voor = client.app.state.archief.documentmappen()  # type: ignore[attr-defined]
     r = _stap1(client, [("kopie.pdf", _PDF, "application/pdf")])
     assert r.status_code == 409
-    assert "staat al in het archief" in r.text
+    assert "staat al in de ordner" in r.text
     assert "kopie.pdf" in r.text
     assert 'href="/doc/2026/2026-03-01_eneco"' in r.text
     assert "Eneco (2026-03-01)" in r.text

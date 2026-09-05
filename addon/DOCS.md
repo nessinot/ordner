@@ -76,11 +76,11 @@ Tot je op Opslaan drukt wordt er niets bewaard. **Annuleren** gooit de gekozen b
 
 Een bestand toevoegen aan een bestaand document doe je op de documentpagina.
 
-Staat een gekozen bestand al in het archief, dan wordt de upload geweigerd; zie "Dubbele bestanden".
+Staat een gekozen bestand al in de ordner, dan wordt de upload geweigerd; zie "Dubbele bestanden".
 
 ## Dubbele bestanden
 
-Ordner voorkomt dat hetzelfde bestand twee keer in het archief komt. Elk bestand krijgt bij het opslaan een vingerafdruk van zijn inhoud (SHA-256, in `meta.md` onder `sha256:`). Bij uploaden, bij "Bestand toevoegen" op de documentpagina en in de inbox vergelijkt Ordner de vingerafdruk met alle documenten:
+Ordner voorkomt dat hetzelfde bestand twee keer in de ordner komt. Elk bestand krijgt bij het opslaan een vingerafdruk van zijn inhoud (SHA-256, in `meta.md` onder `sha256:`). Bij uploaden, bij "Bestand toevoegen" op de documentpagina en in de inbox vergelijkt Ordner de vingerafdruk met alle documenten:
 
 - **Uploaden.** Is een gekozen bestand al bekend, dan wordt er niets opgeslagen. Je ziet per bestand in welk document het al staat, met een link ernaartoe. Kies je meerdere bestanden en is er één al bekend, dan wordt de hele upload geweigerd; kies de overige bestanden daarna opnieuw.
 - **Bestand toevoegen.** Zelfde regel: één bekend bestand, en er wordt niets toegevoegd. Dat geldt ook voor een bestand dat al in ditzelfde document zit.
@@ -106,7 +106,7 @@ Op de documentpagina zie je achter de datum een label **datum uit tekst** of **d
 
 ## Zoeken
 
-Het tabblad **Documenten** (het startscherm) toont de 20 nieuwste documenten. Staan er meer in het archief, dan zegt een regel onder de lijst hoeveel er in totaal zijn; oudere documenten vind je via het zoekveld.
+Het tabblad **Documenten** (het startscherm) toont de 20 nieuwste documenten. Staan er meer in de ordner, dan zegt een regel onder de lijst hoeveel er in totaal zijn; oudere documenten vind je via het zoekveld.
 
 Zoeken werkt op alle woorden tegelijk (elk woord moet voorkomen), zonder onderscheid in hoofdletters, over titel, omschrijving, tags, documentdatum, notities en de gelezen tekst van de bestanden. Een datum of jaartal (`2024`, `2024-03`) telt als zoekwoord, dus `energie 2024` vindt alleen energiedocumenten uit 2024. Bij meer dan 50 treffers worden de 50 nieuwste getoond; de kop noemt het echte aantal en onder de lijst staat een link **Toon alle** voor de volledige lijst. Meestal is een extra zoekwoord sneller.
 
@@ -118,13 +118,13 @@ Open je een document vanuit de resultaten, dan staat bovenaan de documentpagina 
 
 Bestanden die je in `/share/ordner/_inbox/` zet worden automatisch opgenomen zodra Ordner weet van wie ze zijn. Elke vijf seconden kijkt Ordner of er een bestand ligt dat niet meer groeit (twee keer achter elkaar dezelfde grootte). Dan leest het de tekst en beoordeelt het bestand:
 
-- staat het bestand al ergens in het archief, dan wordt het niet opgenomen maar verplaatst naar `_inbox/_dubbel/` (zie "Dubbele bestanden");
+- staat het bestand al ergens in de ordner, dan wordt het niet opgenomen maar verplaatst naar `_inbox/_dubbel/` (zie "Dubbele bestanden");
 - herkent Ordner in de tekst de naam van het bedrijf of de instantie (zie "Titel en tags uit de tekst"), dan wordt er direct een document van gemaakt: die naam als titel, het documenttype als tag, de datum uit de tekst (anders vandaag, zie "Documentdatum"). Het bestand verhuist naar de nieuwe documentmap, samen met de al gelezen tekst;
 - is er geen herkenbare afzender, dan blijft het bestand in de inbox **wachten op een titel**. Ordner raadt geen titel meer uit de bestandsnaam, want de mapnaam wordt daarna nooit meer aangepast.
 
 **Wachtende bestanden een titel geven.** Het startscherm meldt hoeveel bestanden wachten, met een link naar de pagina **Inbox** (ook bereikbaar via de beheerpagina; de tabel Inbox daar toont ook hoeveel bestanden er in totaal in `_inbox/` liggen en hoeveel er als dubbel in `_inbox/_dubbel/` zijn gezet, zie "Beheerpagina"). Daar staat per bestand de naam, de grootte en sinds wanneer het wacht, met een knop **Opnemen**. Die brengt je naar het bekende gegevensscherm van de upload: datum en tags staan al ingevuld uit de tekst, jij typt de titel en kiest **Opslaan**. Het bestand wordt dan een document en verdwijnt uit de inbox. **Terug naar inbox** laat het liggen. Zolang je op dat scherm bezig bent, blijft Ordner van het bestand af (een uur lang; daarna wordt het weer gewoon beoordeeld).
 
-**Leren van je titels.** Zodra een titel in het archief staat, kijkt Ordner opnieuw naar alle wachtende bestanden. Staat die naam letterlijk in de tekst van een ander wachtend bestand, dan wordt dat automatisch opgenomen. Laad je een oud archief met tien brieven van dezelfde onbekende afzender in de inbox, dan geef je er één een titel en volgen de andere negen vanzelf.
+**Leren van je titels.** Zodra een titel in de ordner staat, kijkt Ordner opnieuw naar alle wachtende bestanden. Staat die naam letterlijk in de tekst van een ander wachtend bestand, dan wordt dat automatisch opgenomen. Zet je tien oude brieven van dezelfde onbekende afzender in de inbox, dan geef je er één een titel en volgen de andere negen vanzelf.
 
 **Eén keer lezen.** De tekst van een wachtend bestand staat in `_inbox/.tekst/<bestandsnaam>.txt`. Daardoor draait de OCR per bestand maar één keer, ook na een herstart van de add-on of als het bestand opnieuw beoordeeld wordt. Vervang je een bestand in de inbox door een nieuwere versie, dan wordt het opnieuw gelezen. Bij opname gaat de tekst mee als `.txt` naast het origineel; het bestandje in `.tekst/` verdwijnt dan. Een bestand dat niet gelezen kan worden (beschadigd, of geen pdf of foto) wacht ook op jou; na opname probeert Ordner de tekst alsnog te lezen zoals bij een gewone upload.
 
@@ -136,7 +136,7 @@ Ordner probeert uit de gelezen tekst af te leiden van wie een document komt en w
 
 De **titel** is alleen de naam van de afzender, dus "Eneco Services B.V." of "Gemeente Amsterdam", nooit het soort document of een jaartal. Ordner kijkt in deze volgorde en neemt het eerste wat lukt:
 
-1. Een titel die je al eerder in het archief hebt gebruikt en die letterlijk in de tekst voorkomt. Heb je eenmaal "Eneco" getypt, dan wordt dat bij de volgende Eneco-factuur herkend.
+1. Een titel die je al eerder in de ordner hebt gebruikt en die letterlijk in de tekst voorkomt. Heb je eenmaal "Eneco" getypt, dan wordt dat bij de volgende Eneco-factuur herkend.
 2. De naam achter "t.n.v." of "ten name van", zoals bij de betaalgegevens op een factuur.
 3. De eerste regel met een rechtsvorm (B.V., N.V., VOF, U.A.) of een instantiewoord (Gemeente, Stichting, Vereniging, Waterschap, Provincie, Coöperatie, Ministerie, Belastingdienst, Bank, Verzekeraar, Ziekenhuis, Universiteit, Hogeschool).
 4. Bij een korte tekst, zoals een kassabon, de eerste regel met tekst.
@@ -157,7 +157,7 @@ De beheerpagina toont twee tabellen met tellers, wat er nu gelezen wordt en het 
 
 **Documenten** telt documenten (mappen met een `meta.md`):
 
-- **Totaal**: alle documenten in het archief.
+- **Totaal**: alle documenten in de ordner.
 - **OCR klaar**: documenten waarvan alle pdf's en foto's een gelezen tekst (`.txt`) hebben, of die geen leesbare bestanden bevatten.
 - **OCR nog te doen**: documenten waarin nog minstens één pdf of foto zonder `.txt` zit.
 - **OCR mislukt**: documenten waarbij het lezen is mislukt (zie "Als OCR faalt"). Klaar, nog te doen en mislukt tellen samen op tot het totaal.
@@ -168,7 +168,7 @@ De beheerpagina toont twee tabellen met tellers, wat er nu gelezen wordt en het 
 
 - **Totaal**: alle bestanden die direct in de inboxmap liggen, ook de bestanden die Ordner nog aan het beoordelen of lezen is en de bestanden waar iemand op dat moment via **Opnemen** een titel aan geeft. De submappen `.tekst/` en `_dubbel/` tellen niet mee.
 - **Wacht op titel**: de bestanden zonder herkende afzender, met een link naar de inboxpagina. Het verschil met het totaal is wat nog beoordeeld wordt of waar iemand mee bezig is.
-- **Dubbel**: bestanden die al in het archief stonden en daarom naar `_inbox/_dubbel/` zijn verplaatst. Ordner ruimt die map niet op; kijk er af en toe in en gooi weg wat je niet meer nodig hebt.
+- **Dubbel**: bestanden die al in de ordner stonden en daarom naar `_inbox/_dubbel/` zijn verplaatst. Ordner ruimt die map niet op; kijk er af en toe in en gooi weg wat je niet meer nodig hebt.
 
 De knop **Cache verversen en ontbrekende tekst extraheren** doet in één keer:
 
@@ -205,4 +205,4 @@ Een document met status `failed` wordt door de automatische verversing met rust 
 
 ## Backup
 
-Het hele archief staat in `/share/ordner`. De map `/share` zit standaard in een Home Assistant-backup, dus Ordner heeft geen eigen back-upmechanisme nodig. Omdat het gewone bestanden zijn, kun je de map ook los kopiëren of met een ander programma synchroniseren. De add-on zelf bewaart niets buiten deze map.
+De hele ordner staat in `/share/ordner`. De map `/share` zit standaard in een Home Assistant-backup, dus Ordner heeft geen eigen back-upmechanisme nodig. Omdat het gewone bestanden zijn, kun je de map ook los kopiëren of met een ander programma synchroniseren. De add-on zelf bewaart niets buiten deze map.

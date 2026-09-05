@@ -12,7 +12,7 @@ Gebruikersdocumentatie staat in [`addon/DOCS.md`](addon/DOCS.md) en verschijnt o
 
 1. **Instellingen › Add-ons › Add-on store › ⋮ (rechtsboven) › Repositories** › `https://github.com/nessinot/ordner` toevoegen.
 2. De sectie **Ordner** verschijnt in de store (zo nodig ⋮ › Controleren op updates). Open **Ordner** › **Installeren**. De build draait op de HA-machine en duurt de eerste keer enkele minuten (Debian-image plus OCR-tools).
-3. Start de add-on en zet **Toon in zijbalk** aan. Het archief komt in `/share/ordner`.
+3. Start de add-on en zet **Toon in zijbalk** aan. Je documenten komen in `/share/ordner`.
 
 Updaten: `version` in `addon/config.yaml` ophogen, committen, pushen; in HA ⋮ › Controleren op updates → knop **Update** bij Ordner. Zonder versiebump ziet HA geen update.
 
@@ -32,7 +32,7 @@ uvicorn --app-dir addon ordner.web.app:app --reload
 
 Op Linux/macOS: `ORDNER_DATA=./data uvicorn --app-dir addon ordner.web.app:app --reload`.
 
-De app draait dan op <http://127.0.0.1:8000> met `./data` als archief. OCR werkt lokaal alleen als `pdftotext`, `pdfinfo`, `ocrmypdf` en `tesseract` op het pad staan; zonder die tools krijgen documenten de status `failed`.
+De app draait dan op <http://127.0.0.1:8000> met `./data` als ordner. OCR werkt lokaal alleen als `pdftotext`, `pdfinfo`, `ocrmypdf` en `tesseract` op het pad staan; zonder die tools krijgen documenten de status `failed`.
 
 ## Tests
 
