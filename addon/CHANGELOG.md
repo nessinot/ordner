@@ -2,6 +2,12 @@
 
 Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. Nieuwste versie bovenaan; de bovenste kop moet gelijk zijn aan `version` in `config.yaml` (dat controleert `tests/test_addon_config.py`).
 
+## 0.12.0 (2026-09-05)
+
+- De beheerpagina heeft een eigen tabel **Inbox** met drie tellers: hoeveel bestanden er in `_inbox/` liggen, hoeveel daarvan op een titel wachten (met een link naar de inboxpagina) en hoeveel er als dubbel in `_inbox/_dubbel/` zijn gezet. Tot nu toe telde alleen het eindstation mee: een bestand dat net was neergezet en nog beoordeeld of gelezen werd, stond nergens, en dubbelen verdwenen stil met alleen een regel in het log.
+- De tellers in de tabel **Documenten** zeggen nu wat ze tellen. "OCR wacht" heet "OCR nog te doen" (documenten waarvan nog niet alle tekst gelezen is) en "In wachtrij" heet "OCR-wachtrij (bestanden)" (losse bestanden die de tekstlezer nog moet doen). Onder de tabel staat in één regel wat de rijen tellen.
+- Alle tellers op de beheerpagina worden live bijgewerkt, ook die van de inbox.
+
 ## 0.11.0 (2026-09-05)
 
 - Een bestand in de inbox waarvan Ordner de afzender niet in de tekst herkent, krijgt niet langer de bestandsnaam als titel. Het blijft in de inbox wachten tot jij het een titel geeft. Zo krijg je geen mappen meer met namen als `scan_0001` die daarna nooit meer veranderen, bijvoorbeeld bij het in één keer inladen van een oud archief.

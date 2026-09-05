@@ -440,11 +440,14 @@ def test_inbox_wachtend_op_pagina_startpagina_en_beheer(client: TestClient, mock
     assert "in de inbox wacht" not in client.get("/?q=iets").text  # alleen op de startpagina
 
     r = client.get("/beheer")
-    assert 'data-tel="inbox"><a href="/inbox">1</a>' in r.text
+    assert '<a data-tel="inbox-wachtend" href="/inbox">1</a>' in r.text
+    assert 'data-tel="inbox-totaal">1<' in r.text
+    assert client.get("/api/status").json()["inbox"] == {"totaal": 1, "wachtend": 1, "dubbel": 0}
 
     _in_inbox(client, "tweede.pdf", _PDF + b"2")
     assert "2 bestanden in de inbox wachten op een titel" in client.get("/").text
     assert "2 bestanden wachten op een titel" in client.get("/inbox").text
+    assert client.get("/api/status").json()["inbox"] == {"totaal": 2, "wachtend": 2, "dubbel": 0}
 
 
 def test_inbox_opnemen_scherm2_en_opslaan(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
@@ -1146,9 +1149,10 @@ def test_status_api(client: TestClient) -> None:
     r = client.get("/api/status")
     assert r.status_code == 200
     s = r.json()
-    assert set(s) == {"queue", "bezig", "reconcile_bezig", "tellingen"}
+    assert set(s) == {"queue", "bezig", "reconcile_bezig", "tellingen", "inbox"}
     assert s["reconcile_bezig"] is False
     assert s["tellingen"] == {"totaal": 0, "pending": 0, "done": 0, "failed": 0}
+    assert s["inbox"] == {"totaal": 0, "wachtend": 0, "dubbel": 0}
     assert s["bezig"] == []
 
     _upload(client)
@@ -1178,6 +1182,28 @@ def test_beheer_pagina(client: TestClient) -> None:
     assert "Nog niet gedraaid" in r.text
     assert 'action="/beheer/reconcile"' in r.text
     assert "Loopt automatisch elke 60 minuten" in r.text
+    # pakket 18: labels met eenheid, tabel Inbox met drie tellers
+    assert "OCR nog te doen" in r.text and "OCR-wachtrij (bestanden)" in r.text
+    assert "In wachtrij" not in r.text and "OCR wacht<" not in r.text
+    assert "<h3>Inbox</h3>" in r.text
+    assert 'data-tel="inbox-totaal">0<' in r.text
+    assert '<a data-tel="inbox-wachtend" href="/inbox">0</a>' in r.text  # link ook bij 0
+    assert 'data-tel="inbox-dubbel">0<' in r.text
+    assert "_dubbel</code>" in r.text
+
+
+def test_beheer_telt_inbox_totaal_en_dubbel(client: TestClient) -> None:
+    inbox = _root(client) / "_inbox"
+    (inbox / "nog-niet-beoordeeld.pdf").write_bytes(_PDF)  # ligt er, maar wacht (nog) niet
+    (inbox / ".DS_Store").write_bytes(b"x")
+    (inbox / "_dubbel").mkdir()
+    (inbox / "_dubbel" / "kopie.pdf").write_bytes(_PDF)
+    r = client.get("/beheer")
+    assert r.status_code == 200
+    assert 'data-tel="inbox-totaal">1<' in r.text
+    assert '<a data-tel="inbox-wachtend" href="/inbox">0</a>' in r.text
+    assert 'data-tel="inbox-dubbel">1<' in r.text
+    assert client.get("/api/status").json()["inbox"] == {"totaal": 1, "wachtend": 0, "dubbel": 1}
 
 
 def test_beheer_reconcile(client: TestClient) -> None:

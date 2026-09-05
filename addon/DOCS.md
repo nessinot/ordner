@@ -122,7 +122,7 @@ Bestanden die je in `/share/ordner/_inbox/` zet worden automatisch opgenomen zod
 - herkent Ordner in de tekst de naam van het bedrijf of de instantie (zie "Titel en tags uit de tekst"), dan wordt er direct een document van gemaakt: die naam als titel, het documenttype als tag, de datum uit de tekst (anders vandaag, zie "Documentdatum"). Het bestand verhuist naar de nieuwe documentmap, samen met de al gelezen tekst;
 - is er geen herkenbare afzender, dan blijft het bestand in de inbox **wachten op een titel**. Ordner raadt geen titel meer uit de bestandsnaam, want de mapnaam wordt daarna nooit meer aangepast.
 
-**Wachtende bestanden een titel geven.** Het startscherm meldt hoeveel bestanden wachten, met een link naar de pagina **Inbox** (ook bereikbaar via de beheerpagina). Daar staat per bestand de naam, de grootte en sinds wanneer het wacht, met een knop **Opnemen**. Die brengt je naar het bekende gegevensscherm van de upload: datum en tags staan al ingevuld uit de tekst, jij typt de titel en kiest **Opslaan**. Het bestand wordt dan een document en verdwijnt uit de inbox. **Terug naar inbox** laat het liggen. Zolang je op dat scherm bezig bent, blijft Ordner van het bestand af (een uur lang; daarna wordt het weer gewoon beoordeeld).
+**Wachtende bestanden een titel geven.** Het startscherm meldt hoeveel bestanden wachten, met een link naar de pagina **Inbox** (ook bereikbaar via de beheerpagina; de tabel Inbox daar toont ook hoeveel bestanden er in totaal in `_inbox/` liggen en hoeveel er als dubbel in `_inbox/_dubbel/` zijn gezet, zie "Beheerpagina"). Daar staat per bestand de naam, de grootte en sinds wanneer het wacht, met een knop **Opnemen**. Die brengt je naar het bekende gegevensscherm van de upload: datum en tags staan al ingevuld uit de tekst, jij typt de titel en kiest **Opslaan**. Het bestand wordt dan een document en verdwijnt uit de inbox. **Terug naar inbox** laat het liggen. Zolang je op dat scherm bezig bent, blijft Ordner van het bestand af (een uur lang; daarna wordt het weer gewoon beoordeeld).
 
 **Leren van je titels.** Zodra een titel in het archief staat, kijkt Ordner opnieuw naar alle wachtende bestanden. Staat die naam letterlijk in de tekst van een ander wachtend bestand, dan wordt dat automatisch opgenomen. Laad je een oud archief met tien brieven van dezelfde onbekende afzender in de inbox, dan geef je er één een titel en volgen de andere negen vanzelf.
 
@@ -153,7 +153,22 @@ De omschrijving wordt nooit automatisch ingevuld. Klopt een voorstel niet, pas h
 
 ## Beheerpagina
 
-De beheerpagina toont tellingen (totaal, OCR klaar, wacht, mislukt), hoeveel inboxbestanden op een titel wachten (met een link naar de inboxpagina), wat er nu in de wachtrij staat en het rapport van de laatste verversing.
+De beheerpagina toont twee tabellen met tellers, wat er nu gelezen wordt en het rapport van de laatste verversing. De tellers worden elke paar seconden bijgewerkt zonder dat je de pagina hoeft te verversen.
+
+**Documenten** telt documenten (mappen met een `meta.md`):
+
+- **Totaal**: alle documenten in het archief.
+- **OCR klaar**: documenten waarvan alle pdf's en foto's een gelezen tekst (`.txt`) hebben, of die geen leesbare bestanden bevatten.
+- **OCR nog te doen**: documenten waarin nog minstens één pdf of foto zonder `.txt` zit.
+- **OCR mislukt**: documenten waarbij het lezen is mislukt (zie "Als OCR faalt"). Klaar, nog te doen en mislukt tellen samen op tot het totaal.
+- **OCR-wachtrij (bestanden)**: losse bestanden die de tekstlezer nog moet doen. Dit is de enige rij die bestanden telt in plaats van documenten; één document met drie ongelezen scans staat hier als drie.
+- **Cache verversen**: of de verversing op dit moment loopt.
+
+**Inbox** telt bestanden in `/share/ordner/_inbox/` (zie "Inbox"):
+
+- **Totaal**: alle bestanden die direct in de inboxmap liggen, ook de bestanden die Ordner nog aan het beoordelen of lezen is en de bestanden waar iemand op dat moment via **Opnemen** een titel aan geeft. De submappen `.tekst/` en `_dubbel/` tellen niet mee.
+- **Wacht op titel**: de bestanden zonder herkende afzender, met een link naar de inboxpagina. Het verschil met het totaal is wat nog beoordeeld wordt of waar iemand mee bezig is.
+- **Dubbel**: bestanden die al in het archief stonden en daarom naar `_inbox/_dubbel/` zijn verplaatst. Ordner ruimt die map niet op; kijk er af en toe in en gooi weg wat je niet meer nodig hebt.
 
 De knop **Cache verversen en ontbrekende tekst extraheren** doet in één keer:
 

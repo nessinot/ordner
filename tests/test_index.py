@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from ordner.config import META_NAAM
-from ordner.index import Index, Reconciler, bouw_index
+from ordner.index import Index, InboxTelling, Reconciler, bouw_index
 from ordner.ingest import maak_document_uit_voorbereid
 from ordner.meta import lees_meta, schrijf_meta
 from ordner.storage import Archief, OngeldigPad
@@ -614,6 +614,35 @@ def test_inbox_dubbel_naar_dubbelmap(archief: Archief, queue: Queue) -> None:
     # de _dubbel-map zelf wordt niet als inboxbestand gezien
     assert reconciler.verwerk_inbox() == []
     assert reconciler.wachtend() == []
+
+
+def test_inbox_telling(archief: Archief, queue: Queue) -> None:
+    reconciler = _met_lezer(archief, queue, {"scan.pdf": _ZONDER_TITEL})
+    assert reconciler.inbox_telling() == InboxTelling(0, 0, 0)
+    assert not (archief.inbox_dir / "_dubbel").exists()  # _dubbel/ ontbreekt -> 0, en wordt niet aangemaakt
+
+    (archief.inbox_dir / "scan.pdf").write_bytes(b"%PDF")
+    (archief.inbox_dir / ".DS_Store").write_bytes(b"x")  # "."-bestand telt niet
+    (archief.inbox_dir / ".tekst").mkdir()
+    (archief.inbox_dir / ".tekst" / "los.txt").write_text("x", encoding="utf-8")
+    (archief.inbox_dir / "_dubbel").mkdir()
+    (archief.inbox_dir / "_dubbel" / "kopie.pdf").write_bytes(b"x")
+    (archief.inbox_dir / "_dubbel" / "kopie_2.pdf").write_bytes(b"x")
+    (archief.inbox_dir / "_dubbel" / ".verborgen").write_bytes(b"x")
+    # nog niet beoordeeld: ligt er wel (totaal), wacht nog niet
+    assert reconciler.inbox_telling() == InboxTelling(totaal=1, wachtend=0, dubbel=2)
+
+    reconciler.verwerk_inbox()
+    reconciler.verwerk_inbox()
+    assert reconciler.inbox_telling() == InboxTelling(totaal=1, wachtend=1, dubbel=2)
+
+    reconciler.reserveer("scan.pdf")  # gereserveerd: ligt er nog, maar wacht niet
+    assert reconciler.inbox_telling() == InboxTelling(totaal=1, wachtend=0, dubbel=2)
+    reconciler.geef_vrij("scan.pdf")
+    assert reconciler.inbox_telling().wachtend == 1
+
+    reconciler.verwijder_uit_inbox("scan.pdf")
+    assert reconciler.inbox_telling() == InboxTelling(0, 0, 2)
 
 
 def test_inbox_groeiend_bestand_wacht(archief: Archief, queue: Queue) -> None:

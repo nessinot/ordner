@@ -66,6 +66,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const s = await r.json();
         for (const k of ["totaal", "pending", "done", "failed"]) zet(k, s.tellingen[k]);
         zet("queue", s.queue);
+        zet("inbox-totaal", s.inbox.totaal);
+        zet("inbox-wachtend", s.inbox.wachtend);
+        zet("inbox-dubbel", s.inbox.dubbel);
         zet("reconcile", s.reconcile_bezig ? "bezig" : "niet bezig");
         const lijst = beheer.querySelector("[data-bezig]");
         if (lijst) {
