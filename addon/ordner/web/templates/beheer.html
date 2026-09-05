@@ -10,12 +10,22 @@
     <table class="tellingen">
       <tr><th>Totaal</th><td data-tel="totaal">{{ tellingen.totaal }}</td></tr>
       <tr><th>OCR klaar</th><td data-tel="done">{{ tellingen.done }}</td></tr>
-      <tr><th>OCR wacht</th><td data-tel="pending">{{ tellingen.pending }}</td></tr>
+      <tr><th>OCR nog te doen</th><td data-tel="pending">{{ tellingen.pending }}</td></tr>
       <tr><th>OCR mislukt</th><td data-tel="failed">{{ tellingen.failed }}</td></tr>
-      <tr><th>In wachtrij</th><td data-tel="queue">{{ queue }}</td></tr>
-      <tr><th>Inbox wacht op titel</th><td data-tel="inbox">{% if inbox_wachtend %}<a href="{{ url_for('inbox') }}">{{ inbox_wachtend }}</a>{% else %}0{% endif %}</td></tr>
+      <tr><th>OCR-wachtrij (bestanden)</th><td data-tel="queue">{{ queue }}</td></tr>
       <tr><th>Cache verversen</th><td data-tel="reconcile">{% if reconcile_bezig %}bezig{% else %}niet bezig{% endif %}</td></tr>
     </table>
+    <p class="hint">De eerste vier rijen tellen documenten (klaar, nog te doen en mislukt tellen op tot het totaal). De wachtrij telt bestanden die de tekstlezer nog moet doen.</p>
+  </section>
+
+  <section class="paneel">
+    <h3>Inbox</h3>
+    <table class="tellingen">
+      <tr><th>Totaal</th><td data-tel="inbox-totaal">{{ inbox.totaal }}</td></tr>
+      <tr><th>Wacht op titel</th><td><a data-tel="inbox-wachtend" href="{{ url_for('inbox') }}">{{ inbox.wachtend }}</a></td></tr>
+      <tr><th>Dubbel</th><td data-tel="inbox-dubbel">{{ inbox.dubbel }}</td></tr>
+    </table>
+    <p class="hint">Bestanden in <code>{{ inbox_map }}</code> neemt Ordner op zodra het de afzender herkent; de rest wacht op een titel. Dubbel: bestanden die al in het archief stonden, in <code>{{ inbox_map }}/_dubbel</code>. Die ruimt Ordner niet op.</p>
   </section>
 
   <section class="paneel">

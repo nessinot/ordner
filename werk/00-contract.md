@@ -258,6 +258,12 @@ class Wachtend:                     # pakket 17
     grootte: int
     sinds: datetime                 # mtime van het bestand, zonder microseconden
 
+@dataclass(frozen=True)
+class InboxTelling:                 # pakket 18
+    totaal: int                     # gewone bestanden direct in _inbox/ (naam niet beginnend met "."); gereserveerde tellen mee
+    wachtend: int                   # len(wachtend())
+    dubbel: int                     # gewone bestanden in _inbox/_dubbel/; map ontbreekt -> 0
+
 class Reconciler:
     def __init__(self, archief: Archief, index: Index, queue_fn: Callable[[Path, str], None],
                  lees_tekst: LeesTekst | None = None)   # lees_tekst: voor de inbox (datum, titel en tags uit tekst); None = niets lezen (alles zonder titel wacht)
@@ -272,6 +278,7 @@ class Reconciler:
     def reserveer(self, naam: str) -> None                                  # buiten de poll tot geef_vrij/verwijder_uit_inbox of na INBOX_RESERVERING
     def geef_vrij(self, naam: str) -> None                                  # ook: het bestand wordt bij de volgende poll opnieuw beoordeeld
     def verwijder_uit_inbox(self, naam: str) -> None                        # bestand + sidecar (missing_ok), reservering en geheugenstaat weg
+    def inbox_telling(self) -> InboxTelling                                 # pakket 18: drie directory-scans, geen cache; veilig vanaf de event loop (alleen iterdir/stat; OSError -> overslaan); maakt _dubbel/ niet aan
 ```
 
 ### `ordner/datum.py` (pakket 14)
@@ -423,9 +430,9 @@ app = create_app()
 | `document_ocr` | `POST /doc/{jaar}/{map}/ocr` |
 | `document_verwijder` | `POST /doc/{jaar}/{map}/verwijder` |
 | `bestand` | `GET /doc/{jaar}/{map}/bestand/{naam}` |
-| `beheer` | `GET /beheer` |
+| `beheer` | `GET /beheer` (18: context `inbox: InboxTelling` en `inbox_map: str`; tabel Documenten met labels "OCR nog te doen" en "OCR-wachtrij (bestanden)", tabel Inbox met `data-tel="inbox-totaal"`, `inbox-wachtend` (op de `<a>` naar `inbox`, ook bij 0) en `inbox-dubbel`) |
 | `beheer_reconcile` | `POST /beheer/reconcile` |
-| `status` | `GET /api/status` |
+| `status` | `GET /api/status` (`queue`, `bezig`, `reconcile_bezig`, `tellingen`, sinds 18 `inbox: {"totaal", "wachtend", "dubbel"}`; `ocr` bij `?rel=`) |
 | `static` | `/static/...` |
 
 ## Testfixtures (`tests/conftest.py`)
@@ -460,3 +467,4 @@ _(agents voegen hier regels toe: pakket · wat · waarom)_
 - 15b · Nieuwe module `web/openstaand.py` (`OpenstaandeUpload`, `OpenstaandeUploads`), `app.state.openstaand`, routes `upload_gegevens` (`GET/POST /upload/{token}`) en `upload_annuleer`; `POST /upload` accepteert alleen nog bestanden (minstens één) en negeert titel/datum/tags; nieuwe template `upload_gegevens.html`; `maak_document_uit_bestanden` wordt door de app niet meer aangeroepen · uploaden in twee schermen zodat titel, datum en tags uit de tekst voorgevuld zijn vóór het opslaan. Eén afwijking buiten het pakketbestand: `extract._heic_naar_jpg` vertaalt PIL-fouten (`OSError`/`ValueError`, o.a. `UnidentifiedImageError`) naar `ExtractieFout`; interface ongewijzigd. Nodig omdat scherm 1 nu altijd de tekst leest en `maak_tekstlezer` alleen `ExtractieFout` opvangt: een kapotte `.heic` gaf anders een 500 (de worker ving dit al breed op, de inbox en de datumloze upload uit 14 niet). Zie `werk/15b-tweestaps-upload.md`.
 - 17 · `INBOX_TEKST_DIR`, `INBOX_RESERVERING`, `Archief.inbox_pad`, `ingest.voorbereid_uit_teksten` (door `lees_vooraf` hergebruikt), `Wachtend`, `ReconcileRapport.inbox_wachtend`, `Reconciler.wachtend/bereid_inbox_voor/reserveer/geef_vrij/verwijder_uit_inbox`, `OpenstaandeUpload.inbox_naam`, routes `inbox` en `inbox_opnemen`, template `inbox.html`; de bestandsnaam-fallback voor inboxtitels vervalt · een inboxbestand zonder herkende afzender wacht op een titel van de gebruiker in plaats van een mapnaam te krijgen die nooit meer verandert. Drie kleine afwijkingen van `werk/17-inbox-wacht-op-titel.md`: (1) de volgorde in `verwerk_inbox` is gereserveerd → grootte → *titels ongewijzigd → overslaan* → dubbel → tekst, dus de hashcontrole staat ná de goedkope overslaan-check (anders wordt elke wachtende file elke vijf seconden gehasht); een bestand dat pas ná zijn beoordeling een dubbel wordt gaat daardoor bij de eerstvolgende herbeoordeling naar `_dubbel/`; (2) `geef_vrij` laat het bestand bij de volgende poll opnieuw beoordelen, zodat na "Al opgenomen via de inbox" de poll het als dubbel opruimt in plaats van eindeloos te blijven wachten; (3) de inbox leest het bestand ter plekke (`lees_tekst(pad)`), zonder tempkopie, en gebruikt `lees_vooraf` niet meer. Ook niet-extraheerbare bestanden krijgen een (lege) sidecar, en `.tekst/` blijft staan als hij leeg is. Zie `werk/17-inbox-wacht-op-titel.md`.
 - 16 · `Meta.sha256` (mapping, sleutel direct na `bestanden`, blokstijl), nieuwe module `dubbel.py` (`sha256_van`, `sha256_van_bestand`, `Dubbel`, `zoek_dubbelen`), `Index.zoek_hash` met interne hash-tabel, `ReconcileRapport.gehasht`, `INBOX_DUBBEL_DIR`, `Archief.voeg_bestand_toe` registreert de hash; `POST /upload` en `POST /doc/…/bestanden` antwoorden 409 met de lijst `dubbelen` (template `_dubbelen.html`) · hetzelfde bestand mag niet per ongeluk twee keer in het archief komen; de vingerafdruk staat op schijf omdat er geen indexbestand is. De sleutel staat niet als laatste (zoals `datumbron` in 14) maar bij `bestanden`, omdat het per-bestand-informatie is. Tests die twee keer hetzelfde bestand uploadden (`test_bekende_titel_uit_archief_voorgesteld`, `test_ingress_prefix_in_redirect`, `test_inbox_fout_blokkeert_rest_niet`) kregen andere bytes voor het tweede bestand. Zie `werk/16-dubbele-bestanden.md`.
+- 18 · `InboxTelling` en `Reconciler.inbox_telling()`; `GET /api/status` krijgt de sleutel `inbox`; `GET /beheer` krijgt `inbox: InboxTelling` en `inbox_map` (vervangt `inbox_wachtend`); `zoeken` gebruikt `inbox_telling().wachtend`; `beheer.html` met de labels "OCR nog te doen" en "OCR-wachtrij (bestanden)" en een eigen tabel Inbox (totaal / wacht op titel / dubbel); `app.js` werkt de drie inboxtellers live bij · de beheerpagina liet niet zien hoeveel bestanden er in de inbox lagen (alleen het eindstation "wacht op titel") en de rijen "OCR wacht" en "In wachtrij" telden verschillende eenheden zonder dat te zeggen. Geen wijziging op schijf; de routes lezen nog steeds nooit zelf uit `_inbox/`. Geen afwijkingen van `werk/18-beheertellers-en-inbox.md`.

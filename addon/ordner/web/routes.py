@@ -1,4 +1,4 @@
-"""Routes van de webapp (pakket 08: zoeken, upload, bestand-serving; pakket 09: document, beheer, status; pakket 15b: tweestaps upload; pakket 16: dubbele bestanden; pakket 17: inbox wacht op een titel)."""
+"""Routes van de webapp (pakket 08: zoeken, upload, bestand-serving; pakket 09: document, beheer, status; pakket 15b: tweestaps upload; pakket 16: dubbele bestanden; pakket 17: inbox wacht op een titel; pakket 18: beheertellers)."""
 
 from __future__ import annotations
 
@@ -168,7 +168,7 @@ async def zoeken(request: Request) -> Response:
             "afgekapt": len(kaarten) < totaal,
             "tellingen": index.tellingen(),
             # startpagina (zonder zoekterm): regel met het aantal inboxbestanden dat op een titel wacht (pakket 17)
-            "inbox_wachtend": 0 if q else len(_reconciler(request).wachtend()),
+            "inbox_wachtend": 0 if q else _reconciler(request).inbox_telling().wachtend,
         },
     )
 
@@ -653,11 +653,14 @@ async def bestand(request: Request, jaar: str, map: str, naam: str) -> Response:
 async def status(request: Request) -> Response:
     index = _index(request)
     queue = _queue(request)
+    inbox = _reconciler(request).inbox_telling()
     data: dict[str, object] = {
         "queue": queue.lengte,
         "bezig": sorted(queue.bezig),
         "reconcile_bezig": bool(request.app.state.reconcile_bezig),
         "tellingen": index.tellingen(),
+        # pakket 18: tabel Inbox op de beheerpagina
+        "inbox": {"totaal": inbox.totaal, "wachtend": inbox.wachtend, "dubbel": inbox.dubbel},
     }
     rel = request.query_params.get("rel")
     if rel is not None:
@@ -681,7 +684,9 @@ async def beheer(request: Request) -> Response:
         "reconcile_bezig": bool(request.app.state.reconcile_bezig),
         "rapport": request.app.state.laatste_rapport,
         "interval_minuten": max(1, round(settings.reconcile_interval / 60)),
-        "inbox_wachtend": len(_reconciler(request).wachtend()),
+        # pakket 18: tabel Inbox (totaal / wacht op titel / dubbel)
+        "inbox": _reconciler(request).inbox_telling(),
+        "inbox_map": str(_archief(request).inbox_dir),
     }
     return _templates(request).TemplateResponse(request, "beheer.html", ctx)
 

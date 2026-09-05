@@ -222,11 +222,12 @@ def test_beheer(page: Page, server: Server) -> None:
 
     page.wait_for_url(re.compile(r"/beheer\?m="))
     deadline = time.monotonic() + 10
-    while page.locator(".beheer table").count() < 2 and time.monotonic() < deadline:
+    while page.locator(".beheer table").count() < 3 and time.monotonic() < deadline:
         time.sleep(1)
         page.reload()
-    assert page.locator(".beheer table").count() == 2, "geen rapport van de laatste verversing"
+    assert page.locator(".beheer table").count() == 3, "geen rapport van de laatste verversing"  # Documenten, Inbox, rapport
     expect(page.locator(".beheer")).to_contain_text("Inbox verwerkt")
+    expect(page.locator('[data-tel="inbox-wachtend"]')).to_have_attribute("href", re.compile(r"/inbox$"))
 
 
 def test_ingress_prefix(browser: Browser, server: Server) -> None:

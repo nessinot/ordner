@@ -1,4 +1,4 @@
-"""In-memory index en reconciler (pakket 05; sha256-opzoektabel en dubbelen sinds pakket 16; inbox wacht op een titel sinds pakket 17)."""
+"""In-memory index en reconciler (pakket 05; sha256-opzoektabel en dubbelen sinds pakket 16; inbox wacht op een titel sinds pakket 17; inboxtelling sinds pakket 18)."""
 
 from __future__ import annotations
 
@@ -130,6 +130,34 @@ class Wachtend:
     naam: str
     grootte: int
     sinds: datetime  # mtime van het bestand
+
+
+@dataclass(frozen=True)
+class InboxTelling:
+    """Drie tellers voor de beheerpagina (pakket 18)."""
+
+    totaal: int  # gewone bestanden direct in _inbox/ (naam niet beginnend met "."); gereserveerde tellen mee
+    wachtend: int  # len(wachtend())
+    dubbel: int  # gewone bestanden in _inbox/_dubbel/; map ontbreekt -> 0
+
+
+def _tel_bestanden(map: Path) -> int:
+    """Gewone bestanden direct in `map` zonder "."-prefix; map ontbreekt of verdwijnt onder ons -> 0.
+
+    Draait op de event loop terwijl de poll-thread bestanden verplaatst; een `OSError` op een bestand
+    dat net weg is telt niet mee en geeft nooit een fout.
+    """
+    n = 0
+    try:
+        for p in map.iterdir():
+            try:
+                if p.is_file() and not p.name.startswith("."):
+                    n += 1
+            except OSError:
+                continue
+    except OSError:
+        return 0
+    return n
 
 
 def _titel_en_datum_uit_mapnaam(naam: str) -> tuple[str, date]:
@@ -331,6 +359,14 @@ class Reconciler:
                 continue
             lijst.append(Wachtend(naam, st.st_size, datetime.fromtimestamp(st.st_mtime).replace(microsecond=0)))
         return lijst
+
+    def inbox_telling(self) -> InboxTelling:
+        """Totaal, wachtend en dubbel voor de beheerpagina en `/api/status`; geen cache, alleen iterdir/stat."""
+        return InboxTelling(
+            totaal=_tel_bestanden(self.archief.inbox_dir),
+            wachtend=len(self.wachtend()),
+            dubbel=_tel_bestanden(self.archief.inbox_dir / INBOX_DUBBEL_DIR),
+        )
 
     def bereid_inbox_voor(self, naam: str) -> tuple[Voorbereid, Suggestie]:
         """Bestand en sidecar -> `Voorbereid` en `Suggestie` voor scherm 2 van de upload (leest zo nodig de tekst).
