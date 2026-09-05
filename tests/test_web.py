@@ -1005,7 +1005,7 @@ def test_terugknop_zonder_zoekopdracht(client: TestClient) -> None:
     r = client.get("/")
     assert f'href="{_DOC}"' in r.text  # geen q meegegeven vanuit Recent
     r = client.get(_DOC)
-    assert "Terug naar overzicht" in r.text
+    assert "Terug naar documenten" in r.text
     assert 'class="terug"' in r.text
     assert 'name="q"' not in r.text
 
@@ -1030,7 +1030,7 @@ def test_terugknop_met_toon_alles(client: TestClient) -> None:
     assert '<input type="hidden" name="alles" value="1">' in r.text
     # alles zonder q wordt genegeerd
     r = client.get(f"{_DOC}?alles=1")
-    assert "Terug naar overzicht" in r.text
+    assert "Terug naar documenten" in r.text
     assert 'name="alles"' not in r.text
 
 
