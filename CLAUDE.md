@@ -1,6 +1,6 @@
 # Ordner
 
-Minimale digitale archiefkast voor documenten (facturen, bonnen, digitale post, etc.; privé of zakelijk) als lokale Home Assistant add-on via Ingress. Kernprincipe: **de bestanden op schijf zijn de waarheid**. Mappen, originelen, één leesbare `meta.md` per document en OCR-tekst als `.txt` ernaast. Alles blijft bruikbaar zonder de app. Geen database.
+Minimale digitale ordner voor documenten (facturen, bonnen, digitale post, etc.; privé of zakelijk) als lokale Home Assistant add-on via Ingress. Kernprincipe: **de bestanden op schijf zijn de waarheid**. Mappen, originelen, één leesbare `meta.md` per document en OCR-tekst als `.txt` ernaast. Alles blijft bruikbaar zonder de app. Geen database.
 
 Werkpakketten en het bindende interface-contract staan in `werk/`. Houd het klein; ideeën gaan naar `IDEAS.md`.
 

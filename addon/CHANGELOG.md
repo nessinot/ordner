@@ -2,6 +2,10 @@
 
 Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. Nieuwste versie bovenaan; de bovenste kop moet gelijk zijn aan `version` in `config.yaml` (dat controleert `tests/test_addon_config.py`).
 
+## 0.12.1 (2026-09-05)
+
+- Het eerste tabblad heet **Documenten** in plaats van **Zoeken**. Het is de pagina met je documenten; zoeken doe je in het veld bovenaan. De link bovenaan de documentpagina heet daarom **Terug naar documenten** (na een zoekopdracht nog steeds **Terug naar zoekresultaten**).
+
 ## 0.12.0 (2026-09-05)
 
 - De beheerpagina heeft een eigen tabel **Inbox** met drie tellers: hoeveel bestanden er in `_inbox/` liggen, hoeveel daarvan op een titel wachten (met een link naar de inboxpagina) en hoeveel er als dubbel in `_inbox/_dubbel/` zijn gezet. Tot nu toe telde alleen het eindstation mee: een bestand dat net was neergezet en nog beoordeeld of gelezen werd, stond nergens, en dubbelen verdwenen stil met alleen een regel in het log.

@@ -106,13 +106,13 @@ Op de documentpagina zie je achter de datum een label **datum uit tekst** of **d
 
 ## Zoeken
 
-Het startscherm toont de 20 nieuwste documenten. Staan er meer in het archief, dan zegt een regel onder de lijst hoeveel er in totaal zijn; oudere documenten vind je via het zoekveld.
+Het tabblad **Documenten** (het startscherm) toont de 20 nieuwste documenten. Staan er meer in het archief, dan zegt een regel onder de lijst hoeveel er in totaal zijn; oudere documenten vind je via het zoekveld.
 
 Zoeken werkt op alle woorden tegelijk (elk woord moet voorkomen), zonder onderscheid in hoofdletters, over titel, omschrijving, tags, documentdatum, notities en de gelezen tekst van de bestanden. Een datum of jaartal (`2024`, `2024-03`) telt als zoekwoord, dus `energie 2024` vindt alleen energiedocumenten uit 2024. Bij meer dan 50 treffers worden de 50 nieuwste getoond; de kop noemt het echte aantal en onder de lijst staat een link **Toon alle** voor de volledige lijst. Meestal is een extra zoekwoord sneller.
 
 Tags staan als labels in de resultatenlijst en op de documentpagina. Klik op een label om alle documenten met die tag te zien; de tag komt dan in het zoekveld in plaats van je vorige zoekopdracht. Een tag met een spatie (bijvoorbeeld `gemeente amsterdam`) zoekt op beide woorden.
 
-Open je een document vanuit de resultaten, dan staat bovenaan de documentpagina **Terug naar zoekresultaten**; die brengt je terug bij dezelfde zoekopdracht, ook na opslaan of verwijderen. Vanuit het startscherm heet die link **Terug naar overzicht**.
+Open je een document vanuit de resultaten, dan staat bovenaan de documentpagina **Terug naar zoekresultaten**; die brengt je terug bij dezelfde zoekopdracht, ook na opslaan of verwijderen. Vanuit het startscherm heet die link **Terug naar documenten**.
 
 ## Inbox
 
