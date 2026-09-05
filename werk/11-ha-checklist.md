@@ -13,12 +13,12 @@ Alles wat met een browser of Docker te testen is, zit in pakket 12 en draait aut
 ## Telefoon (HA-app)
 
 4. [ ] Uploaden → foto uit de fotorol (HEIC) → titel → Opslaan. Voortgangsbalk zichtbaar, landt op de documentpagina, wordt vanzelf `done`.
-5. [ ] **iOS: pdf inline** — toont `<object>` de pdf in de HA-app-webview? Zo niet: werkt de "Open"-link? Resultaat noteren in `IDEAS.md` als inline niet werkt (bekend zwak punt).
+5. [x] **iOS: pdf inline** — beantwoord op 2026-09-05 (releases 0.9.1 en 0.9.2): de Open-link zonder `target=_blank` werkt in de HA-app; sinds 0.9.2 opent hij een kijkpagina met terugknop. Android-webview kan geen pdf tonen en downloadt hem; daarvoor staat een losse link onder het lege vlak.
 6. [ ] Afbeelding inline zichtbaar; zoeken vanaf de telefoon werkt.
 
 ## Samba (optioneel, ter bevestiging)
 
-7. [ ] `/share/ordner/JJJJ/…` is leesbaar in de Verkenner: `meta.md`, origineel, `.txt`. Een bestand in `_inbox/` droppen vanaf de pc verschijnt binnen ~10 s in de UI.
+7. [ ] `/share/ordner/JJJJ/…` is leesbaar in de Verkenner: `meta.md`, origineel, `.txt`. Een bestand in `_inbox/` droppen vanaf de pc: met een herkenbare afzender in de tekst verschijnt het binnen ~10 s als document; zonder afzender verschijnt het op de pagina Inbox (regel op het startscherm) en staat de gelezen tekst in `_inbox/.tekst/` (sinds 0.11.0, pakket 17). Opnemen → titel → Opslaan; controleer dat bestand en sidecar daarna weg zijn.
 
 ## Afronding
 
