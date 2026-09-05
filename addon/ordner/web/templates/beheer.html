@@ -13,6 +13,7 @@
       <tr><th>OCR wacht</th><td data-tel="pending">{{ tellingen.pending }}</td></tr>
       <tr><th>OCR mislukt</th><td data-tel="failed">{{ tellingen.failed }}</td></tr>
       <tr><th>In wachtrij</th><td data-tel="queue">{{ queue }}</td></tr>
+      <tr><th>Inbox wacht op titel</th><td data-tel="inbox">{% if inbox_wachtend %}<a href="{{ url_for('inbox') }}">{{ inbox_wachtend }}</a>{% else %}0{% endif %}</td></tr>
       <tr><th>Cache verversen</th><td data-tel="reconcile">{% if reconcile_bezig %}bezig{% else %}niet bezig{% endif %}</td></tr>
     </table>
   </section>
@@ -34,6 +35,7 @@
       <tr><th>meta.md aangemaakt</th><td>{{ rapport.meta_aangemaakt }}</td></tr>
       <tr><th>Vingerafdruk berekend</th><td>{{ rapport.gehasht }}</td></tr>
       <tr><th>Inbox verwerkt</th><td>{{ rapport.inbox_verwerkt }}</td></tr>
+      <tr><th>Inbox wacht op titel</th><td>{{ rapport.inbox_wachtend }}</td></tr>
     </table>
     {% else %}
     <p class="leeg">Nog niet gedraaid.</p>

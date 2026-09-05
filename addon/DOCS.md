@@ -15,6 +15,7 @@ Per document één map, gegroepeerd per jaar. De mapnaam is de documentdatum plu
 ```
 /share/ordner/
   _inbox/                          # hier bestanden droppen om ze automatisch op te nemen
+    .tekst/                        # de gelezen tekst van bestanden die nog in de inbox wachten
   _prullenbak/                     # verwijderde documenten
   2026/
     2026-03-01_woz-beschikking-2026/
@@ -115,15 +116,19 @@ Open je een document vanuit de resultaten, dan staat bovenaan de documentpagina 
 
 ## Inbox
 
-Bestanden die je in `/share/ordner/_inbox/` zet worden automatisch opgenomen: elke vijf seconden kijkt Ordner of er een bestand ligt dat niet meer groeit (twee keer achter elkaar dezelfde grootte). Dan wordt er een nieuw document van gemaakt:
+Bestanden die je in `/share/ordner/_inbox/` zet worden automatisch opgenomen zodra Ordner weet van wie ze zijn. Elke vijf seconden kijkt Ordner of er een bestand ligt dat niet meer groeit (twee keer achter elkaar dezelfde grootte). Dan leest het de tekst en beoordeelt het bestand:
 
-- titel = de naam van het bedrijf of de instantie uit de tekst (zie "Titel en tags uit de tekst"); is die niet te vinden, dan de bestandsnaam zonder extensie, waarbij `_` en `-` spaties worden;
-- tags = het documenttype uit de tekst, bijvoorbeeld `factuur` of `polis`;
-- documentdatum = de datum uit de tekst, anders vandaag (zie "Documentdatum");
-- het bestand wordt verplaatst naar de nieuwe documentmap; is de tekst al gelezen, dan hoeft er geen OCR meer te draaien;
-- staat het bestand al ergens in het archief, dan wordt het niet opgenomen maar verplaatst naar `_inbox/_dubbel/` (zie "Dubbele bestanden").
+- staat het bestand al ergens in het archief, dan wordt het niet opgenomen maar verplaatst naar `_inbox/_dubbel/` (zie "Dubbele bestanden");
+- herkent Ordner in de tekst de naam van het bedrijf of de instantie (zie "Titel en tags uit de tekst"), dan wordt er direct een document van gemaakt: die naam als titel, het documenttype als tag, de datum uit de tekst (anders vandaag, zie "Documentdatum"). Het bestand verhuist naar de nieuwe documentmap, samen met de al gelezen tekst;
+- is er geen herkenbare afzender, dan blijft het bestand in de inbox **wachten op een titel**. Ordner raadt geen titel meer uit de bestandsnaam, want de mapnaam wordt daarna nooit meer aangepast.
 
-Handig voor scanners, e-mailregels of een gedeelde map op de telefoon. Controleer na opname de titel, tags en datum op de documentpagina; de naam uit de tekst is een gok, en bij een bankafschrift kan dat je eigen naam zijn.
+**Wachtende bestanden een titel geven.** Het startscherm meldt hoeveel bestanden wachten, met een link naar de pagina **Inbox** (ook bereikbaar via de beheerpagina). Daar staat per bestand de naam, de grootte en sinds wanneer het wacht, met een knop **Opnemen**. Die brengt je naar het bekende gegevensscherm van de upload: datum en tags staan al ingevuld uit de tekst, jij typt de titel en kiest **Opslaan**. Het bestand wordt dan een document en verdwijnt uit de inbox. **Terug naar inbox** laat het liggen. Zolang je op dat scherm bezig bent, blijft Ordner van het bestand af (een uur lang; daarna wordt het weer gewoon beoordeeld).
+
+**Leren van je titels.** Zodra een titel in het archief staat, kijkt Ordner opnieuw naar alle wachtende bestanden. Staat die naam letterlijk in de tekst van een ander wachtend bestand, dan wordt dat automatisch opgenomen. Laad je een oud archief met tien brieven van dezelfde onbekende afzender in de inbox, dan geef je er één een titel en volgen de andere negen vanzelf.
+
+**Eén keer lezen.** De tekst van een wachtend bestand staat in `_inbox/.tekst/<bestandsnaam>.txt`. Daardoor draait de OCR per bestand maar één keer, ook na een herstart van de add-on of als het bestand opnieuw beoordeeld wordt. Vervang je een bestand in de inbox door een nieuwere versie, dan wordt het opnieuw gelezen. Bij opname gaat de tekst mee als `.txt` naast het origineel; het bestandje in `.tekst/` verdwijnt dan. Een bestand dat niet gelezen kan worden (beschadigd, of geen pdf of foto) wacht ook op jou; na opname probeert Ordner de tekst alsnog te lezen zoals bij een gewone upload.
+
+Handig voor scanners, e-mailregels of een gedeelde map op de telefoon. Controleer na een automatische opname de titel, tags en datum op de documentpagina; de naam uit de tekst is een gok, en bij een bankafschrift kan dat je eigen naam zijn.
 
 ## Titel en tags uit de tekst
 
@@ -136,7 +141,7 @@ De **titel** is alleen de naam van de afzender, dus "Eneco Services B.V." of "Ge
 3. De eerste regel met een rechtsvorm (B.V., N.V., VOF, U.A.) of een instantiewoord (Gemeente, Stichting, Vereniging, Waterschap, Provincie, Coöperatie, Ministerie, Belastingdienst, Bank, Verzekeraar, Ziekenhuis, Universiteit, Hogeschool).
 4. Bij een korte tekst, zoals een kassabon, de eerste regel met tekst.
 
-Bij een langere brief zonder zo'n aanknopingspunt blijft de titel leeg (bij uploaden: een leeg veld dat je zelf invult; in de inbox: de bestandsnaam), want de bovenste regel van een brief is meestal de ontvanger. Hoofdletters blijven zoals ze in de tekst staan.
+Bij een langere brief zonder zo'n aanknopingspunt blijft de titel leeg, want de bovenste regel van een brief is meestal de ontvanger. Bij uploaden is dat een leeg veld dat je zelf invult; in de inbox blijft het bestand wachten tot je het via de inboxpagina een titel geeft (zie "Inbox"). Hoofdletters blijven zoals ze in de tekst staan.
 
 De **tags** zijn de documenttypen die als kopje in de tekst staan: factuur, creditnota, offerte, polis, beschikking, nota, bon (ook kassabon), herinnering (ook betalingsherinnering), aanmaning, contract, overeenkomst, aanslag, jaaroverzicht, jaarafrekening en garantie (garantiebewijs). Het woord moet een regel of kolom beginnen ("Factuur nr. 123" telt, "Factuurdatum" of "deze factuur" niet).
 
@@ -148,7 +153,7 @@ De omschrijving wordt nooit automatisch ingevuld. Klopt een voorstel niet, pas h
 
 ## Beheerpagina
 
-De beheerpagina toont tellingen (totaal, OCR klaar, wacht, mislukt), wat er nu in de wachtrij staat en het rapport van de laatste verversing.
+De beheerpagina toont tellingen (totaal, OCR klaar, wacht, mislukt), hoeveel inboxbestanden op een titel wachten (met een link naar de inboxpagina), wat er nu in de wachtrij staat en het rapport van de laatste verversing.
 
 De knop **Cache verversen en ontbrekende tekst extraheren** doet in één keer:
 
@@ -157,7 +162,7 @@ De knop **Cache verversen en ontbrekende tekst extraheren** doet in één keer:
 3. voor elk bestand zonder vingerafdruk de `sha256` berekenen (zie "Dubbele bestanden");
 4. voor elk pdf- of afbeeldingsbestand zonder `.txt` de tekst laten lezen;
 5. `meta.md` aanmaken voor mappen die er geen hebben;
-6. de inbox verwerken.
+6. de inbox verwerken (zie "Inbox"); het rapport noemt ook hoeveel bestanden daarna nog op een titel wachten.
 
 Dit gebeurt automatisch bij het starten van de add-on en daarna elke `reconcile_interval` seconden (standaard vijf minuten). Gebruik de knop als je iets via Samba hebt gewijzigd en niet wilt wachten.
 

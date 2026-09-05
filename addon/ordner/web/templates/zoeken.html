@@ -17,6 +17,9 @@
   <span class="gedempt">{{ tellingen.totaal }} document{% if tellingen.totaal != 1 %}en{% endif %} in het archief</span>
   {% endif %}
 </div>
+{% if not q and inbox_wachtend %}
+<p class="inbox-wacht"><svg class="icoon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 12h-4c0 1.66-1.35 3-3 3s-3-1.34-3-3H5V5h14v10z"/></svg><span>{{ inbox_wachtend }} bestand{% if inbox_wachtend != 1 %}en{% endif %} in de inbox wacht{% if inbox_wachtend != 1 %}en{% endif %} op een titel · <a href="{{ url_for('inbox') }}">bekijk</a></span></p>
+{% endif %}
 
 {% set herkomst = ('?q=' ~ (q|urlencode) ~ ('&alles=1' if alles else '')) if q else '' %}
 <ul class="kaarten">

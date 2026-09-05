@@ -37,7 +37,16 @@ def test_maak_en_haal() -> None:
     assert store.haal(upload.token) is upload
     assert upload.voorbereid.bestanden == [("a.pdf", b"%PDF")]
     assert upload.suggestie.titel == "Eneco B.V."
+    assert upload.inbox_naam is None
     assert len(store) == 1
+
+
+def test_maak_uit_inbox_onthoudt_naam() -> None:
+    """Pakket 17: een upload die uit de inbox komt weet welk bestand daar op Opslaan wacht."""
+    store = OpenstaandeUploads()
+    upload = store.maak(_vb("scan.pdf"), _sug(), inbox_naam="scan.pdf")
+    assert upload.inbox_naam == "scan.pdf"
+    assert store.haal(upload.token).inbox_naam == "scan.pdf"  # type: ignore[union-attr]
 
 
 def test_onbekend_token_geeft_none() -> None:

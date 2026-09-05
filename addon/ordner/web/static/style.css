@@ -253,6 +253,17 @@ ul.bestandslijst li:last-child { border-bottom: 0; }
 pre.notities { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; margin: 0; }
 .mapinfo { color: var(--gedempt); font-size: 0.85rem; margin-top: 0.75rem; overflow-wrap: anywhere; }
 
+/* --- inbox (pakket 17) ------------------------------------------------------- */
+/* Startpagina: regel met het aantal wachtende inboxbestanden, in de OCR-wacht-kleur */
+p.inbox-wacht { display: flex; align-items: center; gap: 0.6rem; margin: -0.5rem 0 1rem; padding: 0.6rem 1rem; border-radius: 8px; background: var(--pending-tint); color: var(--pending); font-size: 0.95rem; }
+p.inbox-wacht .icoon { width: 1.3rem; height: 1.3rem; flex: none; }
+p.inbox-wacht a { color: inherit; font-weight: 500; }
+.hint-inbox { margin: 0 0 0.75rem; }
+ul.bestandslijst.inbox li form { margin-left: auto; }
+ul.bestandslijst.inbox li button { min-height: 34px; padding: 0.2rem 1rem; }
+/* Scherm 2 van de upload, vanuit de inbox: herkomstregel */
+p.herkomst { margin: -0.5rem 0 1rem; color: var(--gedempt); font-size: 0.9rem; }
+
 /* --- beheer ------------------------------------------------------------------ */
 table.tellingen { width: 100%; border-collapse: collapse; }
 table.tellingen th, table.tellingen td { padding: 0.5rem 0; border-bottom: 1px solid var(--hairline); text-align: left; vertical-align: top; }

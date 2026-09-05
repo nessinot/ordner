@@ -2,6 +2,14 @@
 
 Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. Nieuwste versie bovenaan; de bovenste kop moet gelijk zijn aan `version` in `config.yaml` (dat controleert `tests/test_addon_config.py`).
 
+## 0.11.0 (2026-09-05)
+
+- Een bestand in de inbox waarvan Ordner de afzender niet in de tekst herkent, krijgt niet langer de bestandsnaam als titel. Het blijft in de inbox wachten tot jij het een titel geeft. Zo krijg je geen mappen meer met namen als `scan_0001` die daarna nooit meer veranderen, bijvoorbeeld bij het in één keer inladen van een oud archief.
+- Nieuwe pagina **Inbox** (via de regel op het startscherm of de beheerpagina) toont de wachtende bestanden. Met **Opnemen** kom je in het bekende gegevensscherm van de upload, met datum en tags al ingevuld; je typt alleen de titel. **Terug naar inbox** laat het bestand liggen.
+- Zodra een titel in het archief staat, herkent Ordner de andere wachtende bestanden van dezelfde afzender vanzelf en neemt ze automatisch op. Tien brieven van dezelfde onbekende afzender: één keer een titel typen.
+- Elk inboxbestand wordt maar één keer gelezen (OCR). De gelezen tekst staat in `_inbox/.tekst/`, dus ook na een herstart of een nieuwe beoordeling hoeft er niets opnieuw. Bij opname verhuist de tekst mee naar de documentmap. Kan een bestand niet gelezen worden (of is het geen pdf of foto), dan wacht het ook op jou.
+- Het startscherm meldt hoeveel bestanden in de inbox op een titel wachten; de beheerpagina toont hetzelfde aantal, ook in het rapport van de laatste verversing.
+
 ## 0.10.1 (2026-09-05)
 
 - Ordner herkent nu ook "Afdrukdatum" als documentdatum, bijvoorbeeld op jaaropgaven en polisbladen. Staat er ook een sterker datumwoord in de tekst (zoals "Datum" of "Factuurdatum"), dan wint dat.

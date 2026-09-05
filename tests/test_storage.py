@@ -223,6 +223,17 @@ def test_veilig_pad_ongeldig(archief: Archief, jaar: str, map: str, naam: str | 
         archief.veilig_pad(jaar, map, naam)
 
 
+def test_inbox_pad_geldig(archief: Archief) -> None:
+    assert archief.inbox_pad("scan 0001.pdf") == archief.inbox_dir / "scan 0001.pdf"
+    assert archief.inbox_pad("brief.docx") == archief.inbox_dir / "brief.docx"  # hoeft niet te bestaan
+
+
+@pytest.mark.parametrize("naam", ["", ".", "..", ".tekst", ".verborgen.pdf", "a/b.pdf", "a\\b.pdf", "../meta.md", "_dubbel/x.pdf"])
+def test_inbox_pad_ongeldig(archief: Archief, naam: str) -> None:
+    with pytest.raises(OngeldigPad):
+        archief.inbox_pad(naam)
+
+
 def test_voeg_bestand_toe_registreert_sha256(archief: Archief) -> None:
     import hashlib
 
