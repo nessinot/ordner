@@ -2,6 +2,10 @@
 
 Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. Nieuwste versie bovenaan; de bovenste kop moet gelijk zijn aan `version` in `config.yaml` (dat controleert `tests/test_addon_config.py`).
 
+## 0.10.1 (2026-09-05)
+
+- Ordner herkent nu ook "Afdrukdatum" als documentdatum, bijvoorbeeld op jaaropgaven en polisbladen. Staat er ook een sterker datumwoord in de tekst (zoals "Datum" of "Factuurdatum"), dan wint dat.
+
 ## 0.10.0 (2026-09-05)
 
 - Ordner herkent nu bestanden die al in het archief staan. Upload je een bestand dat er al is (bijvoorbeeld dezelfde factuur voor de tweede keer gedownload), dan wordt de upload geweigerd en zie je in welk document het al staat, met een link ernaartoe. Hetzelfde geldt voor "Bestand toevoegen" op de documentpagina. Kies je meerdere bestanden tegelijk en is er één al bekend, dan wordt er niets opgeslagen; kies de overige bestanden dan opnieuw.

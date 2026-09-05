@@ -23,6 +23,7 @@ _SLEUTELWOORDEN: tuple[tuple[str, str], ...] = (
     ("orderdatum", r"order\s?datum"),
     ("dagtekening", r"dagtekening"),
     ("datum", r"datum"),
+    ("afdrukdatum", r"afdruk\s?datum"),  # laagste prioriteit: printdatum kan later liggen dan de documentdatum
 )
 # Letter-lookarounds i.p.v. \b: "Vervaldatum" en "Betaaldatum" mogen "datum" niet matchen.
 _SLEUTEL_RE = [(naam, re.compile(rf"(?<![a-z])(?:{patroon})(?![a-z])", re.I)) for naam, patroon in _SLEUTELWOORDEN]
