@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 INBOX_DIR = "_inbox"
+INBOX_DUBBEL_DIR = "_dubbel"  # submap van _inbox voor geweigerde dubbelen (pakket 16)
 TRASH_DIR = "_prullenbak"
 META_NAAM = "meta.md"
 EXTRAHEERBAAR = {".pdf", ".jpg", ".jpeg", ".png", ".heic"}

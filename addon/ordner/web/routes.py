@@ -1,4 +1,4 @@
-"""Routes van de webapp (pakket 08: zoeken, upload, bestand-serving; pakket 09: document, beheer, status; pakket 15b: tweestaps upload)."""
+"""Routes van de webapp (pakket 08: zoeken, upload, bestand-serving; pakket 09: document, beheer, status; pakket 15b: tweestaps upload; pakket 16: dubbele bestanden)."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
+from ordner.dubbel import Dubbel, zoek_dubbelen
 from ordner.index import DocEntry, Index, Reconciler
 from ordner.ingest import LeesTekst, Voorbereid, lees_vooraf, maak_document_uit_voorbereid
 from ordner.meta import MetaFout, OcrStatus, is_extraheerbaar, schrijf_meta, txt_pad
@@ -171,6 +172,7 @@ async def zoeken(request: Request) -> Response:
 
 _TOKEN_RE = re.compile(r"[A-Za-z0-9_-]{8,64}")
 _UPLOAD_VERLOPEN = "Deze upload is verlopen; kies de bestanden opnieuw."
+_DUBBEL_FOUT = "Niet opgeslagen: een bestand staat al in het archief."
 
 
 def _openstaand(request: Request) -> OpenstaandeUploads:
@@ -236,6 +238,13 @@ async def upload(request: Request, bestanden: list[UploadFile] = File(default=[]
     if not uploads:
         ctx = {"fout": "Kies minstens één bestand."}
         return _templates(request).TemplateResponse(request, "upload.html", ctx, status_code=400)
+    dubbelen = zoek_dubbelen(_index(request), uploads)
+    if dubbelen:
+        # Vóór het lezen van de tekst (pakket 16): hashen kost niets, OCR seconden. Niets komt op schijf
+        # en er ontstaat geen openstaande upload; de hele upload wordt geweigerd, ook bij één dubbel.
+        _log_dubbelen("upload geweigerd", dubbelen)
+        ctx = {"fout": _DUBBEL_FOUT, "dubbelen": dubbelen}
+        return _templates(request).TemplateResponse(request, "upload.html", ctx, status_code=409)
 
     bekende_titels = {e.meta.titel for e in _index(request).alle()}
     lees_tekst = _lees_tekst(request)
@@ -326,6 +335,10 @@ async def upload_annuleer(request: Request, token: str) -> Response:
     return _redirect(request, "upload", "Upload geannuleerd")
 
 
+def _log_dubbelen(wat: str, dubbelen: list[Dubbel]) -> None:
+    log.info("%s: %s", wat, "; ".join(f"{d.naam} staat al in {d.rel}/{d.bestand}" for d in dubbelen))
+
+
 def _splits_tags(tags: str) -> list[str]:
     return [t.strip() for t in tags.split(",") if t.strip()]
 
@@ -380,6 +393,7 @@ def _document_pagina(
     fout: str = "",
     status_code: int = 200,
     herkomst: dict[str, str] | None = None,
+    dubbelen: list[Dubbel] | None = None,
 ) -> Response:
     ctx = {
         "entry": entry,
@@ -390,6 +404,7 @@ def _document_pagina(
         "bestanden": _bestandsweergaven(entry),
         "fout": fout,
         "herkomst": herkomst or _herkomst("", ""),
+        "dubbelen": dubbelen or [],  # geweigerde bestanden bij toevoegen (pakket 16)
     }
     return _templates(request).TemplateResponse(request, "document.html", ctx, status_code=status_code)
 
@@ -449,11 +464,19 @@ async def document_bestanden(
 ) -> Response:
     entry = _entry(request, jaar, map)
     archief = _archief(request)
+    herkomst = _herkomst(q, alles)
     uploads = [(f.filename, await f.read()) for f in bestanden]
+    dubbelen = zoek_dubbelen(_index(request), [(n, d) for n, d in uploads if n])
+    if dubbelen:
+        # Ook een bestand dat al in ditzelfde document zit; één dubbel -> niets toegevoegd (pakket 16).
+        _log_dubbelen(f"toevoegen aan {entry.rel} geweigerd", dubbelen)
+        return _document_pagina(
+            request, entry, jaar, map, status_code=409, herkomst=herkomst, dubbelen=dubbelen
+        )
     aantal = _sla_bestanden_op(archief, _queue(request), entry.map, uploads)
     _index(request).herlaad(archief, entry.map)
     log.info("bestanden toegevoegd aan %s: %d", entry.rel, aantal)
-    return _redirect(request, "document", "Toegevoegd", query=_herkomst(q, alles), jaar=jaar, map=map)
+    return _redirect(request, "document", "Toegevoegd", query=herkomst, jaar=jaar, map=map)
 
 
 @router.post("/doc/{jaar}/{map}/ocr", name="document_ocr")

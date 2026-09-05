@@ -30,6 +30,7 @@ Een minimale digitale archiefkast voor privédocumenten (WOZ, facturen, bonnen, 
 | Schrijven | `meta.md` en `.txt` altijd via tempbestand in dezelfde map + `os.replace()`. |
 | Web | FastAPI + Jinja2, geen JS-framework, geen build-stap. Vanilla JS alleen voor upload-voortgang en status-polling. Alle links/actions via `request.url_for` (Ingress `root_path`). |
 | Tweestaps upload | Scherm 1 (`GET/POST /upload`) alleen bestanden (minstens één, anders 400). `POST /upload` leest de tekst (`lees_vooraf`, in een thread), bepaalt datum en suggestie (`stel_voor` met de titels uit de index) en zet een *openstaande upload* klaar in het geheugen (`web/openstaand.py`, `app.state.openstaand`, token `secrets.token_urlsafe(16)`, TTL 60 min, max 10, opruimen alleen bij aanmaken), dan 303 naar scherm 2 (`GET /upload/{token}`): bestandslijst en alle velden voorgevuld (titel = suggestie, datum = gevonden of vandaag, tags = suggestie, omschrijving leeg). `POST /upload/{token}` valideert (titel, datum; 400 met formulier), haalt de upload uit de store, maakt het document (`maak_document_uit_voorbereid`; datum gelijk aan de voorgevulde → bron uit `lees_vooraf`, anders `gebruiker`), 303 naar het document met `m=Opgeslagen`. `POST /upload/{token}/annuleer` gooit weg. Onbekend/verlopen token → 303 naar scherm 1 met melding; misvormd token (niet `^[A-Za-z0-9_-]{8,64}$`) → 404. Niets komt op schijf vóór Opslaan; een openstaande upload is weg bij herstart. Details: `werk/15b-tweestaps-upload.md`. |
+| Dubbele bestanden | Elk bronbestand krijgt een SHA-256 in `meta.md` (`sha256:` mapping bestandsnaam → hex, blokstijl, sleutel direct na `bestanden`; oude `meta.md` zonder veld → `{}`). `Index` houdt een opzoektabel hash → (rel, bestandsnaam) bij. `POST /upload` en `POST /doc/…/bestanden` hashen de ontvangen bytes vóór het lezen van de tekst; bij minstens één bekend bestand wordt de hele actie geweigerd (409, pagina met per dubbel bestand een link naar het document; geen openstaande upload, niets op schijf). Inbox: bekend bestand → `_inbox/_dubbel/` (conflict → `<naam>_<JJJJMMDD-HHMMSS>`), waarschuwing in het log. Reconciler: verweesde hashes weg, ontbrekende berekenen (`rapport.gehasht`). `Archief.voeg_bestand_toe` registreert alleen. `_prullenbak` telt niet mee. Alleen byte-identiek. Details: `werk/16-dubbele-bestanden.md`. |
 | Base image | HA Debian-base bookworm; apt: `python3 python3-venv ocrmypdf tesseract-ocr-nld tesseract-ocr-eng poppler-utils libheif1`. |
 | Niet in v1 | Meerdere gebruikers, versiebeheer, autoclassificatie, tag-beheer, map-hernoemen, MCP-server, "alles opnieuw OCR'en", prullenbak legen/terugzetten. Ideeën → `IDEAS.md`. |
 
@@ -49,9 +50,9 @@ ordner/                       # repo-root = add-on-repository (Add-on store › 
     CHANGELOG.md              # tabblad "Changelog" in de add-on; bovenste kop = version in config.yaml (test)
     requirements.txt
     ordner/                   # Python-package
-      __init__.py config.py slug.py meta.py storage.py extract.py datum.py suggestie.py ingest.py index.py search.py worker.py
+      __init__.py config.py slug.py meta.py storage.py extract.py datum.py suggestie.py ingest.py dubbel.py index.py search.py worker.py
       web/ __init__.py app.py routes.py openstaand.py
-        templates/ base.html zoeken.html upload.html upload_gegevens.html document.html beheer.html
+        templates/ base.html zoeken.html upload.html upload_gegevens.html document.html beheer.html bekijk.html _dubbelen.html
         static/ style.css app.js
 ```
 
@@ -60,6 +61,7 @@ ordner/                       # repo-root = add-on-repository (Add-on store › 
 ```
 /share/ordner/
   _inbox/
+    _dubbel/                  # inboxbestanden die al in het archief stonden (pakket 16)
   _prullenbak/
   2026/
     2026-09-03_woz-beschikking/
@@ -79,6 +81,9 @@ documentdatum: 2026-03-01
 uploaddatum: '2026-09-03T14:12'
 tags: [woz, gemeente]
 bestanden: [beschikking.pdf, foto.heic]
+sha256:
+  beschikking.pdf: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+  foto.heic: 2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae
 ocr: done
 datumbron: gebruiker
 ---
@@ -114,6 +119,7 @@ class Settings:
     def from_env(cls) -> "Settings": ...
 
 INBOX_DIR = "_inbox"
+INBOX_DUBBEL_DIR = "_dubbel"        # submap van _inbox voor geweigerde dubbelen (pakket 16)
 TRASH_DIR = "_prullenbak"
 META_NAAM = "meta.md"
 EXTRAHEERBAAR = {".pdf", ".jpg", ".jpeg", ".png", ".heic"}
@@ -142,9 +148,10 @@ class Meta:
     ocr: OcrStatus = "done"
     notities: str = ""               # body onder de frontmatter
     datumbron: DatumBron = "gebruiker"   # ontbreekt in oude meta.md → "gebruiker"; onbekende waarde → "gebruiker" + warning
+    sha256: dict[str, str] = field(default_factory=dict)   # pakket 16: bestandsnaam → hex-hash; ontbreekt → {}; geen mapping → MetaFout
 
 def parse_meta(tekst: str) -> Meta          # raises MetaFout bij ontbrekende frontmatter/titel/datum
-def render_meta(meta: Meta) -> str          # frontmatter (keys: titel, omschrijving, documentdatum, uploaddatum, tags, bestanden, ocr, datumbron; tags/bestanden als flow-lijst [a, b]) + notities
+def render_meta(meta: Meta) -> str          # frontmatter (keys: titel, omschrijving, documentdatum, uploaddatum, tags, bestanden, sha256, ocr, datumbron; tags/bestanden als flow-lijst [a, b], sha256 in blokstijl, leeg → {}) + notities
 def lees_meta(map: Path) -> Meta            # leest map/meta.md
 def schrijf_meta(map: Path, meta: Meta) -> None   # atomic
 def bepaal_ocr_status(map: Path, meta: Meta) -> OcrStatus
@@ -172,7 +179,8 @@ class Archief:
 
     def voeg_bestand_toe(self, doc: Path, naam: str, data: bytes) -> str
         # naam saneren; conflict → stam_2.ext; schrijft bestand atomic;
-        # update meta.bestanden + ocr via bepaal_ocr_status; geeft de opgeslagen naam terug
+        # update meta.bestanden, meta.sha256[naam] (pakket 16) + ocr via bepaal_ocr_status; geeft de opgeslagen naam terug
+        # weigert nooit een dubbel bestand; dat is beleid van upload en inbox
 
     def naar_prullenbak(self, doc: Path) -> Path
     def documentmappen(self) -> list[Path]  # alle root/JJJJ/*/ met meta.md, gesorteerd; "_"- en "."-mappen overslaan
@@ -193,6 +201,23 @@ async def extract_afbeelding(pad: Path, talen: str) -> str
 async def extract_bestand(pad: Path, talen: str) -> str     # dispatch op extensie; niet-extraheerbaar → ExtractieFout
 ```
 
+### `ordner/dubbel.py` (pakket 16)
+```python
+def sha256_van(data: bytes) -> str                 # hex, lowercase
+def sha256_van_bestand(pad: Path) -> str           # in blokken van 1 MiB
+
+@dataclass(frozen=True)
+class Dubbel:
+    naam: str            # naam van het aangeboden bestand
+    rel: str             # document waar het al staat ("2026/2026-03-01_slug"); properties jaar / map
+    bestand: str         # bestandsnaam daar
+    titel: str
+    documentdatum: date
+
+def zoek_dubbelen(index: Index, bestanden: Iterable[tuple[str, bytes]]) -> list[Dubbel]
+    # in aangeboden volgorde; één Dubbel per aangeboden bestand met een treffer in index.zoek_hash
+```
+
 ### `ordner/index.py`
 ```python
 @dataclass
@@ -204,10 +229,11 @@ class DocEntry:
 
 class Index:
     docs: dict[str, DocEntry]
-    def herlaad(self, archief: Archief, map: Path) -> DocEntry   # leest meta.md + .txt's opnieuw
+    def herlaad(self, archief: Archief, map: Path) -> DocEntry   # leest meta.md + .txt's opnieuw; werkt de hash-tabel bij
     def verwijder(self, rel: str) -> None
     def alle(self) -> list[DocEntry]        # documentdatum desc, daarna rel desc
     def tellingen(self) -> dict[str, int]   # {"totaal", "pending", "done", "failed"}
+    def zoek_hash(self, sha256: str) -> tuple[DocEntry, str] | None   # pakket 16: (document, bestandsnaam) of None; bij gelijke bestanden in twee documenten wint de laatst geladen
 
 def bouw_index(archief: Archief) -> Index
 
@@ -218,13 +244,14 @@ class ReconcileRapport:
     gequeued: int
     meta_aangemaakt: int
     inbox_verwerkt: int
+    gehasht: int                    # pakket 16: bestanden waarvoor deze ronde een sha256 is berekend
 
 class Reconciler:
     def __init__(self, archief: Archief, index: Index, queue_fn: Callable[[Path, str], None],
                  lees_tekst: LeesTekst | None = None)   # lees_tekst: voor de inbox (datum, titel en tags uit tekst); None = gedrag van vóór pakket 14
     # _ingest (15a): lees_vooraf → suggestie.stel_voor(vb.tekst, {e.meta.titel for e in index.alle()}) → maak_document_uit_voorbereid
-    def run(self) -> ReconcileRapport       # synchroon; de app roept aan via asyncio.to_thread
-    def verwerk_inbox(self) -> list[Path]   # houdt self._inbox_groottes bij voor de stabiliteitscheck
+    def run(self) -> ReconcileRapport       # synchroon; de app roept aan via asyncio.to_thread. _sync_map (16): verweesde hashes weg, ontbrekende berekenen
+    def verwerk_inbox(self) -> list[Path]   # houdt self._inbox_groottes bij voor de stabiliteitscheck; bekend bestand (zoek_hash) → _inbox/_dubbel/ (16), niet in het resultaat
 ```
 
 ### `ordner/datum.py` (pakket 14)
@@ -358,12 +385,12 @@ app = create_app()
 | Naam | Methode + pad |
 |---|---|
 | `zoeken` | `GET /` |
-| `upload` | `GET /upload` (scherm 1: bestanden), `POST /upload` (bestanden → openstaande upload → 303 naar `upload_gegevens`) |
+| `upload` | `GET /upload` (scherm 1: bestanden), `POST /upload` (bestanden → openstaande upload → 303 naar `upload_gegevens`; 409 + scherm 1 met `dubbelen` bij een bekend bestand, pakket 16) |
 | `upload_gegevens` | `GET /upload/{token}` (scherm 2: gegevens voorgevuld), `POST /upload/{token}` (opslaan) |
 | `upload_annuleer` | `POST /upload/{token}/annuleer` |
 | `document` | `GET /doc/{jaar}/{map}` |
 | `document_meta` | `POST /doc/{jaar}/{map}/meta` |
-| `document_bestanden` | `POST /doc/{jaar}/{map}/bestanden` |
+| `document_bestanden` | `POST /doc/{jaar}/{map}/bestanden` (409 + documentpagina met `dubbelen` bij een bekend bestand, pakket 16) |
 | `document_ocr` | `POST /doc/{jaar}/{map}/ocr` |
 | `document_verwijder` | `POST /doc/{jaar}/{map}/verwijder` |
 | `bestand` | `GET /doc/{jaar}/{map}/bestand/{naam}` |
@@ -402,3 +429,4 @@ _(agents voegen hier regels toe: pakket · wat · waarom)_
 - 13 · Add-on-bestanden en het Python-package verhuisd naar `addon/`; `repository.yaml` in de root; `pythonpath = ["addon", "."]` in `pyproject.toml` · de Supervisor accepteert een git-URL alleen als add-on-repository (elke add-on in een eigen submap met `config.yaml`), zodat installeren en updaten via de Add-on store kan i.p.v. kopiëren naar `/addons/` via Samba.
 - 15a · Nieuwe module `suggestie.py` (`Suggestie`, `stel_voor`, `stel_titel_voor`, `stel_tags_voor`, `cellen`); `ingest.py` gesplitst in `Voorbereid`, `lees_vooraf` en `maak_document_uit_voorbereid`, met `maak_document_uit_bestanden` als ongewijzigde wrapper; `Reconciler._ingest` gebruikt de suggestie voor titel en tags van inboxdocumenten · de titel is pas na het lezen bekend en 15b zet tussen lezen en aanmaken een tweede scherm. Twee kleine aanscherpingen t.o.v. `werk/15a-titel-en-tagsuggestie.md`, beide omdat een verkeerde naam erger is dan geen naam: rechtsvorm-achtervoegsels matchen hoofdlettergevoelig ("b.v." in lopende tekst is "bijvoorbeeld") en een instantie-voorvoegsel telt alleen met minstens één woord erachter ("Gemeente" alleen is geen naam). De bestaande test `test_inbox_met_tekstlezer_haalt_datum_uit_tekst` kreeg een tekst zonder bruikbare naamregel, omdat de korte testtekst anders terecht een bon-titel opleverde.
 - 15b · Nieuwe module `web/openstaand.py` (`OpenstaandeUpload`, `OpenstaandeUploads`), `app.state.openstaand`, routes `upload_gegevens` (`GET/POST /upload/{token}`) en `upload_annuleer`; `POST /upload` accepteert alleen nog bestanden (minstens één) en negeert titel/datum/tags; nieuwe template `upload_gegevens.html`; `maak_document_uit_bestanden` wordt door de app niet meer aangeroepen · uploaden in twee schermen zodat titel, datum en tags uit de tekst voorgevuld zijn vóór het opslaan. Eén afwijking buiten het pakketbestand: `extract._heic_naar_jpg` vertaalt PIL-fouten (`OSError`/`ValueError`, o.a. `UnidentifiedImageError`) naar `ExtractieFout`; interface ongewijzigd. Nodig omdat scherm 1 nu altijd de tekst leest en `maak_tekstlezer` alleen `ExtractieFout` opvangt: een kapotte `.heic` gaf anders een 500 (de worker ving dit al breed op, de inbox en de datumloze upload uit 14 niet). Zie `werk/15b-tweestaps-upload.md`.
+- 16 · `Meta.sha256` (mapping, sleutel direct na `bestanden`, blokstijl), nieuwe module `dubbel.py` (`sha256_van`, `sha256_van_bestand`, `Dubbel`, `zoek_dubbelen`), `Index.zoek_hash` met interne hash-tabel, `ReconcileRapport.gehasht`, `INBOX_DUBBEL_DIR`, `Archief.voeg_bestand_toe` registreert de hash; `POST /upload` en `POST /doc/…/bestanden` antwoorden 409 met de lijst `dubbelen` (template `_dubbelen.html`) · hetzelfde bestand mag niet per ongeluk twee keer in het archief komen; de vingerafdruk staat op schijf omdat er geen indexbestand is. De sleutel staat niet als laatste (zoals `datumbron` in 14) maar bij `bestanden`, omdat het per-bestand-informatie is. Tests die twee keer hetzelfde bestand uploadden (`test_bekende_titel_uit_archief_voorgesteld`, `test_ingress_prefix_in_redirect`, `test_inbox_fout_blokkeert_rest_niet`) kregen andere bytes voor het tweede bestand. Zie `werk/16-dubbele-bestanden.md`.

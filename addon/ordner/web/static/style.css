@@ -108,6 +108,9 @@ nav.hoofd a[aria-current="page"] { background: var(--actief); color: var(--actie
 .melding { display: flex; align-items: center; gap: 0.6rem; background: var(--ok-tint); color: var(--ok); border: 1px solid var(--ok); font-size: 1.05rem; }
 .melding .icoon { width: 1.4rem; height: 1.4rem; }
 .fout { background: var(--failed-tint); color: var(--failed); }
+.dubbelen p { margin: 0 0 0.4rem; }
+.dubbelen ul { margin: 0; padding-left: 1.2rem; font-weight: 400; }
+.dubbelen a { color: inherit; text-decoration: underline; }
 
 /* --- koppen en panelen ----------------------------------------------------- */
 .kop { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.75rem; margin: 0.5rem 0 1rem; }

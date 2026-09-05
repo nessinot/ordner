@@ -64,9 +64,9 @@ def test_render_formaat_en_volgorde() -> None:
     tekst = render_meta(_volle_meta())
     assert tekst.startswith("---\ntitel:")
     regels = tekst.split("\n")
-    keys = [r.split(":")[0] for r in regels[1:9]]
-    assert keys == ["titel", "omschrijving", "documentdatum", "uploaddatum", "tags", "bestanden", "ocr", "datumbron"]
-    assert regels[9] == "---"
+    keys = [r.split(":")[0] for r in regels[1:10]]
+    assert keys == ["titel", "omschrijving", "documentdatum", "uploaddatum", "tags", "bestanden", "sha256", "ocr", "datumbron"]
+    assert regels[10] == "---"
     assert "documentdatum: 2026-03-01" in tekst
     assert "uploaddatum: '2026-09-03T14:12'" in tekst
     assert "tags: [woz, gemeente]" in tekst
@@ -91,6 +91,7 @@ def test_render_voorbeeld_uit_contract() -> None:
         "uploaddatum: '2026-09-03T14:12'\n"
         "tags: [woz, gemeente]\n"
         "bestanden: [beschikking.pdf]\n"
+        "sha256: {}\n"
         "ocr: done\n"
         "datumbron: gebruiker\n"
         "---\n"
@@ -108,6 +109,22 @@ def test_datumbron_parsen_en_default() -> None:
     assert "datumbron" not in zonder
     assert parse_meta(zonder).datumbron == "gebruiker"
     assert parse_meta(zonder.replace("ocr: done", "ocr: done\ndatumbron: raar")).datumbron == "gebruiker"
+
+
+def test_sha256_roundtrip_blokstijl_en_default() -> None:
+    m = _volle_meta()
+    m.sha256 = {"beschikking.pdf": "ab" * 32, "foto.heic": "01" * 32}
+    tekst = render_meta(m)
+    # blokstijl (één regel per bestand); een hash van louter cijfers wordt door PyYAML gequoteerd
+    assert "sha256:\n  beschikking.pdf: " + "ab" * 32 + "\n  foto.heic: '" + "01" * 32 + "'\n" in tekst
+    assert parse_meta(tekst) == m
+    # oude meta.md zonder veld -> {}
+    zonder = render_meta(_minimale_meta()).replace("sha256: {}\n", "")
+    assert "sha256" not in zonder
+    assert parse_meta(zonder).sha256 == {}
+    # geen mapping -> MetaFout
+    with pytest.raises(MetaFout, match="sha256"):
+        parse_meta(render_meta(_minimale_meta()).replace("sha256: {}", "sha256: [a, b]"))
 
 
 # --- parse_meta -----------------------------------------------------------

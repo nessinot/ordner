@@ -1,15 +1,17 @@
-"""In-memory index en reconciler (pakket 05)."""
+"""In-memory index en reconciler (pakket 05; sha256-opzoektabel en dubbelen sinds pakket 16)."""
 
 from __future__ import annotations
 
 import logging
 import re
+import shutil
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 from typing import Callable
 
-from ordner.config import META_NAAM
+from ordner.config import INBOX_DUBBEL_DIR, META_NAAM
+from ordner.dubbel import sha256_van_bestand
 from ordner.ingest import LeesTekst, lees_vooraf, maak_document_uit_voorbereid
 from ordner.meta import Meta, MetaFout, bepaal_ocr_status, is_extraheerbaar, lees_meta, schrijf_meta, txt_pad
 from ordner.storage import Archief
@@ -40,6 +42,7 @@ class Index:
 
     def __init__(self) -> None:
         self.docs: dict[str, DocEntry] = {}
+        self._hashes: dict[str, tuple[str, str]] = {}  # sha256 -> (rel, bestandsnaam); pakket 16
 
     def herlaad(self, archief: Archief, map: Path) -> DocEntry:
         """Leest meta.md en alle .txt's van de map opnieuw in."""
@@ -50,11 +53,31 @@ class Index:
             if txt.exists():
                 teksten[naam] = txt.read_text(encoding="utf-8", errors="replace")
         entry = DocEntry(rel=archief.relatief(map), map=map, meta=meta, teksten=teksten)
+        self._vergeet_hashes(entry.rel)
         self.docs[entry.rel] = entry
+        for naam, h in meta.sha256.items():
+            self._hashes[h] = (entry.rel, naam)  # bij gelijke bestanden in twee documenten wint de laatst geladen
         return entry
 
     def verwijder(self, rel: str) -> None:
+        self._vergeet_hashes(rel)
         self.docs.pop(rel, None)
+
+    def zoek_hash(self, sha256: str) -> tuple[DocEntry, str] | None:
+        """Het document en de bestandsnaam waar een bestand met deze hash al staat; None als onbekend."""
+        treffer = self._hashes.get(sha256)
+        if treffer is None:
+            return None
+        entry = self.docs.get(treffer[0])
+        return None if entry is None else (entry, treffer[1])
+
+    def _vergeet_hashes(self, rel: str) -> None:
+        oud = self.docs.get(rel)
+        if oud is None:
+            return
+        for h in oud.meta.sha256.values():
+            if self._hashes.get(h, ("", ""))[0] == rel:
+                del self._hashes[h]
 
     def alle(self) -> list[DocEntry]:
         """Documentdatum desc, daarna rel desc."""
@@ -87,6 +110,7 @@ class ReconcileRapport:
     gequeued: int = 0
     meta_aangemaakt: int = 0
     inbox_verwerkt: int = 0
+    gehasht: int = 0  # bestanden waarvoor deze ronde een sha256 is berekend (pakket 16)
 
 
 def _titel_en_datum_uit_mapnaam(naam: str) -> tuple[str, date]:
@@ -186,6 +210,21 @@ class Reconciler:
             gewijzigd = True
             rapport.gesynchroniseerd += 1
 
+        # sha256 (pakket 16): verweesde hashes weg, ontbrekende berekenen; zo vult een bestaand archief zichzelf
+        for naam in [n for n in meta.sha256 if n not in meta.bestanden]:
+            del meta.sha256[naam]
+            gewijzigd = True
+        for naam in meta.bestanden:
+            if naam in meta.sha256:
+                continue
+            try:
+                meta.sha256[naam] = sha256_van_bestand(map / naam)
+            except OSError as e:
+                log.warning("hash berekenen mislukt voor %s/%s: %s", self.archief.relatief(map), naam, e)
+                continue
+            gewijzigd = True
+            rapport.gehasht += 1
+
         nieuw = bepaal_ocr_status(map, meta)
         if nieuw != meta.ocr:
             meta.ocr = nieuw
@@ -207,7 +246,10 @@ class Reconciler:
     # --- stap D ---
 
     def verwerk_inbox(self) -> list[Path]:
-        """Ingest inboxbestanden waarvan de grootte in twee opeenvolgende polls gelijk is."""
+        """Ingest inboxbestanden waarvan de grootte in twee opeenvolgende polls gelijk is.
+
+        Een bestand dat al in het archief staat (zelfde sha256) gaat naar `_inbox/_dubbel/` (pakket 16).
+        """
         aangemaakt: list[Path] = []
         kandidaten = sorted(
             p for p in self.archief.inbox_dir.iterdir() if p.is_file() and not p.name.startswith(".")
@@ -218,6 +260,8 @@ class Reconciler:
                 if self._inbox_groottes.get(pad) != grootte:
                     self._inbox_groottes[pad] = grootte
                     continue
+                if self._is_dubbel(pad):
+                    continue
                 aangemaakt.append(self._ingest(pad))
             except Exception:  # noqa: BLE001 - één kapot bestand mag de rest niet blokkeren
                 log.exception("inbox-bestand overgeslagen: %s", pad.name)
@@ -227,6 +271,24 @@ class Reconciler:
             if not pad.exists():
                 del self._inbox_groottes[pad]
         return aangemaakt
+
+    def _is_dubbel(self, pad: Path) -> bool:
+        """Staat dit inboxbestand al in het archief? Dan naar `_inbox/_dubbel/` en True."""
+        treffer = self.index.zoek_hash(sha256_van_bestand(pad))
+        if treffer is None:
+            return False
+        entry, bestand = treffer
+        doelmap = self.archief.inbox_dir / INBOX_DUBBEL_DIR
+        doelmap.mkdir(exist_ok=True)
+        doel = doelmap / pad.name
+        if doel.exists():
+            doel = doelmap / f"{pad.name}_{datetime.now():%Y%m%d-%H%M%S}"
+        shutil.move(str(pad), str(doel))
+        log.warning(
+            "inbox: %s staat al in het archief als %s/%s (%r); verplaatst naar %s/%s",
+            pad.name, entry.rel, bestand, entry.meta.titel, INBOX_DUBBEL_DIR, doel.name,
+        )
+        return True
 
     def _ingest(self, pad: Path) -> Path:
         """Inboxbestand -> document: tekst vooraf lezen, titel en tags voorstellen (pakket 15a), daarna aanmaken."""

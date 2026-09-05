@@ -221,3 +221,15 @@ def test_veilig_pad_ongeldig(archief: Archief, jaar: str, map: str, naam: str | 
     _doc(archief)
     with pytest.raises(OngeldigPad):
         archief.veilig_pad(jaar, map, naam)
+
+
+def test_voeg_bestand_toe_registreert_sha256(archief: Archief) -> None:
+    import hashlib
+
+    doc = archief.maak_document("Bon", DATUM)
+    assert lees_meta(doc).sha256 == {}
+    archief.voeg_bestand_toe(doc, "a.pdf", b"%PDF a")
+    naam = archief.voeg_bestand_toe(doc, "a.pdf", b"%PDF b")  # conflict -> a_2.pdf, eigen hash; nooit geweigerd
+    meta = lees_meta(doc)
+    assert naam == "a_2.pdf"
+    assert meta.sha256 == {"a.pdf": hashlib.sha256(b"%PDF a").hexdigest(), "a_2.pdf": hashlib.sha256(b"%PDF b").hexdigest()}

@@ -3,7 +3,7 @@
 {% set paginatitel = 'Uploaden' %}
 {% block content %}
 <div class="kop"><h2>Nieuw document</h2><span class="gedempt">stap 1 van 2: bestanden</span></div>
-{% if fout %}<p class="fout" role="alert">{{ fout }}</p>{% endif %}
+{% if dubbelen %}{% include "_dubbelen.html" %}{% elif fout %}<p class="fout" role="alert">{{ fout }}</p>{% endif %}
 <form method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data" data-upload class="paneel">
   <label class="veld">
     <span>Bestanden</span>

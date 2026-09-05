@@ -12,3 +12,4 @@
 - Prullenbak legen / terugzetten
 - PDF/A-kopie met tekstlaag bewaren naast het origineel
 - Datumherkenning: Engelse sleutelwoorden ("invoice date"; los "date" is riskant door "due date"/"payment date"); knop "datum opnieuw bepalen" voor bestaande documenten; labels over twee regels ("Factuur-" / "datum")
+- ~~Dubbele documenten herkennen~~ — gedaan in 16 (0.10.0) voor byte-identieke bestanden (SHA-256 in `meta.md`, weigeren met link). Nog open: "waarschijnlijk hetzelfde" op basis van gelijke datum + afzender + bedrag/factuurnummer uit de tekst (zelfde scan twee keer geeft een andere hash); dat zou een waarschuwing op scherm 2 zijn, geen weigering. En een reconciler-check op bestaande dubbelen in het archief (nu wint stilzwijgend het laatst geladen document).
