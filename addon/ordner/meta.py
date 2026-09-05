@@ -1,4 +1,4 @@
-"""Lezen en schrijven van meta.md (pakket 02)."""
+"""Lezen en schrijven van meta.md (pakket 02; `sha256` sinds pakket 16)."""
 
 from __future__ import annotations
 
@@ -37,9 +37,17 @@ class _Dumper(yaml.SafeDumper):
     pass
 
 
+class _Blok(dict):
+    """Mapping die altijd in blokstijl wordt gerenderd (één regel per bestand, voor sha256)."""
+
+
 _Dumper.add_representer(
     _Gequoteerd,
     lambda dumper, data: dumper.represent_scalar("tag:yaml.org,2002:str", str(data), style="'"),
+)
+_Dumper.add_representer(
+    _Blok,
+    lambda dumper, data: dumper.represent_mapping("tag:yaml.org,2002:map", dict(data), flow_style=False),
 )
 
 
@@ -54,6 +62,7 @@ class Meta:
     ocr: OcrStatus = "done"
     notities: str = ""  # body onder de frontmatter
     datumbron: DatumBron = "gebruiker"  # waar documentdatum vandaan komt; ontbreekt in oude meta.md -> gebruiker
+    sha256: dict[str, str] = field(default_factory=dict)  # bestandsnaam -> hex-hash (pakket 16); ontbreekt in oude meta.md -> {}
 
 
 # --- parsen ---------------------------------------------------------------
@@ -111,6 +120,14 @@ def _parse_lijst(waarde: Any, veld: str) -> list[str]:
     raise MetaFout(f"{veld} moet een lijst zijn, kreeg {type(waarde).__name__}")
 
 
+def _parse_mapping(waarde: Any, veld: str) -> dict[str, str]:
+    if waarde is None:
+        return {}
+    if isinstance(waarde, dict):
+        return {str(k): str(v) for k, v in waarde.items()}
+    raise MetaFout(f"{veld} moet een mapping zijn, kreeg {type(waarde).__name__}")
+
+
 def parse_meta(tekst: str) -> Meta:
     """Parseert de tekst van een meta.md. Raises MetaFout bij ontbrekende frontmatter/titel/datum."""
     frontmatter, notities = _splits_frontmatter(tekst)
@@ -159,6 +176,7 @@ def parse_meta(tekst: str) -> Meta:
         ocr=ocr,  # type: ignore[arg-type]
         notities=notities,
         datumbron=datumbron,  # type: ignore[arg-type]
+        sha256=_parse_mapping(data.get("sha256"), "sha256"),
     )
 
 
@@ -174,6 +192,7 @@ def render_meta(meta: Meta) -> str:
         "uploaddatum": _Gequoteerd(meta.uploaddatum.strftime(_UPLOADDATUM_FORMAAT)),
         "tags": list(meta.tags),
         "bestanden": list(meta.bestanden),
+        "sha256": _Blok(meta.sha256),
         "ocr": meta.ocr,
         "datumbron": meta.datumbron,
     }

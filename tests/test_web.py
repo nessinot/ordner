@@ -389,6 +389,85 @@ def test_annuleren(client: TestClient) -> None:
     assert client.post(f"/upload/{token}/annuleer", follow_redirects=False).status_code == 303
 
 
+# --- dubbele bestanden (pakket 16) -------------------------------------------
+
+
+def test_upload_dubbel_geweigerd_met_link(client: TestClient) -> None:
+    _upload(client, titel="Eneco")
+    store = client.app.state.openstaand  # type: ignore[attr-defined]
+    mappen_voor = client.app.state.archief.documentmappen()  # type: ignore[attr-defined]
+    r = _stap1(client, [("kopie.pdf", _PDF, "application/pdf")])
+    assert r.status_code == 409
+    assert "staat al in het archief" in r.text
+    assert "kopie.pdf" in r.text
+    assert 'href="/doc/2026/2026-03-01_eneco"' in r.text
+    assert "Eneco (2026-03-01)" in r.text
+    assert "als <code>a.pdf</code>" in r.text  # andere naam dan in het archief
+    assert len(store) == 0  # geen openstaande upload
+    assert client.app.state.archief.documentmappen() == mappen_voor  # type: ignore[attr-defined]
+    assert list((_root(client) / "_inbox").iterdir()) == []
+
+
+def test_upload_deels_dubbel_weigert_alles(client: TestClient) -> None:
+    _upload(client, titel="Eneco")
+    r = _stap1(client, [("nieuw.pdf", b"%PDF nieuw", "application/pdf"), ("a.pdf", _PDF, "application/pdf")])
+    assert r.status_code == 409
+    assert r.text.count("<li>") == 1  # alleen het dubbele bestand wordt genoemd
+    assert "<code>a.pdf</code>" in r.text
+    assert len(client.app.state.archief.documentmappen()) == 1  # type: ignore[attr-defined]
+    assert len(client.app.state.openstaand) == 0  # type: ignore[attr-defined]
+
+
+def test_upload_dubbel_met_ingress_prefix(client: TestClient) -> None:
+    _upload(client, titel="Eneco")
+    r = _stap1(client, headers={"X-Ingress-Path": _PREFIX})
+    assert r.status_code == 409
+    assert f'href="{_PREFIX}/doc/2026/2026-03-01_eneco"' in r.text
+
+
+def test_toevoegen_dubbel_geweigerd(client: TestClient) -> None:
+    _upload(client, titel="Eneco")
+    _upload(client, titel="Ander", bestanden=[("b.pdf", b"%PDF ander", "application/pdf")])
+    doc = _root(client) / "2026" / "2026-03-01_ander"
+    # kopie.pdf staat in Eneco; één dubbel -> ook nieuw.jpg wordt niet toegevoegd
+    r = client.post(
+        "/doc/2026/2026-03-01_ander/bestanden",
+        files=[("bestanden", ("nieuw.jpg", b"jpgdata", "image/jpeg")), ("bestanden", ("kopie.pdf", _PDF, "application/pdf"))],
+        data={"q": "ander"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 409
+    assert "kopie.pdf" in r.text and 'href="/doc/2026/2026-03-01_eneco"' in r.text
+    assert 'name="q" value="ander"' in r.text  # herkomst blijft
+    assert lees_meta(doc).bestanden == ["b.pdf"]
+    assert not (doc / "nieuw.jpg").exists()
+    # een bestand dat al in ditzelfde document zit
+    r = client.post(
+        "/doc/2026/2026-03-01_ander/bestanden",
+        files=[("bestanden", ("b_kopie.pdf", b"%PDF ander", "application/pdf"))],
+        follow_redirects=False,
+    )
+    assert r.status_code == 409
+    assert 'href="/doc/2026/2026-03-01_ander"' in r.text
+    assert lees_meta(doc).bestanden == ["b.pdf"]
+
+
+def test_sha256_in_meta_na_upload(client: TestClient) -> None:
+    import hashlib
+
+    _upload(client)
+    meta = lees_meta(_root(client) / "2026" / "2026-03-01_test")
+    assert meta.sha256 == {"a.pdf": hashlib.sha256(_PDF).hexdigest()}
+
+
+def test_prullenbak_telt_niet_mee_als_dubbel(client: TestClient) -> None:
+    _upload(client, titel="Eneco")
+    r = client.post("/doc/2026/2026-03-01_eneco/verwijder", follow_redirects=False)
+    assert r.status_code == 303
+    r = _stap1(client)
+    assert r.status_code == 303  # weggegooid document telt niet mee; opnieuw uploaden mag
+
+
 def test_upload_maakt_document_en_ocr(client: TestClient) -> None:
     r = _upload(client, tags="a, b ,, c")
     assert r.status_code == 303
@@ -451,7 +530,7 @@ def test_meta_bewerken_zet_datumbron_op_gebruiker(client: TestClient, mock_cmd) 
 def test_bekende_titel_uit_archief_voorgesteld(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
     _upload(client, titel="Eneco")
     mock_cmd.register("pdftotext", stdout=b"\n".join(b"regel %d" % i for i in range(30)) + b"\nBetaling aan Eneco voor levering\n")
-    token = _token(_stap1(client))
+    token = _token(_stap1(client, [("b.pdf", _PDF + b" ander", "application/pdf")]))  # andere inhoud dan a.pdf (pakket 16)
     assert 'name="titel" value="Eneco"' in client.get(f"/upload/{token}").text
 
 
@@ -500,7 +579,7 @@ def test_ingress_prefix_in_redirect(client: TestClient) -> None:
     # verlopen-redirect en annuleren met prefix
     r = client.get(f"/upload/{token}", headers={"X-Ingress-Path": _PREFIX}, follow_redirects=False)
     assert r.headers["location"].startswith(_PREFIX + "/upload?m=")
-    token2 = _token(_stap1(client))
+    token2 = _token(_stap1(client, [("b.pdf", _PDF + b" ander", "application/pdf")]))  # a.pdf staat al in het archief
     r = client.post(f"/upload/{token2}/annuleer", headers={"X-Ingress-Path": _PREFIX}, follow_redirects=False)
     assert r.headers["location"] == f"{_PREFIX}/upload?m=Upload+geannuleerd"
 

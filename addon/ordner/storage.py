@@ -10,6 +10,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 from ordner.config import INBOX_DIR, META_NAAM, TRASH_DIR
+from ordner.dubbel import sha256_van
 from ordner.meta import DatumBron, Meta, bepaal_ocr_status, is_extraheerbaar, lees_meta, schrijf_meta
 from ordner.slug import maak_slug
 
@@ -105,7 +106,10 @@ class Archief:
         return doc
 
     def voeg_bestand_toe(self, doc: Path, naam: str, data: bytes) -> str:
-        """Slaat data op onder een gesaneerde, unieke naam en werkt meta.md bij."""
+        """Slaat data op onder een gesaneerde, unieke naam en werkt meta.md bij (bestanden, sha256, ocr).
+
+        Weigert nooit een dubbel bestand; dat is beleid van de upload en de inbox (pakket 16).
+        """
         naam = _vrije_naam(doc, _saneer_naam(naam))
         tmp = doc / (_TMP_PREFIX + naam)
         tmp.write_bytes(data)
@@ -114,6 +118,7 @@ class Archief:
         meta = lees_meta(doc)
         if naam not in meta.bestanden:
             meta.bestanden.append(naam)
+        meta.sha256[naam] = sha256_van(data)
         if meta.ocr == "failed" and is_extraheerbaar(naam):
             meta.ocr = "done"  # nieuw bestand verdient een poging
         meta.ocr = bepaal_ocr_status(doc, meta)

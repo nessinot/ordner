@@ -97,6 +97,31 @@ def test_verwijder(archief: Archief) -> None:
     assert index.docs == {}
 
 
+def test_zoek_hash_volgt_herlaad_en_verwijder(archief: Archief) -> None:
+    import hashlib
+
+    doc = _doc(archief, "Factuur", DATUM, "a.pdf")
+    index = bouw_index(archief)
+    h = hashlib.sha256(b"x").hexdigest()
+    treffer = index.zoek_hash(h)
+    assert treffer is not None
+    assert treffer[0].rel == archief.relatief(doc) and treffer[1] == "a.pdf"
+    assert index.zoek_hash("0" * 64) is None
+    # bestand weg + herlaad -> hash weg
+    (doc / "a.pdf").unlink()
+    meta = lees_meta(doc)
+    meta.bestanden = []
+    meta.sha256 = {}
+    schrijf_meta(doc, meta)
+    index.herlaad(archief, doc)
+    assert index.zoek_hash(h) is None
+    archief.voeg_bestand_toe(doc, "b.pdf", b"x")
+    index.herlaad(archief, doc)
+    assert index.zoek_hash(h) is not None
+    index.verwijder(archief.relatief(doc))
+    assert index.zoek_hash(h) is None
+
+
 # --- Reconciler: sync ------------------------------------------------------
 
 
@@ -139,6 +164,29 @@ def test_reconcile_behoudt_volgorde_en_geupload_txt(archief: Archief, reconciler
     reconciler.run()
 
     assert lees_meta(doc).bestanden == ["b.pdf", "notities.txt", "a.pdf", "nieuw.png"]
+
+
+def test_reconcile_vult_ontbrekende_sha256_en_ruimt_verweesde_op(archief: Archief, reconciler: Reconciler) -> None:
+    import hashlib
+
+    doc = _doc(archief, "Factuur", DATUM, "a.pdf")
+    (doc / "scan.jpg").write_bytes(b"jpg")  # via Samba: geen hash
+    meta = lees_meta(doc)
+    meta.sha256 = {"weg.pdf": "0" * 64}  # oude meta.md: a.pdf zonder hash, plus een verweesde hash
+    schrijf_meta(doc, meta)
+
+    rapport = reconciler.run()
+
+    meta = lees_meta(doc)
+    assert meta.bestanden == ["a.pdf", "scan.jpg"]
+    assert meta.sha256 == {"a.pdf": hashlib.sha256(b"x").hexdigest(), "scan.jpg": hashlib.sha256(b"jpg").hexdigest()}
+    assert rapport.gehasht == 2
+    assert reconciler.index.zoek_hash(hashlib.sha256(b"jpg").hexdigest()) is not None
+    # tweede ronde: niets te hashen, niets geschreven
+    mtime = (doc / META_NAAM).stat().st_mtime_ns
+    rapport = reconciler.run()
+    assert rapport.gehasht == 0
+    assert (doc / META_NAAM).stat().st_mtime_ns == mtime
 
 
 def test_reconcile_ongewijzigd_schrijft_niet(archief: Archief, reconciler: Reconciler, queue: Queue) -> None:
@@ -347,6 +395,30 @@ def test_inbox_zonder_treffer_houdt_bestandsnaam(archief: Archief, queue: Queue)
     assert meta.tags == []
 
 
+def test_inbox_dubbel_naar_dubbelmap(archief: Archief, reconciler: Reconciler, queue: Queue) -> None:
+    doc = _doc(archief, "Eneco", DATUM, "factuur.pdf")  # inhoud b"x"
+    reconciler.index.herlaad(archief, doc)
+    (archief.inbox_dir / "kopie.pdf").write_bytes(b"x")
+    (archief.inbox_dir / "nieuw.pdf").write_bytes(b"nieuw")
+    reconciler.verwerk_inbox()
+    docs = reconciler.verwerk_inbox()
+
+    assert [d.name for d in docs] == [f"{date.today():%Y-%m-%d}_nieuw"]
+    assert not (archief.inbox_dir / "kopie.pdf").exists()
+    assert (archief.inbox_dir / "_dubbel" / "kopie.pdf").read_bytes() == b"x"
+    assert len(archief.documentmappen()) == 2
+    assert queue.calls == [(docs[0], "nieuw.pdf")]
+    assert reconciler._inbox_groottes == {}
+    # nog een keer dezelfde naam -> tijdstempel-achtervoegsel, niets overschreven
+    (archief.inbox_dir / "kopie.pdf").write_bytes(b"x")
+    reconciler.verwerk_inbox()
+    assert reconciler.verwerk_inbox() == []
+    namen = sorted(p.name for p in (archief.inbox_dir / "_dubbel").iterdir())
+    assert len(namen) == 2 and namen[0] == "kopie.pdf" and namen[1].startswith("kopie.pdf_")
+    # de _dubbel-map zelf wordt niet als inboxbestand gezien
+    assert reconciler.verwerk_inbox() == []
+
+
 def test_inbox_groeiend_bestand_wacht(archief: Archief, reconciler: Reconciler) -> None:
     pad = archief.inbox_dir / "scan.pdf"
     pad.write_bytes(b"1")
@@ -387,7 +459,7 @@ def test_inbox_via_run_en_opruimen_groottes(archief: Archief, reconciler: Reconc
 
 def test_inbox_fout_blokkeert_rest_niet(archief: Archief, reconciler: Reconciler, monkeypatch: pytest.MonkeyPatch) -> None:
     (archief.inbox_dir / "kapot.pdf").write_bytes(b"x")
-    (archief.inbox_dir / "goed.pdf").write_bytes(b"x")
+    (archief.inbox_dir / "goed.pdf").write_bytes(b"y")  # andere inhoud: gelijke bytes zouden een dubbel zijn (pakket 16)
     reconciler.verwerk_inbox()
 
     origineel = archief.voeg_bestand_toe

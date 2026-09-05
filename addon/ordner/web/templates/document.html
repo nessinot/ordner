@@ -46,6 +46,7 @@
     </div>
     {% endfor %}
 
+    {% include "_dubbelen.html" %}
     <form method="post" action="{{ url_for('document_bestanden', jaar=jaar, map=map) }}" enctype="multipart/form-data" class="bestand-toevoegen">
       {{ herkomst_velden() }}
       <label class="veld">

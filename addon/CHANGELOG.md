@@ -2,6 +2,14 @@
 
 Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. Nieuwste versie bovenaan; de bovenste kop moet gelijk zijn aan `version` in `config.yaml` (dat controleert `tests/test_addon_config.py`).
 
+## 0.10.0 (2026-09-05)
+
+- Ordner herkent nu bestanden die al in het archief staan. Upload je een bestand dat er al is (bijvoorbeeld dezelfde factuur voor de tweede keer gedownload), dan wordt de upload geweigerd en zie je in welk document het al staat, met een link ernaartoe. Hetzelfde geldt voor "Bestand toevoegen" op de documentpagina. Kies je meerdere bestanden tegelijk en is er één al bekend, dan wordt er niets opgeslagen; kies de overige bestanden dan opnieuw.
+- Herkenning werkt op de inhoud van het bestand (een SHA-256-vingerafdruk), niet op de naam. Elk bestand krijgt zijn vingerafdruk in `meta.md` onder `sha256:`. Bestaande documenten krijgen hem bij de eerste verversing na de update vanzelf; daarna hoef je niets te doen.
+- Een bestand in de inbox dat al in het archief staat wordt niet opnieuw opgenomen maar verplaatst naar `_inbox/_dubbel/`, met een melding in het log.
+- Alleen exact gelijke bestanden worden herkend. Dezelfde brief twee keer scannen levert twee verschillende bestanden op en wordt niet als dubbel gezien. Een document dat in de prullenbak ligt telt niet mee: opnieuw uploaden mag.
+- De beheerpagina toont in het rapport hoeveel vingerafdrukken de laatste verversing heeft berekend.
+
 ## 0.9.2 (2026-09-05)
 
 - De knop "Open" bij een bestand toont het bestand nu op een eigen pagina binnen Ordner, met de gewone kop en een terugknop naar het document. Voorheen vulde het bestand op de telefoon het hele scherm en was er geen weg terug. Bij een pdf die de browser niet kan tonen staat er een link om hem los te openen.

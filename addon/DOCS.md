@@ -39,6 +39,9 @@ documentdatum: 2026-03-01
 uploaddatum: '2026-09-03T14:12'
 tags: [woz, gemeente]
 bestanden: [beschikking.pdf, foto.heic]
+sha256:
+  beschikking.pdf: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+  foto.heic: 2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae
 ocr: done
 datumbron: gebruiker
 ---
@@ -53,6 +56,7 @@ Eventuele eigen notities. Deze tekst wordt meegezocht.
 | `uploaddatum` | Wanneer het document is aangemaakt. Informatief. |
 | `tags` | Lijst met trefwoorden. Meegezocht. |
 | `bestanden` | De originelen in deze map. Wordt door Ordner bijgehouden; bestanden die je via Samba toevoegt worden bij de volgende verversing opgenomen. |
+| `sha256` | Per bestand een vingerafdruk van de inhoud, waarmee Ordner dubbele bestanden herkent (zie "Dubbele bestanden"). Wordt door Ordner bijgehouden; ontbreekt hij, dan vult de volgende verversing hem aan. |
 | `ocr` | `pending` (tekst wordt nog gelezen), `done` (klaar) of `failed` (mislukt, zie hieronder). |
 | `datumbron` | Waar de documentdatum vandaan komt: `gebruiker` (zelf ingevuld of later gewijzigd), `tekst` (uit het document gelezen) of `upload` (geen datum gevonden, dag van uploaden). Zie "Documentdatum". |
 
@@ -70,6 +74,22 @@ Uploaden gaat in twee stappen.
 Tot je op Opslaan drukt wordt er niets bewaard. **Annuleren** gooit de gekozen bestanden weg; het tabblad sluiten of de add-on herstarten heeft hetzelfde effect. Een niet afgemaakte upload verloopt na een uur; kom je daarna terug, dan vraagt Ordner je de bestanden opnieuw te kiezen. Na Opslaan kom je op de documentpagina met de bevestiging "Opgeslagen".
 
 Een bestand toevoegen aan een bestaand document doe je op de documentpagina.
+
+Staat een gekozen bestand al in het archief, dan wordt de upload geweigerd; zie "Dubbele bestanden".
+
+## Dubbele bestanden
+
+Ordner voorkomt dat hetzelfde bestand twee keer in het archief komt. Elk bestand krijgt bij het opslaan een vingerafdruk van zijn inhoud (SHA-256, in `meta.md` onder `sha256:`). Bij uploaden, bij "Bestand toevoegen" op de documentpagina en in de inbox vergelijkt Ordner de vingerafdruk met alle documenten:
+
+- **Uploaden.** Is een gekozen bestand al bekend, dan wordt er niets opgeslagen. Je ziet per bestand in welk document het al staat, met een link ernaartoe. Kies je meerdere bestanden en is er één al bekend, dan wordt de hele upload geweigerd; kies de overige bestanden daarna opnieuw.
+- **Bestand toevoegen.** Zelfde regel: één bekend bestand, en er wordt niets toegevoegd. Dat geldt ook voor een bestand dat al in ditzelfde document zit.
+- **Inbox.** Een bekend bestand wordt niet opgenomen maar verplaatst naar `_inbox/_dubbel/`; het log noemt het document waar het al staat.
+
+Goed om te weten:
+
+- Alleen **exact gelijke** bestanden worden herkend, ongeacht de bestandsnaam. Dezelfde brief nog een keer scannen of fotograferen geeft een ander bestand en wordt niet herkend. Sommige portalen zetten bij elke download een datum in de pdf; ook dan verschilt het bestand.
+- Een document in de **prullenbak** telt niet mee. Heb je iets weggegooid, dan mag je het opnieuw uploaden.
+- Bestaande documenten van vóór deze functie krijgen hun vingerafdrukken vanzelf bij de eerste verversing (bij het starten van de add-on of via de beheerpagina). Vervang je buiten Ordner om een bestand door een ander bestand met dezelfde naam, dan blijft de oude vingerafdruk staan.
 
 ## Bestanden bekijken
 
@@ -100,7 +120,8 @@ Bestanden die je in `/share/ordner/_inbox/` zet worden automatisch opgenomen: el
 - titel = de naam van het bedrijf of de instantie uit de tekst (zie "Titel en tags uit de tekst"); is die niet te vinden, dan de bestandsnaam zonder extensie, waarbij `_` en `-` spaties worden;
 - tags = het documenttype uit de tekst, bijvoorbeeld `factuur` of `polis`;
 - documentdatum = de datum uit de tekst, anders vandaag (zie "Documentdatum");
-- het bestand wordt verplaatst naar de nieuwe documentmap; is de tekst al gelezen, dan hoeft er geen OCR meer te draaien.
+- het bestand wordt verplaatst naar de nieuwe documentmap; is de tekst al gelezen, dan hoeft er geen OCR meer te draaien;
+- staat het bestand al ergens in het archief, dan wordt het niet opgenomen maar verplaatst naar `_inbox/_dubbel/` (zie "Dubbele bestanden").
 
 Handig voor scanners, e-mailregels of een gedeelde map op de telefoon. Controleer na opname de titel, tags en datum op de documentpagina; de naam uit de tekst is een gok, en bij een bankafschrift kan dat je eigen naam zijn.
 
@@ -133,9 +154,10 @@ De knop **Cache verversen en ontbrekende tekst extraheren** doet in één keer:
 
 1. alle documentmappen opnieuw inlezen in het geheugen;
 2. de bestandslijst in `meta.md` gelijktrekken met wat er echt in de map staat;
-3. voor elk pdf- of afbeeldingsbestand zonder `.txt` de tekst laten lezen;
-4. `meta.md` aanmaken voor mappen die er geen hebben;
-5. de inbox verwerken.
+3. voor elk bestand zonder vingerafdruk de `sha256` berekenen (zie "Dubbele bestanden");
+4. voor elk pdf- of afbeeldingsbestand zonder `.txt` de tekst laten lezen;
+5. `meta.md` aanmaken voor mappen die er geen hebben;
+6. de inbox verwerken.
 
 Dit gebeurt automatisch bij het starten van de add-on en daarna elke `reconcile_interval` seconden (standaard vijf minuten). Gebruik de knop als je iets via Samba hebt gewijzigd en niet wilt wachten.
 
