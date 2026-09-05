@@ -57,6 +57,17 @@ def test_prioriteit_volgorde_lijst() -> None:
     assert _datum("Datum: 01-01-2024\nDagtekening: 02-01-2024\nOrderdatum: 03-01-2024") == date(2024, 1, 3)
     assert _datum("Datum: 01-01-2024\nDagtekening: 02-01-2024") == date(2024, 1, 2)
     assert _datum("Notadatum: 04-01-2024\nOrderdatum: 03-01-2024") == date(2024, 1, 4)
+    assert _datum("Afdrukdatum: 05-01-2024\nDatum: 01-01-2024") == date(2024, 1, 1)
+
+
+def test_afdrukdatum_als_enige_sleutelwoord() -> None:
+    t = vind_datum("Afdrukdatum: 05-01-2024", VANDAAG)
+    assert t is not None
+    assert t.datum == date(2024, 1, 5)
+    assert t.sleutelwoord == "afdrukdatum"
+    assert _datum("Afdruk datum 5 januari 2024") == date(2024, 1, 5)
+    assert _datum("Afdrukdatum      Pagina\n05-01-2024       1 van 2") == date(2024, 1, 5)
+    assert _datum("Vervaldatum: 31-01-2024\nAfdrukdatum: 05-01-2024") == date(2024, 1, 5)
 
 
 def test_vervaldatum_en_betaaldatum_tellen_niet() -> None:
