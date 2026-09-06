@@ -26,14 +26,14 @@ Werkpakketten en het bindende interface-contract staan in `werk/`. Houd het klei
 | Tweestaps upload | Scherm 1 (`/upload`): alleen bestanden, minstens één. De server leest de tekst, bepaalt datum en suggesties en houdt alles als *openstaande upload* in het geheugen (`web/openstaand.py`, token in de URL, TTL 60 min, max 10; niets op schijf, weg bij herstart). Scherm 2 (`/upload/{token}`): alle velden voorgevuld; Opslaan maakt het document (datum ongewijzigd → bron uit de tekst/upload, gewijzigd → `gebruiker`), Annuleren gooit weg. Details: `werk/15b-tweestaps-upload.md`. |
 | Dubbele bestanden | Per bronbestand een SHA-256 in `meta.md` (`sha256:` mapping naam → hex, blokstijl, direct na `bestanden`); `Index` houdt hash → (rel, naam) bij (`zoek_hash`). Upload en "bestand toevoegen" hashen vóór het lezen van de tekst en weigeren de hele actie bij één bekend bestand (409, lijst met links naar het document; `dubbel.py`). Inbox: bekend bestand → `_inbox/_dubbel/`. Reconciler vult ontbrekende hashes aan en verwijdert verweesde; `Archief.voeg_bestand_toe` weigert nooit. Prullenbak telt niet mee. Alleen byte-identiek. Details: `werk/16-dubbele-bestanden.md`. |
 | Zoeken | AND over alle woorden, hoofdletterongevoelig, over titel, omschrijving, tags, documentdatum, notities en alle `.txt`-teksten. Snippet ±80 tekens. Sortering documentdatum desc. `_inbox`/`_prullenbak` nooit in de index. |
-| Prullenbak | `_prullenbak/<mapnaam>`; bij conflict `<mapnaam>_<JJJJMMDD-HHMMSS>`. |
+| Prullenbak | `_prullenbak/<mapnaam>`; bij conflict `<mapnaam>_<JJJJMMDD-HHMMSS>`. Pagina `/prullenbak` (via beheer): kijken, per item of alles definitief verwijderen met `confirm()` (pakket 19); geen terugzetten. `meta.md` ongemoeid; alle toegang via `Archief.prullenbak_pad` (enige verdediging vóór `rmtree`); tabel Prullenbak op beheer, aantal live via `/api/status`. Details: `werk/19-prullenbak.md`. |
 | Schrijven | `meta.md` en `.txt` altijd via tempbestand in dezelfde map + `os.replace()`. |
 | Web | FastAPI + Jinja2, geen JS-framework, geen build-stap. Vanilla JS alleen voor upload-voortgang (scherm 1 volgt de redirect naar scherm 2) en status-polling; scherm 2 werkt zonder JS. Alle links via de Jinja-global `url_for` (pad inclusief Ingress `root_path`). |
 | Base image | HA Debian-base bookworm; apt: `python3 python3-venv ocrmypdf tesseract-ocr-nld tesseract-ocr-eng poppler-utils libheif1`. |
 
 ## Niet in v1
 
-Meerdere gebruikers, versiebeheer, autoclassificatie, tag-beheer, map-hernoemen, MCP-server, "alles opnieuw OCR'en", prullenbak legen/terugzetten. Ideeën → `IDEAS.md`.
+Meerdere gebruikers, versiebeheer, autoclassificatie, tag-beheer, map-hernoemen, MCP-server, "alles opnieuw OCR'en", prullenbak terugzetten. Ideeën → `IDEAS.md`.
 
 ## Conventies
 

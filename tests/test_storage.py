@@ -7,7 +7,7 @@ import pytest
 
 from ordner.config import META_NAAM
 from ordner.meta import lees_meta
-from ordner.storage import Archief, OngeldigPad
+from ordner.storage import Archief, OngeldigPad, PrullenbakItem
 
 DATUM = date(2026, 3, 1)
 NU = datetime(2026, 9, 3, 14, 12, 33, 456)
@@ -244,3 +244,146 @@ def test_voeg_bestand_toe_registreert_sha256(archief: Archief) -> None:
     meta = lees_meta(doc)
     assert naam == "a_2.pdf"
     assert meta.sha256 == {"a.pdf": hashlib.sha256(b"%PDF a").hexdigest(), "a_2.pdf": hashlib.sha256(b"%PDF b").hexdigest()}
+
+
+# --- prullenbak: kijken en legen (pakket 19) --------------------------------------
+
+
+def _vul_prullenbak(archief: Archief) -> tuple[Path, Path, Path]:
+    """Twee weggegooide documenten (de tweede met conflict-suffix), een los bestand en een '.'-bestand."""
+    doc1 = _doc(archief)
+    archief.voeg_bestand_toe(doc1, "a.pdf", b"%PDF 1234")
+    archief.voeg_bestand_toe(doc1, "b.jpg", b"jpg")
+    (doc1 / "a.pdf.txt").write_text("tekst", encoding="utf-8")
+    eerste = archief.naar_prullenbak(doc1)
+    tweede = archief.naar_prullenbak(_doc(archief))
+    los = archief.trash_dir / "los.pdf"
+    los.write_bytes(b"%PDF los")
+    (archief.trash_dir / ".DS_Store").write_bytes(b"x")
+    return eerste, tweede, los
+
+
+def test_prullenbak_inhoud_leeg(archief: Archief) -> None:
+    assert archief.prullenbak_inhoud() == []
+    assert archief.prullenbak_inhoud(met_grootte=False) == []
+
+
+def test_prullenbak_inhoud(archief: Archief) -> None:
+    eerste, tweede, los = _vul_prullenbak(archief)
+    items = archief.prullenbak_inhoud()
+    assert [i.naam for i in items] == sorted([eerste.name, tweede.name, "los.pdf"], reverse=True)
+    assert ".DS_Store" not in [i.naam for i in items]
+    per_naam = {i.naam: i for i in items}
+    a = per_naam[eerste.name]
+    assert a.is_map and a.titel == "WOZ-beschikking 2026" and a.documentdatum == DATUM and a.bestanden == 2
+    assert a.grootte == sum(p.stat().st_size for p in eerste.iterdir())  # meta.md + a.pdf + b.jpg + a.pdf.txt
+    assert per_naam[tweede.name].bestanden == 0
+    l = per_naam["los.pdf"]
+    assert l == PrullenbakItem("los.pdf", False, "los.pdf", None, 1, len(b"%PDF los"))
+    assert all(i.grootte == 0 for i in archief.prullenbak_inhoud(met_grootte=False))
+
+
+def test_prullenbak_inhoud_zonder_meta(archief: Archief) -> None:
+    map = archief.trash_dir / "2025-01-01_samba"
+    map.mkdir()
+    (map / "scan.pdf").write_bytes(b"%PDF")
+    (map / "scan.pdf.txt").write_text("t", encoding="utf-8")
+    (map / "foto.jpg").write_bytes(b"jpg")
+    (map / ".verborgen").write_bytes(b"x")
+    (map / "sub").mkdir()
+    (archief.trash_dir / "2025-02-02_kapot").mkdir()
+    (archief.trash_dir / "2025-02-02_kapot" / META_NAAM).write_text("geen frontmatter", encoding="utf-8")
+    items = {i.naam: i for i in archief.prullenbak_inhoud()}
+    assert items["2025-01-01_samba"] == PrullenbakItem("2025-01-01_samba", True, "2025-01-01_samba", None, 2, 4 + 1 + 3 + 1)
+    kapot = items["2025-02-02_kapot"]
+    assert kapot.titel == "2025-02-02_kapot" and kapot.documentdatum is None and kapot.bestanden == 0
+
+
+def test_prullenbak_pad_geldig(archief: Archief) -> None:
+    eerste, _tweede, los = _vul_prullenbak(archief)
+    assert archief.prullenbak_pad(eerste.name) == eerste
+    assert archief.prullenbak_pad("los.pdf") == los
+
+
+@pytest.mark.parametrize("naam", ["", ".", "..", "a/b", "a\\b", ".tekst", ".DS_Store", "bestaat-niet", "../_inbox", "..\\_inbox"])
+def test_prullenbak_pad_ongeldig(archief: Archief, naam: str) -> None:
+    _vul_prullenbak(archief)
+    with pytest.raises(OngeldigPad):
+        archief.prullenbak_pad(naam)
+
+
+def test_prullenbak_pad_nooit_buiten_de_prullenbak(archief: Archief) -> None:
+    """Een naam die naar buiten wijst (jaarmap, inbox, root) is nooit geldig, ook niet als het doel bestaat."""
+    _doc(archief)
+    for naam in ("../2026", "../2026/2026-03-01_woz-beschikking-2026", "../_inbox", "..", "../"):
+        with pytest.raises(OngeldigPad):
+            archief.prullenbak_pad(naam)
+    assert (archief.root / "2026" / "2026-03-01_woz-beschikking-2026" / META_NAAM).exists()
+
+
+def _symlink(bron: Path, doel: Path) -> None:
+    import os
+
+    try:
+        os.symlink(doel, bron, target_is_directory=doel.is_dir())
+    except (OSError, NotImplementedError):
+        pytest.skip("geen symlink-rechten op dit platform")
+
+
+def test_prullenbak_pad_symlink_wordt_niet_gevolgd(archief: Archief) -> None:
+    doc = _doc(archief)
+    link = archief.trash_dir / "link"
+    _symlink(link, doc)
+    pad = archief.prullenbak_pad("link")
+    assert pad == link and pad.is_symlink()  # de link zelf, nooit het doel
+    item = next(i for i in archief.prullenbak_inhoud() if i.naam == "link")
+    assert not item.is_map and item.bestanden == 1  # geen walk door het doel
+
+
+def test_verwijder_definitief_map_en_bestand(archief: Archief) -> None:
+    eerste, tweede, los = _vul_prullenbak(archief)
+    archief.verwijder_definitief(eerste.name)
+    assert not eerste.exists() and tweede.exists() and los.exists()
+    archief.verwijder_definitief("los.pdf")
+    assert not los.exists()
+    assert archief.trash_dir.is_dir()
+    with pytest.raises(OngeldigPad):
+        archief.verwijder_definitief(eerste.name)  # al weg
+
+
+def test_verwijder_definitief_symlink_laat_doel_intact(archief: Archief) -> None:
+    doc = _doc(archief)
+    archief.voeg_bestand_toe(doc, "a.pdf", b"%PDF")
+    link = archief.trash_dir / "link"
+    _symlink(link, doc)
+    archief.verwijder_definitief("link")
+    assert not link.exists() and not link.is_symlink()
+    assert (doc / "a.pdf").exists() and (doc / META_NAAM).exists()
+    assert archief.trash_dir.is_dir()
+
+
+def test_leeg_prullenbak(archief: Archief) -> None:
+    eerste, tweede, los = _vul_prullenbak(archief)
+    assert archief.leeg_prullenbak() == (3, 0)
+    assert not eerste.exists() and not tweede.exists() and not los.exists()
+    assert (archief.trash_dir / ".DS_Store").exists()
+    assert archief.trash_dir.is_dir()
+    assert archief.prullenbak_inhoud() == []
+    assert archief.leeg_prullenbak() == (0, 0)
+
+
+def test_leeg_prullenbak_gaat_door_na_fout(archief: Archief, monkeypatch: pytest.MonkeyPatch) -> None:
+    import shutil
+
+    eerste, tweede, los = _vul_prullenbak(archief)
+    echte_rmtree = shutil.rmtree
+
+    def kapot(pad, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if Path(pad).name == eerste.name:
+            raise OSError("alleen-lezen")
+        return echte_rmtree(pad, *args, **kwargs)
+
+    monkeypatch.setattr(shutil, "rmtree", kapot)
+    assert archief.leeg_prullenbak() == (2, 1)
+    assert eerste.exists() and not tweede.exists() and not los.exists()
+    assert archief.trash_dir.is_dir()

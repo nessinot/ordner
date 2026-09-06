@@ -29,6 +29,15 @@
   </section>
 
   <section class="paneel">
+    <h3>Prullenbak</h3>
+    <table class="tellingen">
+      <tr><th>Items</th><td><a data-tel="prullenbak-aantal" href="{{ url_for('prullenbak') }}">{{ prullenbak_aantal }}</a></td></tr>
+      <tr><th>Grootte</th><td>{{ prullenbak_grootte }}</td></tr>
+    </table>
+    <p class="hint">Verwijderde documenten staan in <code>{{ prullenbak_map }}</code>. Ordner ruimt de prullenbak niet vanzelf op; legen doe je op de prullenbakpagina.</p>
+  </section>
+
+  <section class="paneel">
     <h3>Nu bezig</h3>
     <ul data-bezig class="bezig">
       {% for rel, naam in bezig %}<li>{{ rel }}/{{ naam }}</li>{% else %}<li class="leeg">Niets.</li>{% endfor %}

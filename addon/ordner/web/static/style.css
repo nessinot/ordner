@@ -261,6 +261,10 @@ p.inbox-wacht a { color: inherit; font-weight: 500; }
 .hint-inbox { margin: 0 0 0.75rem; }
 ul.bestandslijst.inbox li form { margin-left: auto; }
 ul.bestandslijst.inbox li button { min-height: 34px; padding: 0.2rem 1rem; }
+/* --- prullenbak (pakket 19) -------------------------------------------------- */
+ul.bestandslijst.prullenbak li form { margin-left: auto; }
+ul.bestandslijst.prullenbak li button { min-height: 34px; padding: 0.2rem 1rem; }
+ul.bestandslijst.prullenbak code { font-size: 0.8rem; overflow-wrap: anywhere; }
 /* Scherm 2 van de upload, vanuit de inbox: herkomstregel */
 p.herkomst { margin: -0.5rem 0 1rem; color: var(--gedempt); font-size: 0.9rem; }
 

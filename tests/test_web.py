@@ -731,7 +731,7 @@ def _vandaag():  # type: ignore[no-untyped-def]
 
 def test_ingress_prefix_in_alle_links(client: TestClient) -> None:
     _upload(client)
-    for pad in ("/", "/?q=test", "/upload", "/doc/2026/2026-03-01_test", "/beheer"):
+    for pad in ("/", "/?q=test", "/upload", "/doc/2026/2026-03-01_test", "/beheer", "/prullenbak"):
         r = client.get(pad, headers={"X-Ingress-Path": _PREFIX})
         assert r.status_code == 200, pad
         urls = re.findall(r'(?:href|action|src)="([^"]*)"', r.text)
@@ -1149,10 +1149,11 @@ def test_status_api(client: TestClient) -> None:
     r = client.get("/api/status")
     assert r.status_code == 200
     s = r.json()
-    assert set(s) == {"queue", "bezig", "reconcile_bezig", "tellingen", "inbox"}
+    assert set(s) == {"queue", "bezig", "reconcile_bezig", "tellingen", "inbox", "prullenbak"}
     assert s["reconcile_bezig"] is False
     assert s["tellingen"] == {"totaal": 0, "pending": 0, "done": 0, "failed": 0}
     assert s["inbox"] == {"totaal": 0, "wachtend": 0, "dubbel": 0}
+    assert s["prullenbak"] == {"aantal": 0}
     assert s["bezig"] == []
 
     _upload(client)
@@ -1162,6 +1163,10 @@ def test_status_api(client: TestClient) -> None:
     assert s["ocr"] == "done"
     assert s["tellingen"]["totaal"] == 1
     assert client.get("/api/status?rel=2026/bestaat-niet").json()["ocr"] is None
+
+    # pakket 19: een weggegooid document telt mee in de prullenbak
+    client.post("/doc/2026/2026-03-01_test/verwijder", follow_redirects=False)
+    assert client.get("/api/status").json()["prullenbak"] == {"aantal": 1}
 
 
 # --- beheer ----------------------------------------------------------------
@@ -1190,6 +1195,26 @@ def test_beheer_pagina(client: TestClient) -> None:
     assert '<a data-tel="inbox-wachtend" href="/inbox">0</a>' in r.text  # link ook bij 0
     assert 'data-tel="inbox-dubbel">0<' in r.text
     assert "_dubbel</code>" in r.text
+    # pakket 19: tabel Prullenbak met link naar de prullenbakpagina, ook bij 0
+    assert "<h3>Prullenbak</h3>" in r.text
+    assert '<a data-tel="prullenbak-aantal" href="/prullenbak">0</a>' in r.text
+    assert "_prullenbak</code>" in r.text
+    assert r.text.index("<h3>Inbox</h3>") < r.text.index("<h3>Prullenbak</h3>") < r.text.index("<h3>Nu bezig</h3>")
+
+
+def test_beheer_telt_prullenbak(client: TestClient) -> None:
+    _upload(client, titel="Weg ermee")
+    doc = _root(client) / "2026" / "2026-03-01_weg-ermee"
+    assert _wacht_op_status(doc, "done")
+    client.post("/doc/2026/2026-03-01_weg-ermee/verwijder", follow_redirects=False)
+    (_root(client) / "_prullenbak" / ".DS_Store").write_bytes(b"x")
+    r = client.get("/beheer")
+    assert r.status_code == 200
+    assert '<a data-tel="prullenbak-aantal" href="/prullenbak">1</a>' in r.text
+    map = _root(client) / "_prullenbak" / "2026-03-01_weg-ermee"
+    grootte = sum(p.stat().st_size for p in map.iterdir())
+    assert 0 < grootte < 1000  # meta.md + a.pdf + a.pdf.txt
+    assert f"<tr><th>Grootte</th><td>{grootte} B</td></tr>" in r.text
 
 
 def test_beheer_telt_inbox_totaal_en_dubbel(client: TestClient) -> None:
@@ -1272,3 +1297,127 @@ def test_ingress_prefix_op_documentpagina(client: TestClient) -> None:
         follow_redirects=False,
     )
     assert r.headers["location"] == f"{_PREFIX}{_DOC}?m=Opgeslagen"
+
+
+# --- prullenbak (pakket 19) --------------------------------------------------
+
+
+def _weggegooid(client: TestClient, titel: str = "Weg ermee") -> Path:
+    """Uploadt een document en gooit het weg; geeft de map in _prullenbak terug."""
+    _upload(client, titel=titel)
+    map = "2026-03-01_" + titel.lower().replace(" ", "-")
+    doc = _root(client) / "2026" / map
+    assert _wacht_op_status(doc, "done")
+    r = client.post(f"/doc/2026/{map}/verwijder", follow_redirects=False)
+    assert r.status_code == 303
+    pad = _root(client) / "_prullenbak" / map
+    assert pad.is_dir()
+    return pad
+
+
+def test_prullenbak_pagina_leeg(client: TestClient) -> None:
+    r = client.get("/prullenbak")
+    assert r.status_code == 200
+    assert "<h2>Prullenbak</h2>" in r.text
+    assert "De prullenbak is leeg." in r.text
+    assert "_prullenbak</code>" in r.text
+    assert "Definitief verwijderen" not in r.text
+    assert re.search(r'<button[^>]*\bdisabled\b[^>]*>Prullenbak legen</button>', r.text)
+    assert 'action="/prullenbak/leeg"' in r.text
+    assert "Terugzetten kan door de map met Samba" in r.text
+
+
+def test_prullenbak_pagina_met_items(client: TestClient) -> None:
+    pad = _weggegooid(client)
+    (_root(client) / "_prullenbak" / "los.pdf").write_bytes(b"%PDF los")
+    (_root(client) / "_prullenbak" / ".DS_Store").write_bytes(b"x")
+    r = client.get("/prullenbak")
+    assert r.status_code == 200
+    assert "Weg ermee" in r.text
+    assert f"<code>{pad.name}</code>" in r.text
+    assert "2026-03-01" in r.text
+    assert "1 bestand ·" in r.text
+    assert f'<input type="hidden" name="naam" value="{pad.name}">' in r.text
+    assert '<input type="hidden" name="naam" value="los.pdf">' in r.text
+    assert ".DS_Store" not in r.text
+    assert r.text.count('action="/prullenbak/verwijder"') == 2
+    assert "confirm('Definitief verwijderen? Dit kan niet ongedaan gemaakt worden.')" in r.text
+    assert "confirm('Alles in de prullenbak definitief verwijderen? Dit kan niet ongedaan gemaakt worden.')" in r.text
+    assert not re.search(r'<button[^>]*\bdisabled\b[^>]*>Prullenbak legen</button>', r.text)
+    assert "De prullenbak is leeg." not in r.text
+    # nieuwste mapnaam bovenaan: "los.pdf" sorteert na "2026-..." dus staat als eerste (naam aflopend)
+    assert r.text.index("los.pdf") < r.text.index(pad.name)
+
+
+def test_prullenbak_verwijder(client: TestClient) -> None:
+    pad = _weggegooid(client)
+    ander = _weggegooid(client, titel="Blijft")
+    r = client.post("/prullenbak/verwijder", data={"naam": pad.name}, follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/prullenbak?m=Definitief+verwijderd"
+    assert not pad.exists()
+    assert ander.is_dir()
+    assert (_root(client) / "_prullenbak").is_dir()
+    assert client.get("/api/status").json()["prullenbak"] == {"aantal": 1}
+
+
+def test_prullenbak_leeg(client: TestClient) -> None:
+    een = _weggegooid(client, titel="Een")
+    twee = _weggegooid(client, titel="Twee")
+    r = client.post("/prullenbak/leeg", follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/prullenbak?m=Prullenbak+geleegd"
+    assert not een.exists() and not twee.exists()
+    assert (_root(client) / "_prullenbak").is_dir()
+    assert client.get("/api/status").json()["prullenbak"] == {"aantal": 0}
+    assert "De prullenbak is leeg." in client.get("/prullenbak").text
+
+
+def test_prullenbak_leeg_meldt_mislukte_items(client: TestClient, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    import shutil
+
+    een = _weggegooid(client, titel="Een")
+    twee = _weggegooid(client, titel="Twee")
+    echte_rmtree = shutil.rmtree
+
+    def kapot(pad, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if Path(pad).name == een.name:
+            raise OSError("alleen-lezen")
+        return echte_rmtree(pad, *args, **kwargs)
+
+    monkeypatch.setattr(shutil, "rmtree", kapot)
+    r = client.post("/prullenbak/leeg", follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/prullenbak?m=Prullenbak+geleegd%2C+1+item%28s%29+konden+niet+worden+verwijderd+%28zie+het+log%29"
+    assert een.exists() and not twee.exists()
+
+
+def test_prullenbak_verwijder_mislukt(client: TestClient, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    import shutil
+
+    pad = _weggegooid(client)
+    monkeypatch.setattr(shutil, "rmtree", lambda *a, **k: (_ for _ in ()).throw(OSError("alleen-lezen")))
+    r = client.post("/prullenbak/verwijder", data={"naam": pad.name}, follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == f"/prullenbak?m=Verwijderen+mislukt%3A+{pad.name}"
+    assert pad.exists()
+
+
+def test_prullenbak_verwijder_ongeldige_naam_404(client: TestClient) -> None:
+    pad = _weggegooid(client)
+    root = _root(client)
+    buiten = root / "2026" / "2026-03-01_blijft"
+    buiten.mkdir()
+    (buiten / "meta.md").write_text("---\ntitel: Blijft\ndocumentdatum: 2026-03-01\n---\n", encoding="utf-8")
+    (root / "_prullenbak" / ".tekst").mkdir()
+    (root / "_inbox" / "scan.pdf").write_bytes(_PDF)
+    for naam in ("..", "../2026", "../2026/2026-03-01_blijft", "a/b", ".tekst", "bestaat-niet", "", "../_inbox", "../_inbox/scan.pdf"):
+        r = client.post("/prullenbak/verwijder", data={"naam": naam}, follow_redirects=False)
+        assert r.status_code == 404, naam
+    r = client.post("/prullenbak/verwijder", data={}, follow_redirects=False)
+    assert r.status_code == 404
+    assert buiten.is_dir() and (buiten / "meta.md").exists()
+    assert (root / "_inbox" / "scan.pdf").exists()
+    assert (root / "_prullenbak" / ".tekst").is_dir()
+    assert pad.is_dir()
+    assert (root / "2026").is_dir() and (root / "_inbox").is_dir() and (root / "_prullenbak").is_dir()

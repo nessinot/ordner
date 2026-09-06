@@ -69,6 +69,7 @@ document.addEventListener("DOMContentLoaded", () => {
         zet("inbox-totaal", s.inbox.totaal);
         zet("inbox-wachtend", s.inbox.wachtend);
         zet("inbox-dubbel", s.inbox.dubbel);
+        zet("prullenbak-aantal", s.prullenbak.aantal);
         zet("reconcile", s.reconcile_bezig ? "bezig" : "niet bezig");
         const lijst = beheer.querySelector("[data-bezig]");
         if (lijst) {

@@ -1,4 +1,4 @@
-"""Routes van de webapp (pakket 08: zoeken, upload, bestand-serving; pakket 09: document, beheer, status; pakket 15b: tweestaps upload; pakket 16: dubbele bestanden; pakket 17: inbox wacht op een titel; pakket 18: beheertellers)."""
+"""Routes van de webapp (pakket 08: zoeken, upload, bestand-serving; pakket 09: document, beheer, status; pakket 15b: tweestaps upload; pakket 16: dubbele bestanden; pakket 17: inbox wacht op een titel; pakket 18: beheertellers; pakket 19: prullenbak kijken en legen)."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from ordner.index import DocEntry, Index, Reconciler
 from ordner.ingest import LeesTekst, Voorbereid, lees_vooraf, maak_document_uit_voorbereid
 from ordner.meta import MetaFout, OcrStatus, is_extraheerbaar, schrijf_meta, txt_pad
 from ordner.search import zoek
-from ordner.storage import Archief, OngeldigPad
+from ordner.storage import Archief, OngeldigPad, PrullenbakItem
 from ordner.suggestie import Suggestie, stel_voor
 from ordner.web.openstaand import OpenstaandeUpload, OpenstaandeUploads
 from ordner.worker import OcrQueue
@@ -451,6 +451,69 @@ async def inbox_opnemen(request: Request, naam: str = Form("")) -> Response:
     return _redirect(request, "upload_gegevens", token=openstaand.token)
 
 
+# --- prullenbak (pakket 19) --------------------------------------------------
+
+
+@dataclass
+class PrullenbakRegel:
+    """Eén item op de prullenbakpagina: een weggegooid document (map) of een los bestand."""
+
+    naam: str
+    is_map: bool
+    titel: str
+    documentdatum: date | None
+    bestanden: int
+    grootte: str  # geformatteerd via _grootte
+
+
+def _prullenbak_regel(item: PrullenbakItem) -> PrullenbakRegel:
+    return PrullenbakRegel(item.naam, item.is_map, item.titel, item.documentdatum, item.bestanden, _grootte(item.grootte))
+
+
+@router.get("/prullenbak", name="prullenbak")
+async def prullenbak(request: Request) -> Response:
+    """Wat er in `_prullenbak/` staat, met per item een knop Definitief verwijderen en één knop Prullenbak legen."""
+    archief = _archief(request)
+    # De groottes vragen een recursieve walk over alle weggegooide mappen: in een thread.
+    items = await asyncio.to_thread(archief.prullenbak_inhoud)
+    ctx = {
+        "items": [_prullenbak_regel(i) for i in items],
+        "grootte": _grootte(sum(i.grootte for i in items)),
+        "prullenbak_map": str(archief.trash_dir),
+    }
+    return _templates(request).TemplateResponse(request, "prullenbak.html", ctx)
+
+
+@router.post("/prullenbak/verwijder", name="prullenbak_verwijder")
+async def prullenbak_verwijder(request: Request, naam: str = Form("")) -> Response:
+    """Eén item onomkeerbaar verwijderen; de padcontrole in `prullenbak_pad` is de enige verdediging vóór `rmtree`."""
+    archief = _archief(request)
+    try:
+        archief.prullenbak_pad(naam)
+    except OngeldigPad:
+        raise HTTPException(status_code=404, detail="Niet gevonden in de prullenbak") from None
+    try:
+        await asyncio.to_thread(archief.verwijder_definitief, naam)
+    except OngeldigPad:
+        # Net weg (andere tab of Samba): niets te doen.
+        raise HTTPException(status_code=404, detail="Niet gevonden in de prullenbak") from None
+    except OSError as e:
+        log.warning("prullenbak: %s kon niet worden verwijderd: %s", naam, e)
+        return _redirect(request, "prullenbak", f"Verwijderen mislukt: {naam}")
+    return _redirect(request, "prullenbak", "Definitief verwijderd")
+
+
+@router.post("/prullenbak/leeg", name="prullenbak_leeg")
+async def prullenbak_leeg(request: Request) -> Response:
+    """Alles in de prullenbak onomkeerbaar verwijderen; `_prullenbak/` zelf blijft bestaan."""
+    _verwijderd, mislukt = await asyncio.to_thread(_archief(request).leeg_prullenbak)
+    if mislukt:
+        melding = f"Prullenbak geleegd, {mislukt} item(s) konden niet worden verwijderd (zie het log)"
+    else:
+        melding = "Prullenbak geleegd"
+    return _redirect(request, "prullenbak", melding)
+
+
 # --- document -------------------------------------------------------------
 
 _INLINE_AFBEELDING = {".jpg", ".jpeg", ".png"}
@@ -661,6 +724,8 @@ async def status(request: Request) -> Response:
         "tellingen": index.tellingen(),
         # pakket 18: tabel Inbox op de beheerpagina
         "inbox": {"totaal": inbox.totaal, "wachtend": inbox.wachtend, "dubbel": inbox.dubbel},
+        # pakket 19: alleen het aantal (één iterdir plus de meta's), niet de grootte (recursieve walk)
+        "prullenbak": {"aantal": len(_archief(request).prullenbak_inhoud(met_grootte=False))},
     }
     rel = request.query_params.get("rel")
     if rel is not None:
@@ -677,6 +742,8 @@ async def beheer(request: Request) -> Response:
     index = _index(request)
     queue = _queue(request)
     settings = request.app.state.settings
+    archief = _archief(request)
+    prullenbak = await asyncio.to_thread(archief.prullenbak_inhoud)  # met groottes: in een thread (pakket 19)
     ctx = {
         "tellingen": index.tellingen(),
         "queue": queue.lengte,
@@ -686,7 +753,11 @@ async def beheer(request: Request) -> Response:
         "interval_minuten": max(1, round(settings.reconcile_interval / 60)),
         # pakket 18: tabel Inbox (totaal / wacht op titel / dubbel)
         "inbox": _reconciler(request).inbox_telling(),
-        "inbox_map": str(_archief(request).inbox_dir),
+        "inbox_map": str(archief.inbox_dir),
+        # pakket 19: tabel Prullenbak (aantal live via /api/status, grootte = stand bij het laden)
+        "prullenbak_aantal": len(prullenbak),
+        "prullenbak_grootte": _grootte(sum(i.grootte for i in prullenbak)),
+        "prullenbak_map": str(archief.trash_dir),
     }
     return _templates(request).TemplateResponse(request, "beheer.html", ctx)
 

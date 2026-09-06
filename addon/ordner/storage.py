@@ -1,4 +1,4 @@
-"""Archief op schijf: mappen, bestanden, prullenbak (pakket 03)."""
+"""Archief op schijf: mappen, bestanden, prullenbak (pakket 03; pakket 19: prullenbak kijken en legen)."""
 
 from __future__ import annotations
 
@@ -6,12 +6,13 @@ import logging
 import os
 import re
 import shutil
+from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 
 from ordner.config import INBOX_DIR, META_NAAM, TRASH_DIR
 from ordner.dubbel import sha256_van
-from ordner.meta import DatumBron, Meta, bepaal_ocr_status, is_extraheerbaar, lees_meta, schrijf_meta
+from ordner.meta import DatumBron, Meta, MetaFout, bepaal_ocr_status, is_extraheerbaar, lees_meta, schrijf_meta
 from ordner.slug import maak_slug
 
 log = logging.getLogger(__name__)
@@ -24,6 +25,45 @@ _TMP_PREFIX = ".tmp-"
 
 class OngeldigPad(Exception):
     """Padcomponent is onveilig, ligt buiten het archief of bestaat niet."""
+
+
+@dataclass(frozen=True)
+class PrullenbakItem:
+    """Eén map of los bestand direct in `_prullenbak/` (pakket 19)."""
+
+    naam: str  # naam van de map of het losse bestand in _prullenbak/
+    is_map: bool
+    titel: str  # meta.titel; zonder leesbare meta.md de naam zelf
+    documentdatum: date | None  # meta.documentdatum; None zonder leesbare meta.md of bij een los bestand
+    bestanden: int  # len(meta.bestanden), anders gewone bestanden in de map (geen meta.md, "."-namen, .txt); los bestand -> 1
+    grootte: int  # bytes, recursief; 0 bij met_grootte=False
+
+
+def _map_grootte(map: Path) -> int:
+    """Som van de bestandsgroottes onder `map`, recursief; symlinks niet gevolgd, OSError per bestand overgeslagen."""
+    totaal = 0
+    for dirpath, _dirnames, filenames in os.walk(map):
+        for naam in filenames:
+            try:
+                totaal += os.lstat(os.path.join(dirpath, naam)).st_size
+            except OSError:
+                continue
+    return totaal
+
+
+def _tel_gewone_bestanden(map: Path) -> int:
+    """Bestanden direct in `map` zonder meta.md, "."-namen en .txt (fallback zonder leesbare meta.md)."""
+    n = 0
+    try:
+        for p in map.iterdir():
+            try:
+                if p.is_file() and not p.name.startswith(".") and p.name != META_NAAM and p.suffix.lower() != ".txt":
+                    n += 1
+            except OSError:
+                continue
+    except OSError:
+        return 0
+    return n
 
 
 def _saneer_naam(naam: str) -> str:
@@ -133,6 +173,93 @@ class Archief:
         shutil.move(str(doc), str(doel))
         log.info("naar prullenbak: %s -> %s", doc.name, doel.name)
         return doel
+
+    # --- prullenbak (pakket 19) -------------------------------------------
+
+    def prullenbak_pad(self, naam: str) -> Path:
+        """`_prullenbak/<naam>` voor een naam uit een formulier; de enige verdediging vóór `rmtree`.
+
+        Raises OngeldigPad bij een lege naam, `.`/`..`, een pad-scheider, een naam die met `.` begint,
+        een resolved pad dat niet direct onder `trash_dir` ligt, of een item dat niet bestaat. Een symlink
+        wordt niet gevolgd: het pad is de link zelf (die ligt per definitie in de prullenbak) en
+        `verwijder_definitief` haalt alleen de link weg.
+        """
+        _controleer_component(naam)
+        if naam.startswith(".") or Path(naam).name != naam:
+            raise OngeldigPad(f"ongeldige prullenbaknaam: {naam!r}")
+        pad = self.trash_dir / naam
+        if pad.is_symlink():
+            return pad
+        echt = pad.resolve()
+        if echt.parent != self.trash_dir or echt.name != naam:
+            raise OngeldigPad(f"pad ligt niet direct in de prullenbak: {echt}")
+        if not echt.exists():
+            raise OngeldigPad(f"pad bestaat niet: {echt}")
+        return echt
+
+    def prullenbak_inhoud(self, met_grootte: bool = True) -> list[PrullenbakItem]:
+        """Mappen en losse bestanden direct in `_prullenbak/` zonder "."-prefix, op naam aflopend.
+
+        Titel, datum en bestandsaantal uit `meta.md` (MetaFout/OSError -> naam als titel, geen datum, bestanden
+        geteld). `met_grootte=False` slaat de recursieve walk over (grootte 0): goedkoop genoeg voor de teller
+        op de event loop. Een item dat onder ons verdwijnt (OSError) wordt overgeslagen; nooit een fout.
+        """
+        try:
+            paden = sorted(self.trash_dir.iterdir(), key=lambda p: p.name, reverse=True)
+        except OSError:
+            return []
+        items: list[PrullenbakItem] = []
+        for p in paden:
+            if p.name.startswith("."):
+                continue
+            try:
+                if p.is_symlink() or not p.is_dir():
+                    # los bestand of symlink (nooit gevolgd, ook niet voor de grootte)
+                    grootte = p.lstat().st_size if met_grootte else 0
+                    items.append(PrullenbakItem(p.name, False, p.name, None, 1, grootte))
+                    continue
+                try:
+                    meta = lees_meta(p)
+                    titel, datum, bestanden = meta.titel, meta.documentdatum, len(meta.bestanden)
+                except (MetaFout, OSError):
+                    titel, datum, bestanden = p.name, None, _tel_gewone_bestanden(p)
+                grootte = _map_grootte(p) if met_grootte else 0
+                items.append(PrullenbakItem(p.name, True, titel, datum, bestanden, grootte))
+            except OSError:
+                continue
+        return items
+
+    def verwijder_definitief(self, naam: str) -> None:
+        """Haalt één item onomkeerbaar uit de prullenbak: symlink of bestand -> unlink, map -> rmtree.
+
+        Alleen via `prullenbak_pad`; een `OSError` (bv. alleen-lezen bestand op Windows) gaat door naar de aanroeper.
+        """
+        pad = self.prullenbak_pad(naam)
+        if pad.is_symlink() or pad.is_file():
+            pad.unlink()
+        else:
+            shutil.rmtree(pad)
+        log.info("definitief verwijderd uit de prullenbak: %s", naam)
+
+    def leeg_prullenbak(self) -> tuple[int, int]:
+        """Verwijdert alle items uit `prullenbak_inhoud()` één voor één; geeft (verwijderd, mislukt) terug.
+
+        Een `OSError` op één item wordt gelogd en de rest gaat door. `trash_dir` zelf blijft bestaan;
+        een item dat intussen al weg is (OngeldigPad) telt niet mee.
+        """
+        verwijderd = mislukt = 0
+        for item in self.prullenbak_inhoud(met_grootte=False):
+            try:
+                self.verwijder_definitief(item.naam)
+            except OngeldigPad:
+                continue
+            except OSError as e:
+                log.warning("prullenbak legen: %s kon niet worden verwijderd: %s", item.naam, e)
+                mislukt += 1
+            else:
+                verwijderd += 1
+        log.info("prullenbak geleegd: %d verwijderd, %d mislukt", verwijderd, mislukt)
+        return verwijderd, mislukt
 
     def documentmappen(self) -> list[Path]:
         """Alle root/JJJJ/*/ met meta.md, gesorteerd; '_'- en '.'-mappen overgeslagen."""

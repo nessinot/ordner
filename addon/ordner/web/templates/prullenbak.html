@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% set paginatitel = 'Prullenbak' %}
+{% block content %}
+<div class="kop">
+  <h2>Prullenbak</h2>
+  <span class="gedempt">{% if items %}{{ items|length }} item{% if items|length != 1 %}s{% endif %} · {{ grootte }}{% else %}leeg{% endif %}</span>
+</div>
+
+<section class="paneel">
+{% if items %}
+  <ul class="bestandslijst prullenbak">
+    {% for item in items %}
+    <li>
+      <span class="bestand-naam">{{ item.titel }}</span>
+      <span class="gedempt klein"><code>{{ item.naam }}</code>{% if item.documentdatum %} · {{ item.documentdatum.isoformat() }}{% endif %} · {{ item.bestanden }} bestand{% if item.bestanden != 1 %}en{% endif %} · {{ item.grootte }}</span>
+      <form method="post" action="{{ url_for('prullenbak_verwijder') }}">
+        <input type="hidden" name="naam" value="{{ item.naam }}">
+        <button type="submit" class="gevaar" onclick="return confirm('Definitief verwijderen? Dit kan niet ongedaan gemaakt worden.')">Definitief verwijderen</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p class="leeg">De prullenbak is leeg.</p>
+  <p class="hint">Documenten die je verwijdert komen in <code>{{ prullenbak_map }}</code> terecht.</p>
+{% endif %}
+  <form method="post" action="{{ url_for('prullenbak_leeg') }}">
+    <div class="knoppen">
+      <button type="submit" class="gevaar"{% if not items %} disabled{% endif %} onclick="return confirm('Alles in de prullenbak definitief verwijderen? Dit kan niet ongedaan gemaakt worden.')">Prullenbak legen</button>
+    </div>
+  </form>
+  <p class="hint">Terugzetten kan door de map met Samba of de Verkenner terug te verplaatsen naar de jaarmap en daarna Cache verversen te gebruiken op de beheerpagina.</p>
+</section>
+{% endblock %}

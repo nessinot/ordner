@@ -2,6 +2,13 @@
 
 Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. Nieuwste versie bovenaan; de bovenste kop moet gelijk zijn aan `version` in `config.yaml` (dat controleert `tests/test_addon_config.py`).
 
+## 0.13.0 (2026-09-06)
+
+- Nieuwe pagina **Prullenbak**, bereikbaar via de beheerpagina. Je ziet wat er in `_prullenbak/` staat: per weggegooid document de titel, de mapnaam (zoals je die via Samba terugziet), de documentdatum, het aantal bestanden en de grootte. Tot nu toe was een verwijderd document in de app onzichtbaar en kon je alleen via Samba opruimen.
+- Per item een knop **Definitief verwijderen** en bovenaan een knop **Prullenbak legen**. Beide vragen eerst om bevestiging. Dit kan niet ongedaan gemaakt worden; de map wordt echt van schijf gehaald. Terugzetten werkt zoals voorheen: de map met Samba of de Verkenner terug naar de jaarmap en daarna **Cache verversen**.
+- De beheerpagina heeft een tabel **Prullenbak** met het aantal items (live bijgewerkt, met een link naar de pagina) en de totale grootte.
+- Ordner ruimt de prullenbak nooit vanzelf op; legen doe je zelf.
+
 ## 0.12.1 (2026-09-05)
 
 - Het eerste tabblad heet **Documenten** in plaats van **Zoeken**. Het is de pagina met je documenten; zoeken doe je in het veld bovenaan. De link bovenaan de documentpagina heet daarom **Terug naar documenten** (na een zoekopdracht nog steeds **Terug naar zoekresultaten**).

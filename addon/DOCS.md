@@ -149,11 +149,22 @@ De omschrijving wordt nooit automatisch ingevuld. Klopt een voorstel niet, pas h
 
 ## Prullenbak
 
-"Verwijderen" op de documentpagina verplaatst de hele documentmap naar `/share/ordner/_prullenbak/`. Er wordt niets echt gewist. Terugzetten doe je door de map met Samba of de Verkenner terug te verplaatsen naar de juiste jaarmap en daarna "Cache verversen" te gebruiken op de beheerpagina. Definitief opruimen doe je door de map uit `_prullenbak` te verwijderen.
+"Verwijderen" op de documentpagina verplaatst de hele documentmap naar `/share/ordner/_prullenbak/`. Er wordt dan nog niets echt gewist. Ordner ruimt de prullenbak nooit vanzelf op.
+
+De pagina **Prullenbak** (via de beheerpagina, tabel Prullenbak) laat zien wat erin staat. Per weggegooid document zie je de titel, de mapnaam (zo heet de map als je via Samba kijkt), de documentdatum, het aantal bestanden en de grootte. Losse bestanden die iemand rechtstreeks in `_prullenbak/` heeft gezet staan er ook in. De nieuwste documentdatum staat bovenaan. Wanneer iets is weggegooid weet Ordner niet; dat staat nergens.
+
+Definitief opruimen doe je op die pagina:
+
+- **Definitief verwijderen** achter een item haalt die ene map van schijf.
+- **Prullenbak legen** haalt alles weg. Lukt dat bij een item niet (bijvoorbeeld een alleen-lezen bestand), dan meldt de pagina hoeveel er zijn blijven staan en staat de reden in het add-on-log.
+
+Beide knoppen vragen eerst om bevestiging. Daarna is er geen weg terug: de bestanden zijn echt weg en staan ook niet meer in een back-up die je daarna maakt.
+
+**Terugzetten** doe je door de map met Samba of de Verkenner terug te verplaatsen naar de juiste jaarmap en daarna **Cache verversen** te gebruiken op de beheerpagina. Let op: wat in de prullenbak staat telt niet mee bij het herkennen van dubbele bestanden. Gooi je een document weg, upload je hetzelfde bestand opnieuw en zet je daarna de oude map via Samba terug, dan heb je het twee keer.
 
 ## Beheerpagina
 
-De beheerpagina toont twee tabellen met tellers, wat er nu gelezen wordt en het rapport van de laatste verversing. De tellers worden elke paar seconden bijgewerkt zonder dat je de pagina hoeft te verversen.
+De beheerpagina toont drie tabellen met tellers, wat er nu gelezen wordt en het rapport van de laatste verversing. De tellers worden elke paar seconden bijgewerkt zonder dat je de pagina hoeft te verversen.
 
 **Documenten** telt documenten (mappen met een `meta.md`):
 
@@ -169,6 +180,11 @@ De beheerpagina toont twee tabellen met tellers, wat er nu gelezen wordt en het 
 - **Totaal**: alle bestanden die direct in de inboxmap liggen, ook de bestanden die Ordner nog aan het beoordelen of lezen is en de bestanden waar iemand op dat moment via **Opnemen** een titel aan geeft. De submappen `.tekst/` en `_dubbel/` tellen niet mee.
 - **Wacht op titel**: de bestanden zonder herkende afzender, met een link naar de inboxpagina. Het verschil met het totaal is wat nog beoordeeld wordt of waar iemand mee bezig is.
 - **Dubbel**: bestanden die al in de ordner stonden en daarom naar `_inbox/_dubbel/` zijn verplaatst. Ordner ruimt die map niet op; kijk er af en toe in en gooi weg wat je niet meer nodig hebt.
+
+**Prullenbak** telt wat er in `/share/ordner/_prullenbak/` staat (zie "Prullenbak"):
+
+- **Items**: weggegooide documenten (mappen) plus losse bestanden, met een link naar de prullenbakpagina.
+- **Grootte**: hoeveel schijfruimte de prullenbak in totaal inneemt. Deze rij is de stand bij het laden van de pagina; het aantal items wordt wel live bijgewerkt.
 
 De knop **Cache verversen en ontbrekende tekst extraheren** doet in één keer:
 

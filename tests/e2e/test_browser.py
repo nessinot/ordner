@@ -190,6 +190,24 @@ def test_verwijderen_met_confirm(page: Page, server: Server) -> None:
     assert (server.archief / "_prullenbak" / doc.name).is_dir()
 
 
+def test_prullenbak_legen_met_confirm(page: Page, server: Server) -> None:
+    """Pakket 19: het zojuist weggegooide document staat op de prullenbakpagina; Prullenbak legen haalt het van schijf."""
+    doc = _doc_map(server)
+    weg = server.archief / "_prullenbak" / doc.name
+    assert weg.is_dir()
+    page.goto(server.url + "/prullenbak")
+    expect(page.locator("ul.prullenbak .bestand-naam").first).to_contain_text("E2E factuur")
+    expect(page.locator("ul.prullenbak")).to_contain_text(doc.name)
+    page.once("dialog", lambda dialog: dialog.accept())
+    page.get_by_role("button", name="Prullenbak legen").click()
+
+    page.wait_for_url(re.compile(r"m=Prullenbak"))
+    expect(page.locator(".melding")).to_have_text("Prullenbak geleegd")
+    expect(page.locator(".paneel")).to_contain_text("De prullenbak is leeg.")
+    assert not weg.exists()
+    assert (server.archief / "_prullenbak").is_dir()
+
+
 def test_inbox(page: Page, server: Server) -> None:
     """Pakket 17: zonder herkende afzender wacht het bestand op de inboxpagina; met tesseract (bon-titel) wordt het zelf opgenomen."""
     inbox = server.archief / "_inbox" / "foto.jpg"
@@ -222,12 +240,14 @@ def test_beheer(page: Page, server: Server) -> None:
 
     page.wait_for_url(re.compile(r"/beheer\?m="))
     deadline = time.monotonic() + 10
-    while page.locator(".beheer table").count() < 3 and time.monotonic() < deadline:
+    while page.locator(".beheer table").count() < 4 and time.monotonic() < deadline:
         time.sleep(1)
         page.reload()
-    assert page.locator(".beheer table").count() == 3, "geen rapport van de laatste verversing"  # Documenten, Inbox, rapport
+    assert page.locator(".beheer table").count() == 4, "geen rapport van de laatste verversing"  # Documenten, Inbox, Prullenbak, rapport
     expect(page.locator(".beheer")).to_contain_text("Inbox verwerkt")
     expect(page.locator('[data-tel="inbox-wachtend"]')).to_have_attribute("href", re.compile(r"/inbox$"))
+    expect(page.locator('[data-tel="prullenbak-aantal"]')).to_have_attribute("href", re.compile(r"/prullenbak$"))
+    expect(page.locator('[data-tel="prullenbak-aantal"]')).to_have_text("0")  # test_prullenbak_legen_met_confirm heeft hem geleegd
 
 
 def test_ingress_prefix(browser: Browser, server: Server) -> None:
