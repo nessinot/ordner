@@ -1,5 +1,5 @@
 name: Ordner
-version: "0.13.1"
+version: "0.13.2"
 slug: ordner
 description: "Digitale ordner voor je documenten: mappen, originelen en leesbare tekst, geen database"
 url: https://github.com/nessinot/ordner
@@ -9,7 +9,7 @@ arch:
 init: false
 ingress: true
 ingress_port: 8099
-panel_icon: mdi:archive
+panel_icon: mdi:bookshelf
 panel_title: Ordner
 map:
   - share:rw

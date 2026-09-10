@@ -2,6 +2,10 @@
 
 Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. Nieuwste versie bovenaan; de bovenste kop moet gelijk zijn aan `version` in `config.yaml` (dat controleert `tests/test_addon_config.py`).
 
+## 0.13.2 (2026-09-10)
+
+- Het icoon van Ordner in de zijbalk van Home Assistant is nu een boekenplank (`mdi:bookshelf`) in plaats van een archiefdoos, passend bij het nieuwe add-on-icoon. Verandert het icoon niet direct, herstart dan de add-on of herlaad de pagina.
+
 ## 0.13.1 (2026-09-10)
 
 - De add-on heeft nu een eigen icoon en logo: drie ordners op een plank. Je ziet het icoon in de lijst met add-ons en het logo bovenaan de pagina van de add-on. Aan de app zelf verandert niets.
