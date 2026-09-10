@@ -5,3 +5,4 @@ tests/fixtures/*.pdf binary
 tests/fixtures/*.png binary
 tests/fixtures/*.jpg binary
 tests/fixtures/*.heic binary
+addon/*.png binary

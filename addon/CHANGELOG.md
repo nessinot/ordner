@@ -2,6 +2,10 @@
 
 Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. Nieuwste versie bovenaan; de bovenste kop moet gelijk zijn aan `version` in `config.yaml` (dat controleert `tests/test_addon_config.py`).
 
+## 0.13.1 (2026-09-10)
+
+- De add-on heeft nu een eigen icoon en logo: drie ordners op een plank. Je ziet het icoon in de lijst met add-ons en het logo bovenaan de pagina van de add-on. Aan de app zelf verandert niets.
+
 ## 0.13.0 (2026-09-06)
 
 - Nieuwe pagina **Prullenbak**, bereikbaar via de beheerpagina. Je ziet wat er in `_prullenbak/` staat: per weggegooid document de titel, de mapnaam (zoals je die via Samba terugziet), de documentdatum, het aantal bestanden en de grootte. Tot nu toe was een verwijderd document in de app onzichtbaar en kon je alleen via Samba opruimen.
