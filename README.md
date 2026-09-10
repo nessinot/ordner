@@ -62,4 +62,3 @@ Vink in de Tesseract-installer de Nederlandse taaldata aan en zorg dat `tesserac
 - `addon/ordner/`: het Python-package; `addon/ordner/web/` de FastAPI-app met templates.
 - `tests/`: pytest.
 - `CLAUDE.md`: ontwerpbeslissingen en conventies.
-- `IDEAS.md`: wat bewust niet in v1 zit.

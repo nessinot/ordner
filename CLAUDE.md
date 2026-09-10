@@ -2,7 +2,7 @@
 
 Minimale digitale ordner voor documenten (facturen, bonnen, digitale post, etc.; privé of zakelijk) als lokale Home Assistant add-on via Ingress. Kernprincipe: **de bestanden op schijf zijn de waarheid**. Mappen, originelen, één leesbare `meta.md` per document en OCR-tekst als `.txt` ernaast. Alles blijft bruikbaar zonder de app. Geen database.
 
-Werkpakketten en het bindende interface-contract staan in `werk/`. Die map is **lokaal en staat niet in git** (`.gitignore`); verwijzingen naar `werk/…` in dit bestand gelden alleen voor de lokale werkkopie. Houd het klein; ideeën gaan naar `IDEAS.md`.
+Werkpakketten en het bindende interface-contract staan in `werk/`. Die map is **lokaal en staat niet in git** (`.gitignore`); verwijzingen naar `werk/…` in dit bestand gelden alleen voor de lokale werkkopie. Houd het klein; ideeën gaan naar `IDEAS.md` (ook lokaal, niet in git).
 
 ## Ontwerpbeslissingen
 
@@ -33,7 +33,7 @@ Werkpakketten en het bindende interface-contract staan in `werk/`. Die map is **
 
 ## Niet in v1
 
-Meerdere gebruikers, versiebeheer, autoclassificatie, tag-beheer, map-hernoemen, MCP-server, "alles opnieuw OCR'en", prullenbak terugzetten. Ideeën → `IDEAS.md`.
+Meerdere gebruikers, versiebeheer, autoclassificatie, tag-beheer, map-hernoemen, MCP-server, "alles opnieuw OCR'en", prullenbak terugzetten. Ideeën → `IDEAS.md` (lokaal, niet in git).
 
 ## Conventies
 
