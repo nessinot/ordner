@@ -54,9 +54,14 @@ class Dubbel:
 
 def zoek_dubbelen(index: Index, bestanden: Iterable[tuple[str, bytes]]) -> list[Dubbel]:
     """Voor elk aangeboden (naam, bytes) met een treffer in de index één `Dubbel`, in aangeboden volgorde."""
+    return zoek_dubbelen_van_hashes(index, ((naam, sha256_van(data)) for naam, data in bestanden))
+
+
+def zoek_dubbelen_van_hashes(index: Index, hashes: Iterable[tuple[str, str]]) -> list[Dubbel]:
+    """Als `zoek_dubbelen`, maar met al berekende (naam, sha256)-paren; voor terugzetten uit de prullenbak (pakket 20)."""
     dubbelen: list[Dubbel] = []
-    for naam, data in bestanden:
-        treffer = index.zoek_hash(sha256_van(data))
+    for naam, h in hashes:
+        treffer = index.zoek_hash(h)
         if treffer is None:
             continue
         entry, bestand = treffer

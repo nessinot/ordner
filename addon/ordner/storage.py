@@ -1,4 +1,4 @@
-"""Archief op schijf: mappen, bestanden, prullenbak (pakket 03; pakket 19: prullenbak kijken en legen)."""
+"""Archief op schijf: mappen, bestanden, prullenbak (pakket 03; pakket 19: prullenbak kijken en legen; pakket 20: terugzetten)."""
 
 from __future__ import annotations
 
@@ -21,6 +21,8 @@ _ONVEILIG = re.compile(r"[^A-Za-z0-9._ -]")
 _JAAR = re.compile(r"[0-9]{4}")
 _FALLBACK_NAAM = "bestand"
 _TMP_PREFIX = ".tmp-"
+_PRULLENBAK_SUFFIX = re.compile(r"_[0-9]{8}-[0-9]{6}$")  # conflict-tijdstempel van naar_prullenbak
+_JAARPREFIX = re.compile(r"^[0-9]{4}-")
 
 
 class OngeldigPad(Exception):
@@ -39,6 +41,17 @@ class PrullenbakItem:
     grootte: int  # bytes, recursief; 0 bij met_grootte=False
 
 
+@dataclass(frozen=True)
+class PrullenbakDocument:
+    """Eén weggegooide documentmap, voor de kijkpagina en Terugzetten (pakket 20)."""
+
+    naam: str
+    map: Path
+    meta: Meta | None  # None zonder leesbare meta.md
+    bestanden: list[str]  # meta.bestanden, anders gewone bestanden in de map
+    jaar: str | None  # jaarmap waar Terugzetten hem neerzet; None -> niet terugzetbaar
+
+
 def _map_grootte(map: Path) -> int:
     """Som van de bestandsgroottes onder `map`, recursief; symlinks niet gevolgd, OSError per bestand overgeslagen."""
     totaal = 0
@@ -51,19 +64,24 @@ def _map_grootte(map: Path) -> int:
     return totaal
 
 
-def _tel_gewone_bestanden(map: Path) -> int:
-    """Bestanden direct in `map` zonder meta.md, "."-namen en .txt (fallback zonder leesbare meta.md)."""
-    n = 0
+def _gewone_bestanden(map: Path) -> list[str]:
+    """Bestandsnamen direct in `map` zonder meta.md, "."-namen en .txt, gesorteerd (fallback zonder leesbare meta.md)."""
+    namen: list[str] = []
     try:
         for p in map.iterdir():
             try:
                 if p.is_file() and not p.name.startswith(".") and p.name != META_NAAM and p.suffix.lower() != ".txt":
-                    n += 1
+                    namen.append(p.name)
             except OSError:
                 continue
     except OSError:
-        return 0
-    return n
+        pass
+    return sorted(namen)
+
+
+def _tel_gewone_bestanden(map: Path) -> int:
+    """Aantal gewone bestanden in `map` (zie `_gewone_bestanden`)."""
+    return len(_gewone_bestanden(map))
 
 
 def _saneer_naam(naam: str) -> str:
@@ -260,6 +278,67 @@ class Archief:
                 verwijderd += 1
         log.info("prullenbak geleegd: %d verwijderd, %d mislukt", verwijderd, mislukt)
         return verwijderd, mislukt
+
+    # --- prullenbak: kijken in een document en terugzetten (pakket 20) -----
+
+    def prullenbak_document(self, naam: str) -> PrullenbakDocument:
+        """Een weggegooide documentmap voor de kijkpagina; via `prullenbak_pad`.
+
+        Raises OngeldigPad als het item geen map is (los bestand of symlink). Zonder leesbare `meta.md`
+        is `meta` None en komen de bestanden uit de map zelf.
+        """
+        pad = self.prullenbak_pad(naam)
+        if pad.is_symlink() or not pad.is_dir():
+            raise OngeldigPad(f"geen documentmap in de prullenbak: {naam!r}")
+        meta: Meta | None
+        try:
+            meta = lees_meta(pad)
+        except (MetaFout, OSError):
+            meta = None
+        bestanden = list(meta.bestanden) if meta is not None else _gewone_bestanden(pad)
+        return PrullenbakDocument(naam, pad, meta, bestanden, self._terugzet_jaar(naam, meta))
+
+    def prullenbak_bestand(self, naam: str, bestand: str) -> Path:
+        """Een bestaand bestand direct in `_prullenbak/<naam>/`; raises OngeldigPad bij alles wat daarbuiten wijst."""
+        map = self.prullenbak_document(naam).map
+        _controleer_component(bestand)
+        if bestand.startswith(".") or Path(bestand).name != bestand:
+            raise OngeldigPad(f"ongeldige bestandsnaam: {bestand!r}")
+        pad = (map / bestand).resolve()
+        if pad.parent != map or pad.name != bestand or not pad.is_file():
+            raise OngeldigPad(f"bestand niet in de prullenbakmap: {bestand!r}")
+        return pad
+
+    def herstel_uit_prullenbak(self, naam: str) -> Path:
+        """Verplaatst `_prullenbak/<naam>` terug naar de jaarmap en geeft de nieuwe absolute map terug.
+
+        Het jaar komt uit de mapnaam (`JJJJ-...`), anders uit `meta.documentdatum`; zonder beide OngeldigPad.
+        De conflict-tijdstempel `_JJJJMMDD-HHMMSS` van `naar_prullenbak` wordt gestript; bestaat de naam in
+        de jaarmap al, dan `_2`, `_3`, ... zoals bij aanmaken. Dubbelen controleert de aanroeper (pakket 16).
+        """
+        item = self.prullenbak_document(naam)
+        if item.jaar is None:
+            raise OngeldigPad(f"geen jaar te bepalen voor {naam!r}")
+        jaarmap = self.root / item.jaar
+        basis = _PRULLENBAK_SUFFIX.sub("", naam) or naam
+        doel = jaarmap / basis
+        n = 2
+        while doel.exists():
+            doel = jaarmap / f"{basis}_{n}"
+            n += 1
+        jaarmap.mkdir(exist_ok=True)
+        shutil.move(str(item.map), str(doel))
+        log.info("teruggezet uit de prullenbak: %s -> %s", naam, self.relatief(doel))
+        return doel
+
+    @staticmethod
+    def _terugzet_jaar(naam: str, meta: Meta | None) -> str | None:
+        """Jaarmap voor Terugzetten: de eerste vier tekens van `JJJJ-...`, anders het jaar van de documentdatum."""
+        if _JAARPREFIX.match(naam):
+            return naam[:4]
+        if meta is not None:
+            return f"{meta.documentdatum.year:04d}"
+        return None
 
     def documentmappen(self) -> list[Path]:
         """Alle root/JJJJ/*/ met meta.md, gesorteerd; '_'- en '.'-mappen overgeslagen."""

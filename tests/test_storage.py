@@ -387,3 +387,89 @@ def test_leeg_prullenbak_gaat_door_na_fout(archief: Archief, monkeypatch: pytest
     assert archief.leeg_prullenbak() == (2, 1)
     assert eerste.exists() and not tweede.exists() and not los.exists()
     assert archief.trash_dir.is_dir()
+
+
+# --- prullenbak: kijken in een document en terugzetten (pakket 20) ----------------
+
+
+def test_prullenbak_document(archief: Archief) -> None:
+    eerste, tweede, _los = _vul_prullenbak(archief)
+    item = archief.prullenbak_document(eerste.name)
+    assert item.naam == eerste.name and item.map == eerste
+    assert item.meta is not None and item.meta.titel == "WOZ-beschikking 2026"
+    assert item.bestanden == ["a.pdf", "b.jpg"]
+    assert item.jaar == "2026"
+    assert archief.prullenbak_document(tweede.name).jaar == "2026"  # ook met conflict-tijdstempel
+
+
+def test_prullenbak_document_zonder_meta(archief: Archief) -> None:
+    map = archief.trash_dir / "2024-05-05_kaal"
+    map.mkdir()
+    (map / "scan.pdf").write_bytes(b"pdf")
+    (map / "scan.pdf.txt").write_text("x", encoding="utf-8")
+    (map / ".stil").write_bytes(b"x")
+    item = archief.prullenbak_document("2024-05-05_kaal")
+    assert item.meta is None
+    assert item.bestanden == ["scan.pdf"]
+    assert item.jaar == "2024"
+
+
+def test_prullenbak_document_jaar_uit_meta_of_geen(archief: Archief) -> None:
+    doc = _doc(archief)
+    doel = archief.trash_dir / "hernoemd-via-samba"
+    doc.rename(doel)
+    assert archief.prullenbak_document("hernoemd-via-samba").jaar == "2026"  # meta.documentdatum
+    (archief.trash_dir / "leeg").mkdir()
+    assert archief.prullenbak_document("leeg").jaar is None
+    with pytest.raises(OngeldigPad):
+        archief.herstel_uit_prullenbak("leeg")
+
+
+@pytest.mark.parametrize("naam", ["los.pdf", "bestaat-niet", "", "..", ".DS_Store", "a/b"])
+def test_prullenbak_document_ongeldig(archief: Archief, naam: str) -> None:
+    _vul_prullenbak(archief)
+    with pytest.raises(OngeldigPad):
+        archief.prullenbak_document(naam)
+
+
+def test_prullenbak_bestand(archief: Archief) -> None:
+    eerste, _tweede, _los = _vul_prullenbak(archief)
+    assert archief.prullenbak_bestand(eerste.name, "a.pdf") == eerste / "a.pdf"
+    assert archief.prullenbak_bestand(eerste.name, "a.pdf.txt") == eerste / "a.pdf.txt"
+    (archief.root / "buiten.pdf").write_bytes(b"x")
+    for bestand in ("", ".", "..", "meta.md" + "/", "nietbestaand.pdf", "../los.pdf", "..\\..\\buiten.pdf", ".tmp-x", "sub/a.pdf"):
+        with pytest.raises(OngeldigPad):
+            archief.prullenbak_bestand(eerste.name, bestand)
+    with pytest.raises(OngeldigPad):
+        archief.prullenbak_bestand("los.pdf", "x")
+    # een submap is geen bestand
+    (eerste / "sub").mkdir()
+    with pytest.raises(OngeldigPad):
+        archief.prullenbak_bestand(eerste.name, "sub")
+
+
+def test_herstel_uit_prullenbak(archief: Archief) -> None:
+    eerste, tweede, _los = _vul_prullenbak(archief)
+    doc = archief.herstel_uit_prullenbak(eerste.name)
+    assert doc == archief.root / "2026" / "2026-03-01_woz-beschikking-2026"
+    assert (doc / "a.pdf").read_bytes() == b"%PDF 1234" and (doc / "a.pdf.txt").exists() and (doc / META_NAAM).exists()
+    assert not eerste.exists() and archief.trash_dir.is_dir()
+    assert archief.relatief(doc) in {archief.relatief(m) for m in archief.documentmappen()}
+    # de tweede (met tijdstempel): gestript, naam bezet -> _2
+    doc2 = archief.herstel_uit_prullenbak(tweede.name)
+    assert doc2 == archief.root / "2026" / "2026-03-01_woz-beschikking-2026_2"
+    assert not tweede.exists()
+
+
+def test_herstel_uit_prullenbak_maakt_jaarmap(archief: Archief) -> None:
+    doc = archief.maak_document("Oud", date(2019, 1, 2))
+    weg = archief.naar_prullenbak(doc)
+    (archief.root / "2019").rmdir()
+    assert archief.herstel_uit_prullenbak(weg.name) == archief.root / "2019" / "2019-01-02_oud"
+
+
+def test_herstel_uit_prullenbak_ongeldig(archief: Archief) -> None:
+    _vul_prullenbak(archief)
+    for naam in ("los.pdf", "bestaat-niet", "..", ""):
+        with pytest.raises(OngeldigPad):
+            archief.herstel_uit_prullenbak(naam)

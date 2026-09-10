@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% set paginatitel = titel %}
+{% block content %}
+<section class="document prullenbak-document">
+  <p class="terug">
+    <a href="{{ url_for('prullenbak') }}">
+      <svg class="icoon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+      Terug naar de prullenbak
+    </a>
+  </p>
+  <div class="dockop">
+  <div class="kop">
+    <h2>{{ titel }}</h2>
+    {% if meta %}<span class="datum">{{ meta.documentdatum.isoformat() }}</span>{% endif %}
+    <span class="badge badge-prullenbak" title="Dit document staat in de prullenbak. Zet het terug om het te bewerken of te doorzoeken.">in de prullenbak</span>
+  </div>
+  {% if meta and meta.omschrijving %}<p class="omschrijving">{{ meta.omschrijving }}</p>{% endif %}
+  {% if meta and meta.tags %}
+  <p class="badges">{% for tag in meta.tags %}<span class="badge badge-tag">{{ tag }}</span>{% endfor %}</p>
+  {% endif %}
+  {% if not meta %}<p class="hint">De map heeft geen leesbare <code>meta.md</code>; getoond wordt wat er aan bestanden in staat.</p>{% endif %}
+  </div>
+
+  <section class="paneel">
+    <h3>Bestanden</h3>
+    {% if not bestanden %}<p class="leeg">Geen bestanden.</p>{% endif %}
+    {% for b in bestanden %}
+    {% set url = url_for('prullenbak_bestand', naam=naam, bestand=b.naam) %}
+    {% set kijk_url = url_for('prullenbak_bekijk', naam=naam, bestand=b.naam) %}
+    <div class="bestand">
+      <div class="bestand-kop">
+        <span class="bestand-naam">{{ b.naam }}</span>
+        {% if b.tekst_aanwezig %}<span class="badge">tekst aanwezig</span>{% endif %}
+        <a class="knop" href="{{ kijk_url }}">Open</a>
+      </div>
+      {% if b.soort == 'afbeelding' %}
+      <img src="{{ url }}" alt="{{ b.naam }}" loading="lazy">
+      {% elif b.soort == 'pdf' %}
+      <object type="application/pdf" data="{{ url }}">Kan de pdf hier niet tonen. <a href="{{ kijk_url }}">Open de pdf</a>.</object>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </section>
+
+  {% if meta and meta.notities %}
+  <section class="paneel">
+    <h3>Notities</h3>
+    <pre class="notities">{{ meta.notities }}</pre>
+  </section>
+  {% endif %}
+
+  <section class="paneel">
+    <h3>Acties</h3>
+    {% set dubbelen_gevolg = 'het document is niet teruggezet' %}
+    {% include "_dubbelen.html" %}
+    <div class="knoppen">
+      {% if jaar %}
+      <form method="post" action="{{ url_for('prullenbak_terugzetten') }}">
+        <input type="hidden" name="naam" value="{{ naam }}">
+        <button type="submit">Terugzetten</button>
+      </form>
+      {% endif %}
+      <form method="post" action="{{ url_for('prullenbak_verwijder') }}">
+        <input type="hidden" name="naam" value="{{ naam }}">
+        <button type="submit" class="gevaar" onclick="return confirm('Definitief verwijderen? Dit kan niet ongedaan gemaakt worden.')">Definitief verwijderen</button>
+      </form>
+    </div>
+    {% if jaar %}
+    <p class="hint">Terugzetten zet de map terug in de jaarmap <code>{{ jaar }}/</code>; daarna is het document weer te bewerken en te doorzoeken.</p>
+    {% else %}
+    <p class="hint">Deze map kan niet automatisch teruggezet worden: de naam begint niet met een jaar en er is geen leesbare documentdatum. Verplaats hem met Samba of de Verkenner naar de juiste jaarmap en gebruik daarna Cache verversen op de beheerpagina.</p>
+    {% endif %}
+    <p class="mapinfo">Map <code>_prullenbak/{{ naam }}</code> in <code>{{ prullenbak_map }}</code></p>
+  </section>
+</section>
+{% endblock %}

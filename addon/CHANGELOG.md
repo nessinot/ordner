@@ -2,6 +2,13 @@
 
 Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. Nieuwste versie bovenaan; de bovenste kop moet gelijk zijn aan `version` in `config.yaml` (dat controleert `tests/test_addon_config.py`).
 
+## 0.14.0 (2026-09-10)
+
+- Een document in de prullenbak is weer te openen: klik op de prullenbakpagina op de titel en je ziet de bestanden, de gegevens en de notities, net als op de gewone documentpagina. Bewerken kan daar niet; daarvoor zet je het document eerst terug.
+- **Terugzetten**: met één knop op die pagina gaat het document terug naar zijn jaarmap en is het meteen weer te doorzoeken. Is een van de bestanden inmiddels al in een ander document opgeslagen, dan weigert Ordner het terugzetten en laat zien in welk document het bestand staat.
+- **Ongedaan maken**: direct na "Verwijderen" staat in de groene melding een knop Ongedaan maken, zodat een misklik meteen te herstellen is.
+- De hint om een map via Samba terug te zetten is van de prullenbakpagina verdwenen; dat kan nog steeds, maar hoeft niet meer.
+
 ## 0.13.2 (2026-09-10)
 
 - Het icoon van Ordner in de zijbalk van Home Assistant is nu een boekenplank (`mdi:bookshelf`) in plaats van een archiefdoos, passend bij het nieuwe add-on-icoon. Verandert het icoon niet direct, herstart dan de add-on of herlaad de pagina.

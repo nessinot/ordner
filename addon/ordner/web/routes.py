@@ -1,4 +1,4 @@
-"""Routes van de webapp (pakket 08: zoeken, upload, bestand-serving; pakket 09: document, beheer, status; pakket 15b: tweestaps upload; pakket 16: dubbele bestanden; pakket 17: inbox wacht op een titel; pakket 18: beheertellers; pakket 19: prullenbak kijken en legen)."""
+"""Routes van de webapp (pakket 08: zoeken, upload, bestand-serving; pakket 09: document, beheer, status; pakket 15b: tweestaps upload; pakket 16: dubbele bestanden; pakket 17: inbox wacht op een titel; pakket 18: beheertellers; pakket 19: prullenbak kijken en legen; pakket 20: prullenbak kijken in een document en terugzetten)."""
 
 from __future__ import annotations
 
@@ -13,13 +13,14 @@ from pathlib import Path
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
+from starlette.datastructures import URL
 
-from ordner.dubbel import Dubbel, sha256_van, zoek_dubbelen
+from ordner.dubbel import Dubbel, sha256_van, sha256_van_bestand, zoek_dubbelen, zoek_dubbelen_van_hashes
 from ordner.index import DocEntry, Index, Reconciler
 from ordner.ingest import LeesTekst, Voorbereid, lees_vooraf, maak_document_uit_voorbereid
 from ordner.meta import MetaFout, OcrStatus, is_extraheerbaar, schrijf_meta, txt_pad
 from ordner.search import zoek
-from ordner.storage import Archief, OngeldigPad, PrullenbakItem
+from ordner.storage import Archief, OngeldigPad, PrullenbakDocument, PrullenbakItem
 from ordner.suggestie import Suggestie, stel_voor
 from ordner.web.openstaand import OpenstaandeUpload, OpenstaandeUploads
 from ordner.worker import OcrQueue
@@ -94,14 +95,20 @@ def _redirect(
     melding: str | None = None,
     /,
     query: dict[str, str] | None = None,
+    ongedaan: str | None = None,
     **path_params: str,
 ) -> RedirectResponse:
-    """303-redirect via url_for (Ingress-prefix); pad zonder scheme/host. `query` (bv. de zoekopdracht) gaat mee."""
+    """303-redirect via url_for (Ingress-prefix); pad zonder scheme/host. `query` (bv. de zoekopdracht) gaat mee.
+
+    `ongedaan` is de prullenbaknaam waarmee de melding een knop Ongedaan maken krijgt (pakket 20).
+    """
     url = request.url_for(naam, **path_params)
     if query:
         url = url.include_query_params(**{k: v for k, v in query.items() if v})
     if melding:
         url = url.include_query_params(m=melding)
+    if ongedaan:
+        url = url.include_query_params(ongedaan=ongedaan)
     doel = url.path + (f"?{url.query}" if url.query else "")
     return RedirectResponse(doel, status_code=303)
 
@@ -514,6 +521,115 @@ async def prullenbak_leeg(request: Request) -> Response:
     return _redirect(request, "prullenbak", melding)
 
 
+# --- prullenbak: kijken in een document en terugzetten (pakket 20) -----------
+
+
+def _prullenbak_item(request: Request, naam: str) -> PrullenbakDocument:
+    """`PrullenbakDocument` voor een naam uit de URL of een formulier; 404 bij `OngeldigPad` (ook los bestand/symlink)."""
+    try:
+        return _archief(request).prullenbak_document(naam)
+    except OngeldigPad:
+        raise HTTPException(status_code=404, detail="Niet gevonden in de prullenbak") from None
+
+
+def _prullenbak_document_pagina(
+    request: Request, item: PrullenbakDocument, dubbelen: list[Dubbel] | None = None, status_code: int = 200
+) -> Response:
+    meta = item.meta
+    bestanden = [Bestandsweergave(n, _soort(n), txt_pad(item.map / n).exists()) for n in item.bestanden]
+    ctx = {
+        "naam": item.naam,
+        "meta": meta,
+        "titel": meta.titel if meta is not None else item.naam,
+        "bestanden": bestanden,
+        "jaar": item.jaar,  # None -> geen knop Terugzetten
+        "prullenbak_map": str(_archief(request).trash_dir),
+        "dubbelen": dubbelen or [],
+    }
+    return _templates(request).TemplateResponse(request, "prullenbak_document.html", ctx, status_code=status_code)
+
+
+@router.get("/prullenbak/{naam}", name="prullenbak_document")
+async def prullenbak_document(request: Request, naam: str) -> Response:
+    """Kijkpagina voor een weggegooid document: inhoud zoals op de documentpagina, knoppen Terugzetten en Definitief verwijderen."""
+    item = await asyncio.to_thread(_prullenbak_item, request, naam)
+    return _prullenbak_document_pagina(request, item)
+
+
+@router.get("/prullenbak/{naam}/bekijk/{bestand}", name="prullenbak_bekijk")
+async def prullenbak_bekijk(request: Request, naam: str, bestand: str) -> Response:
+    item = _prullenbak_item(request, naam)
+    try:
+        _archief(request).prullenbak_bestand(naam, bestand)
+    except OngeldigPad:
+        raise HTTPException(status_code=404, detail="Bestand niet gevonden") from None
+    return _bekijk_pagina(
+        request,
+        bestand,
+        url=_pad_van(request.url_for("prullenbak_bestand", naam=naam, bestand=bestand)),
+        terug_url=_pad_van(request.url_for("prullenbak_document", naam=naam)),
+        terug_titel=item.meta.titel if item.meta is not None else item.naam,
+    )
+
+
+@router.get("/prullenbak/{naam}/bestand/{bestand}", name="prullenbak_bestand")
+async def prullenbak_bestand(request: Request, naam: str, bestand: str) -> Response:
+    try:
+        pad = _archief(request).prullenbak_bestand(naam, bestand)
+    except OngeldigPad:
+        raise HTTPException(status_code=404, detail="Bestand niet gevonden") from None
+    return FileResponse(
+        pad,
+        media_type=mimetypes.guess_type(bestand)[0] or "application/octet-stream",
+        content_disposition_type="inline",
+        filename=bestand,
+    )
+
+
+def _hashes_van(item: PrullenbakDocument) -> list[tuple[str, str]]:
+    """(bestandsnaam, sha256) per bestand van de map: uit `meta.sha256`, anders van schijf; onleesbaar -> overgeslagen."""
+    bekend = item.meta.sha256 if item.meta is not None else {}
+    hashes: list[tuple[str, str]] = []
+    for n in item.bestanden:
+        h = bekend.get(n)
+        if h is None:
+            try:
+                h = sha256_van_bestand(item.map / n)
+            except OSError:
+                continue
+        hashes.append((n, h))
+    return hashes
+
+
+@router.post("/prullenbak/terugzetten", name="prullenbak_terugzetten")
+async def prullenbak_terugzetten(request: Request, naam: str = Form("")) -> Response:
+    """Zet een weggegooid document terug in de jaarmap; geweigerd (409) als een bestand al in een ander document staat."""
+    item = await asyncio.to_thread(_prullenbak_item, request, naam)
+    if item.jaar is None:
+        raise HTTPException(status_code=404, detail="Niet terug te zetten: geen jaar bekend")
+    archief = _archief(request)
+    index = _index(request)
+    dubbelen = zoek_dubbelen_van_hashes(index, await asyncio.to_thread(_hashes_van, item))
+    if dubbelen:
+        _log_dubbelen(f"terugzetten van {naam} geweigerd", dubbelen)
+        return _prullenbak_document_pagina(request, item, dubbelen=dubbelen, status_code=409)
+    try:
+        doc = await asyncio.to_thread(archief.herstel_uit_prullenbak, naam)
+    except OngeldigPad:
+        raise HTTPException(status_code=404, detail="Niet gevonden in de prullenbak") from None
+    try:
+        entry = index.herlaad(archief, doc)
+    except MetaFout:
+        entry = None  # map zonder leesbare meta.md: de reconciler maakt er een en neemt hem dan op
+    if entry is not None and entry.meta.ocr == "pending":
+        queue = _queue(request)
+        for n in entry.meta.bestanden:
+            if is_extraheerbaar(n) and not txt_pad(doc / n).exists():
+                queue.enqueue(doc, n)
+    jaar, map = _splits_rel(archief.relatief(doc))
+    return _redirect(request, "document", "Teruggezet", jaar=jaar, map=map)
+
+
 # --- document -------------------------------------------------------------
 
 _INLINE_AFBEELDING = {".jpg", ".jpeg", ".png"}
@@ -663,9 +779,11 @@ async def document_verwijder(
     entry = _entry(request, jaar, map)
     archief = _archief(request)
     rel = archief.relatief(entry.map)
-    archief.naar_prullenbak(entry.map)
+    doel = archief.naar_prullenbak(entry.map)
     _index(request).verwijder(rel)
-    return _redirect(request, "zoeken", "Verplaatst naar prullenbak", query=_herkomst(q, alles))
+    return _redirect(
+        request, "zoeken", "Verplaatst naar prullenbak", query=_herkomst(q, alles), ongedaan=doel.name
+    )
 
 
 @router.get("/doc/{jaar}/{map}/bekijk/{naam}", name="bekijk")
@@ -682,14 +800,27 @@ async def bekijk(request: Request, jaar: str, map: str, naam: str) -> Response:
         raise HTTPException(status_code=404, detail="Bestand niet gevonden") from None
     if not pad.is_file():
         raise HTTPException(status_code=404, detail="Bestand niet gevonden")
-    ctx = {
-        "meta": entry.meta,
-        "jaar": jaar,
-        "map": map,
-        "naam": naam,
-        "soort": _soort(naam),
-        "herkomst": _herkomst(request.query_params.get("q", ""), request.query_params.get("alles", "")),
-    }
+    herkomst = _herkomst(request.query_params.get("q", ""), request.query_params.get("alles", ""))
+    terug = request.url_for("document", jaar=jaar, map=map)
+    if herkomst["q"]:
+        terug = terug.include_query_params(**{k: v for k, v in herkomst.items() if v})
+    return _bekijk_pagina(
+        request,
+        naam,
+        url=_pad_van(request.url_for("bestand", jaar=jaar, map=map, naam=naam)),
+        terug_url=_pad_van(terug),
+        terug_titel=entry.meta.titel,
+    )
+
+
+def _pad_van(url: URL) -> str:
+    """Pad plus query van een `url_for`-resultaat, zonder scheme/host (zoals de Jinja-global `url_for`)."""
+    return url.path + (f"?{url.query}" if url.query else "")
+
+
+def _bekijk_pagina(request: Request, naam: str, url: str, terug_url: str, terug_titel: str) -> Response:
+    """`bekijk.html` voor een bestand in het archief of in de prullenbak (pakket 20)."""
+    ctx = {"naam": naam, "soort": _soort(naam), "url": url, "terug_url": terug_url, "terug_titel": terug_titel}
     return _templates(request).TemplateResponse(request, "bekijk.html", ctx)
 
 

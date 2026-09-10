@@ -265,6 +265,14 @@ ul.bestandslijst.inbox li button { min-height: 34px; padding: 0.2rem 1rem; }
 ul.bestandslijst.prullenbak li form { margin-left: auto; }
 ul.bestandslijst.prullenbak li button { min-height: 34px; padding: 0.2rem 1rem; }
 ul.bestandslijst.prullenbak code { font-size: 0.8rem; overflow-wrap: anywhere; }
+/* --- prullenbak: kijken en terugzetten (pakket 20) --------------------------- */
+ul.bestandslijst.prullenbak a.bestand-naam { color: inherit; }
+ul.bestandslijst.prullenbak a.bestand-naam:hover { color: var(--accent); }
+.badge-prullenbak { background: var(--failed-tint); color: var(--failed); }
+/* Ongedaan maken in de melding: een knop die eruitziet als een link, rechts */
+.melding form.ongedaan { margin-left: auto; }
+.tekstknop { background: none; border: 0; padding: 0; min-height: 0; color: inherit; font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
+.tekstknop:hover { filter: none; color: var(--accent); }
 /* Scherm 2 van de upload, vanuit de inbox: herkomstregel */
 p.herkomst { margin: -0.5rem 0 1rem; color: var(--gedempt); font-size: 0.9rem; }
 

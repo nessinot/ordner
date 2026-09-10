@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from ordner.meta import lees_meta
+from ordner.meta import lees_meta, schrijf_meta
 
 _PREFIX = "/api/hassio_ingress/abc"
 _PDF = b"%PDF-1.4 testinhoud"
@@ -1051,7 +1051,7 @@ def test_acties_behouden_zoekopdracht(client: TestClient) -> None:
     assert r.status_code == 400
     assert '<input type="hidden" name="q" value="test">' in r.text
     r = client.post(f"{_DOC}/verwijder", data={"q": "test"}, follow_redirects=False)
-    assert r.headers["location"] == "/?q=test&m=Verplaatst+naar+prullenbak"
+    assert r.headers["location"] == "/?q=test&m=Verplaatst+naar+prullenbak&ongedaan=2026-03-01_test"
 
 
 def test_meta_nietbestaand_404(client: TestClient) -> None:
@@ -1132,7 +1132,7 @@ def test_verwijderen(client: TestClient) -> None:
     rel = "2026/2026-03-01_weg-ermee"
     r = client.post(f"/doc/{rel}/verwijder", follow_redirects=False)
     assert r.status_code == 303
-    assert r.headers["location"] == "/?m=Verplaatst+naar+prullenbak"
+    assert r.headers["location"] == "/?m=Verplaatst+naar+prullenbak&ongedaan=2026-03-01_weg-ermee"
     root = _root(client)
     assert not (root / "2026" / "2026-03-01_weg-ermee").exists()
     assert (root / "_prullenbak" / "2026-03-01_weg-ermee" / "meta.md").exists()
@@ -1140,6 +1140,222 @@ def test_verwijderen(client: TestClient) -> None:
     assert "Weg ermee" not in client.get("/?q=ermee").text
     assert "Weg ermee" not in client.get("/").text
     assert rel not in client.app.state.index.docs  # type: ignore[attr-defined]
+    # pakket 20: de melding op de startpagina biedt Ongedaan maken (POST terugzetten met de prullenbaknaam)
+    r = client.get(r.headers["location"])
+    assert "Verplaatst naar prullenbak" in r.text
+    assert 'action="/prullenbak/terugzetten"' in r.text
+    assert '<input type="hidden" name="naam" value="2026-03-01_weg-ermee">' in r.text
+    assert ">Ongedaan maken</button>" in r.text
+    assert "Ongedaan maken" not in client.get("/?m=Opgeslagen").text
+
+
+# --- prullenbak: kijken in een document en terugzetten (pakket 20) ------------
+
+
+def _weggegooid_naam(client: TestClient, titel: str = "Weg ermee", bestanden: list[Bestand] | None = None) -> str:
+    """Upload een document en gooi het weg; geeft de prullenbaknaam terug."""
+    _upload(client, titel=titel, bestanden=bestanden)
+    slug = titel.lower().replace(" ", "-")
+    r = client.post(f"/doc/2026/2026-03-01_{slug}/verwijder", follow_redirects=False)
+    assert r.status_code == 303
+    return f"2026-03-01_{slug}"
+
+
+def test_prullenbak_lijst_linkt_naar_kijkpagina(client: TestClient) -> None:
+    naam = _weggegooid_naam(client)
+    (_root(client) / "_prullenbak" / "los.pdf").write_bytes(_PDF)
+    r = client.get("/prullenbak")
+    assert f'<a class="bestand-naam" href="/prullenbak/{naam}">Weg ermee</a>' in r.text
+    assert '<span class="bestand-naam">los.pdf</span>' in r.text  # los bestand: geen link
+    assert "Klik op een titel" in r.text
+
+
+def test_prullenbak_kijkpagina(client: TestClient) -> None:
+    naam = _weggegooid_naam(
+        client, bestanden=[_A_PDF, ("b.png", b"png", "image/png"), ("c.docx", b"docx", "application/octet-stream")]
+    )
+    r = client.get(f"/prullenbak/{naam}")
+    assert r.status_code == 200
+    assert "<title>Weg ermee · Ordner</title>" in r.text
+    assert "<h2>Weg ermee</h2>" in r.text
+    assert '<span class="datum">2026-03-01</span>' in r.text
+    assert "in de prullenbak</span>" in r.text
+    assert f'href="/prullenbak">' in r.text  # terug naar de lijst
+    assert f'<object type="application/pdf" data="/prullenbak/{naam}/bestand/a.pdf">' in r.text
+    assert f'<img src="/prullenbak/{naam}/bestand/b.png"' in r.text
+    assert f'href="/prullenbak/{naam}/bekijk/c.docx">Open</a>' in r.text
+    assert "tekst aanwezig" in r.text  # a.pdf.txt is er (stap 1 van de upload)
+    assert 'action="/prullenbak/terugzetten"' in r.text and ">Terugzetten</button>" in r.text
+    assert 'action="/prullenbak/verwijder"' in r.text and "Definitief verwijderen" in r.text
+    assert f'<input type="hidden" name="naam" value="{naam}">' in r.text
+    assert "jaarmap <code>2026/</code>" in r.text
+    assert f"<code>_prullenbak/{naam}</code>" in r.text
+    # geen bewerkformulier, geen OCR-knop, geen toevoegen; tags geen zoeklinks
+    assert 'name="titel"' not in r.text and "OCR opnieuw" not in r.text and "Bestand toevoegen" not in r.text
+
+
+def test_prullenbak_kijkpagina_zonder_meta(client: TestClient) -> None:
+    root = _root(client)
+    map = root / "_prullenbak" / "2024-05-05_zonder"
+    map.mkdir()
+    (map / "scan.pdf").write_bytes(_PDF)
+    (map / "scan.pdf.txt").write_text("x", encoding="utf-8")
+    r = client.get("/prullenbak/2024-05-05_zonder")
+    assert r.status_code == 200
+    assert "<h2>2024-05-05_zonder</h2>" in r.text
+    assert "geen leesbare <code>meta.md</code>" in r.text
+    assert 'data="/prullenbak/2024-05-05_zonder/bestand/scan.pdf"' in r.text
+    assert "jaarmap <code>2024/</code>" in r.text  # jaar uit de mapnaam
+    # geen jaar uit de naam en geen meta: geen knop Terugzetten
+    (root / "_prullenbak" / "zonder-jaar").mkdir()
+    r = client.get("/prullenbak/zonder-jaar")
+    assert r.status_code == 200
+    assert ">Terugzetten</button>" not in r.text
+    assert "kan niet automatisch teruggezet worden" in r.text
+    assert client.post("/prullenbak/terugzetten", data={"naam": "zonder-jaar"}).status_code == 404
+
+
+def test_prullenbak_bestand_en_bekijk(client: TestClient) -> None:
+    naam = _weggegooid_naam(client, bestanden=[_A_PDF, ("b.png", b"png", "image/png")])
+    r = client.get(f"/prullenbak/{naam}/bestand/a.pdf")
+    assert r.status_code == 200
+    assert r.content == _PDF
+    assert r.headers["content-type"].startswith("application/pdf")
+    assert r.headers["content-disposition"].startswith("inline")
+    r = client.get(f"/prullenbak/{naam}/bekijk/a.pdf")
+    assert r.status_code == 200
+    assert f'<iframe class="bekijk-vlak" src="/prullenbak/{naam}/bestand/a.pdf"' in r.text
+    assert f'href="/prullenbak/{naam}">' in r.text
+    assert "Terug naar “Weg ermee”" in r.text
+    r = client.get(f"/prullenbak/{naam}/bekijk/b.png")
+    assert f'<img class="bekijk-vlak" src="/prullenbak/{naam}/bestand/b.png"' in r.text
+
+
+def test_prullenbak_kijkpagina_404(client: TestClient) -> None:
+    naam = _weggegooid_naam(client)
+    root = _root(client)
+    (root / "_prullenbak" / "los.pdf").write_bytes(_PDF)
+    (root / "_prullenbak" / ".tekst").mkdir()
+    for pad in (
+        "/prullenbak/bestaat-niet",
+        "/prullenbak/los.pdf",  # los bestand: geen kijkpagina
+        "/prullenbak/.tekst",
+        "/prullenbak/%2E%2E",
+        "/prullenbak/..%5C2026",
+        f"/prullenbak/{naam}/bestand/nietbestaand.pdf",
+        f"/prullenbak/{naam}/bestand/..%5Cmeta.md",
+        f"/prullenbak/{naam}/bestand/..%2F..%2F2026%2F2026-03-01_test%2Fa.pdf",
+        f"/prullenbak/{naam}/bekijk/nietbestaand.pdf",
+        "/prullenbak/los.pdf/bestand/x",
+    ):
+        assert client.get(pad).status_code == 404, pad
+    for naam_form in ("", "..", "a/b", ".tekst", "bestaat-niet", "los.pdf"):
+        assert client.post("/prullenbak/terugzetten", data={"naam": naam_form}).status_code == 404, naam_form
+    assert client.get(f"/prullenbak/{naam}").status_code == 200
+
+
+def test_prullenbak_terugzetten(client: TestClient) -> None:
+    naam = _weggegooid_naam(client, bestanden=[_A_PDF, ("b.png", b"png", "image/png")])
+    root = _root(client)
+    index = client.app.state.index  # type: ignore[attr-defined]
+    assert "2026/2026-03-01_weg-ermee" not in index.docs
+    r = client.post("/prullenbak/terugzetten", data={"naam": naam}, follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/doc/2026/2026-03-01_weg-ermee?m=Teruggezet"
+    doc = root / "2026" / "2026-03-01_weg-ermee"
+    assert (doc / "meta.md").exists() and (doc / "a.pdf").exists() and (doc / "a.pdf.txt").exists()
+    assert not (root / "_prullenbak" / naam).exists()
+    assert (root / "_prullenbak").is_dir()
+    # direct in de index, doorzoekbaar en de hashes tellen weer mee als dubbel
+    assert "2026/2026-03-01_weg-ermee" in index.docs
+    assert "Weg ermee" in client.get("/?q=ermee").text
+    r = client.get(r.headers["location"])
+    assert r.status_code == 200 and "Teruggezet" in r.text and "Ongedaan maken" not in r.text
+    r = _stap1(client, [_A_PDF])
+    assert r.status_code == 409
+    assert client.get("/api/status").json()["prullenbak"] == {"aantal": 0}
+
+
+def test_prullenbak_terugzetten_via_ongedaan_maken(client: TestClient) -> None:
+    """De knop in de melding is hetzelfde formulier: POST terugzetten met de naam uit de redirect."""
+    _upload(client, titel="Oeps")
+    r = client.post("/doc/2026/2026-03-01_oeps/verwijder", follow_redirects=False)
+    assert r.headers["location"].endswith("&ongedaan=2026-03-01_oeps")
+    r = client.post("/prullenbak/terugzetten", data={"naam": "2026-03-01_oeps"}, follow_redirects=False)
+    assert r.headers["location"] == "/doc/2026/2026-03-01_oeps?m=Teruggezet"
+    assert client.get("/doc/2026/2026-03-01_oeps").status_code == 200
+
+
+def test_prullenbak_terugzetten_strip_tijdstempel_en_collision(client: TestClient) -> None:
+    root = _root(client)
+    naam1 = _weggegooid_naam(client)  # 2026-03-01_weg-ermee
+    _upload(client, titel="Weg ermee", bestanden=[("b.pdf", b"%PDF andere bytes", "application/pdf")])
+    r = client.post("/doc/2026/2026-03-01_weg-ermee/verwijder", follow_redirects=False)
+    naam2 = r.headers["location"].rpartition("ongedaan=")[2]
+    assert naam2.startswith(naam1 + "_") and naam2 != naam1  # conflict-tijdstempel
+    # de tweede terugzetten: tijdstempel gestript, oude naam is vrij
+    r = client.post("/prullenbak/terugzetten", data={"naam": naam2}, follow_redirects=False)
+    assert r.headers["location"] == "/doc/2026/2026-03-01_weg-ermee?m=Teruggezet"
+    assert (root / "2026" / "2026-03-01_weg-ermee" / "b.pdf").exists()
+    # de eerste ook: naam bezet -> _2
+    r = client.post("/prullenbak/terugzetten", data={"naam": naam1}, follow_redirects=False)
+    assert r.headers["location"] == "/doc/2026/2026-03-01_weg-ermee_2?m=Teruggezet"
+    assert (root / "2026" / "2026-03-01_weg-ermee_2" / "a.pdf").exists()
+
+
+def test_prullenbak_terugzetten_dubbel_geweigerd(client: TestClient) -> None:
+    naam = _weggegooid_naam(client)
+    _upload(client, titel="Opnieuw")  # zelfde a.pdf, nu in een ander document
+    root = _root(client)
+    r = client.post("/prullenbak/terugzetten", data={"naam": naam})
+    assert r.status_code == 409
+    assert "het document is niet teruggezet" in r.text
+    assert 'href="/doc/2026/2026-03-01_opnieuw">Opnieuw (2026-03-01)</a>' in r.text
+    assert "<h2>Weg ermee</h2>" in r.text  # de kijkpagina zelf, met de knoppen
+    assert (root / "_prullenbak" / naam / "a.pdf").exists()
+    assert not (root / "2026" / "2026-03-01_weg-ermee").exists()
+    # zonder hashes in meta.md wordt van schijf gehasht
+    meta_pad = root / "_prullenbak" / naam / "meta.md"
+    tekst = meta_pad.read_text(encoding="utf-8")
+    meta_pad.write_text("\n".join(l for l in tekst.splitlines() if not l.startswith("sha256") and not l.startswith("  a.pdf")), encoding="utf-8")
+    assert lees_meta(root / "_prullenbak" / naam).sha256 == {}
+    assert client.post("/prullenbak/terugzetten", data={"naam": naam}).status_code == 409
+    # is het andere document weg, dan mag het wel
+    client.post("/doc/2026/2026-03-01_opnieuw/verwijder", follow_redirects=False)
+    r = client.post("/prullenbak/terugzetten", data={"naam": naam}, follow_redirects=False)
+    assert r.status_code == 303
+
+
+def test_prullenbak_terugzetten_queued_pending_ocr(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
+    naam = _weggegooid_naam(client)
+    root = _root(client)
+    weg = root / "_prullenbak" / naam
+    (weg / "a.pdf.txt").unlink()
+    meta = lees_meta(weg)
+    meta.ocr = "pending"
+    schrijf_meta(weg, meta)
+    eerste = sum(1 for c in mock_cmd.calls if c[0] == "pdftotext")
+    r = client.post("/prullenbak/terugzetten", data={"naam": naam}, follow_redirects=False)
+    assert r.status_code == 303
+    doc = root / "2026" / "2026-03-01_weg-ermee"
+    assert _wacht_op(doc / "a.pdf.txt")
+    assert _wacht_op_status(doc, "done")
+    assert sum(1 for c in mock_cmd.calls if c[0] == "pdftotext") == eerste + 1
+
+
+def test_prullenbak_links_met_ingress_prefix(client: TestClient) -> None:
+    naam = _weggegooid_naam(client)
+    for pad in ("/prullenbak", f"/prullenbak/{naam}", f"/prullenbak/{naam}/bekijk/a.pdf", "/?m=x&ongedaan=" + naam):
+        r = client.get(pad, headers={"X-Ingress-Path": _PREFIX})
+        assert r.status_code == 200, pad
+        urls = re.findall(r'(?:href|action|src|data)="([^"]*)"', r.text)
+        assert urls, pad
+        for url in urls:
+            assert url.startswith(_PREFIX + "/"), (pad, url)
+    r = client.post(
+        "/prullenbak/terugzetten", data={"naam": naam}, headers={"X-Ingress-Path": _PREFIX}, follow_redirects=False
+    )
+    assert r.headers["location"] == f"{_PREFIX}/doc/2026/2026-03-01_weg-ermee?m=Teruggezet"
 
 
 # --- status-API ------------------------------------------------------------
@@ -1324,7 +1540,7 @@ def test_prullenbak_pagina_leeg(client: TestClient) -> None:
     assert "Definitief verwijderen" not in r.text
     assert re.search(r'<button[^>]*\bdisabled\b[^>]*>Prullenbak legen</button>', r.text)
     assert 'action="/prullenbak/leeg"' in r.text
-    assert "Terugzetten kan door de map met Samba" in r.text
+    assert "Klik op een titel" in r.text
 
 
 def test_prullenbak_pagina_met_items(client: TestClient) -> None:

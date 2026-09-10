@@ -89,7 +89,7 @@ Ordner voorkomt dat hetzelfde bestand twee keer in de ordner komt. Elk bestand k
 Goed om te weten:
 
 - Alleen **exact gelijke** bestanden worden herkend, ongeacht de bestandsnaam. Dezelfde brief nog een keer scannen of fotograferen geeft een ander bestand en wordt niet herkend. Sommige portalen zetten bij elke download een datum in de pdf; ook dan verschilt het bestand.
-- Een document in de **prullenbak** telt niet mee. Heb je iets weggegooid, dan mag je het opnieuw uploaden.
+- Een document in de **prullenbak** telt niet mee. Heb je iets weggegooid, dan mag je het opnieuw uploaden. Terugzetten uit de prullenbak controleert wél: staat een bestand van de weggegooide map inmiddels in een ander document, dan wordt het terugzetten geweigerd.
 - Bestaande documenten van vóór deze functie krijgen hun vingerafdrukken vanzelf bij de eerste verversing (bij het starten van de add-on of via de beheerpagina). Vervang je buiten Ordner om een bestand door een ander bestand met dezelfde naam, dan blijft de oude vingerafdruk staan.
 
 ## Bestanden bekijken
@@ -151,7 +151,17 @@ De omschrijving wordt nooit automatisch ingevuld. Klopt een voorstel niet, pas h
 
 "Verwijderen" op de documentpagina verplaatst de hele documentmap naar `/share/ordner/_prullenbak/`. Er wordt dan nog niets echt gewist. Ordner ruimt de prullenbak nooit vanzelf op.
 
+Direct na "Verwijderen" staat in de groene melding een knop **Ongedaan maken**. Die zet het document meteen terug; daarna sta je weer op de documentpagina.
+
 De pagina **Prullenbak** (via de beheerpagina, tabel Prullenbak) laat zien wat erin staat. Per weggegooid document zie je de titel, de mapnaam (zo heet de map als je via Samba kijkt), de documentdatum, het aantal bestanden en de grootte. Losse bestanden die iemand rechtstreeks in `_prullenbak/` heeft gezet staan er ook in. De nieuwste documentdatum staat bovenaan. Wanneer iets is weggegooid weet Ordner niet; dat staat nergens.
+
+Klik op de titel om het document te **bekijken**: je ziet de bestanden, de gegevens en de notities zoals op de gewone documentpagina, met het label "in de prullenbak". Bewerken, OCR opnieuw en bestanden toevoegen kan daar niet; zoeken vindt een document in de prullenbak ook niet. Daarvoor zet je het eerst terug.
+
+**Terugzetten** doe je met de knop op die pagina. De map gaat terug naar de jaarmap waar hij vandaan kwam (het jaar staat voorin de mapnaam) en het document is meteen weer te doorzoeken en te bewerken. Was de mapnaam in de prullenbak voorzien van een tijdstempel (omdat je hetzelfde document twee keer had weggegooid), dan valt die weer weg; bestaat de oude naam intussen opnieuw, dan krijgt de map `_2` erachter. Ontbrekende OCR-tekst wordt daarna alsnog gemaakt.
+
+Terugzetten wordt **geweigerd** als een van de bestanden inmiddels al in een ander document zit, bijvoorbeeld omdat je het na het weggooien opnieuw hebt geüpload. De pagina laat dan zien in welk document het staat; gooi dat weg of laat het zo en verwijder het prullenbakitem definitief. Zo heb je nooit ongemerkt hetzelfde bestand twee keer in de ordner.
+
+Een map die iemand via Samba in `_prullenbak/` heeft gezet zonder jaar voorin de naam en zonder leesbare `meta.md` kan Ordner niet zelf terugzetten; de pagina zegt dat dan. Verplaats zo'n map met Samba of de Verkenner naar de juiste jaarmap en gebruik daarna **Cache verversen** op de beheerpagina.
 
 Definitief opruimen doe je op die pagina:
 
@@ -160,7 +170,7 @@ Definitief opruimen doe je op die pagina:
 
 Beide knoppen vragen eerst om bevestiging. Daarna is er geen weg terug: de bestanden zijn echt weg en staan ook niet meer in een back-up die je daarna maakt.
 
-**Terugzetten** doe je door de map met Samba of de Verkenner terug te verplaatsen naar de juiste jaarmap en daarna **Cache verversen** te gebruiken op de beheerpagina. Let op: wat in de prullenbak staat telt niet mee bij het herkennen van dubbele bestanden. Gooi je een document weg, upload je hetzelfde bestand opnieuw en zet je daarna de oude map via Samba terug, dan heb je het twee keer.
+Let op: wat in de prullenbak staat telt niet mee bij het herkennen van dubbele bestanden bij een upload. Gooi je een document weg en upload je hetzelfde bestand opnieuw, dan mag dat; de knop Terugzetten weigert daarna wel (zie hierboven). Zet je zo'n map via Samba terug in plaats van met de knop, dan heb je het bestand twee keer.
 
 ## Beheerpagina
 

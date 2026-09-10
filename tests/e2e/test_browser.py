@@ -190,6 +190,34 @@ def test_verwijderen_met_confirm(page: Page, server: Server) -> None:
     assert (server.archief / "_prullenbak" / doc.name).is_dir()
 
 
+def test_prullenbak_kijken_en_terugzetten(page: Page, server: Server) -> None:
+    """Pakket 20: titel in de prullenbak opent de kijkpagina met de inhoud; Terugzetten brengt het document terug.
+
+    Gooit het daarna opnieuw weg zodat test_prullenbak_legen_met_confirm zijn item heeft.
+    """
+    doc = _doc_map(server)
+    weg = server.archief / "_prullenbak" / doc.name
+    assert weg.is_dir()
+    page.goto(server.url + "/prullenbak")
+    page.locator("ul.prullenbak a.bestand-naam", has_text=TITEL).click()
+    page.wait_for_url(re.compile(rf"/prullenbak/{re.escape(doc.name)}$"))
+    expect(page.locator("h2").first).to_contain_text(TITEL)
+    expect(page.locator(".badge-prullenbak")).to_have_text("in de prullenbak")
+    expect(page.locator(".bestand", has_text="tekst.pdf")).to_be_visible()
+    page.get_by_role("button", name="Terugzetten").click()
+
+    page.wait_for_url(re.compile(r"/doc/[^/]+/[^/]+\?m=Teruggezet$"))
+    expect(page.locator(".melding")).to_have_text("Teruggezet")
+    expect(page.locator("h2").first).to_contain_text(TITEL)
+    assert doc.is_dir() and not weg.exists()
+
+    page.once("dialog", lambda dialog: dialog.accept())
+    page.get_by_role("button", name="Verwijderen").click()
+    page.wait_for_url(re.compile(r"m=Verplaatst"))
+    expect(page.locator(".melding")).to_contain_text("Ongedaan maken")
+    assert weg.is_dir()
+
+
 def test_prullenbak_legen_met_confirm(page: Page, server: Server) -> None:
     """Pakket 19: het zojuist weggegooide document staat op de prullenbakpagina; Prullenbak legen haalt het van schijf."""
     doc = _doc_map(server)
