@@ -563,6 +563,77 @@ def test_inbox_met_titel_direct_opgenomen(client: TestClient, mock_cmd) -> None:
     assert "in de inbox wacht" not in client.get("/").text
 
 
+def test_scherm2_toont_bestanden_inline_en_serveert_ze(client: TestClient) -> None:
+    """0.15.0: op scherm 2 is elk bestand te zien (inline plus Open-knop), geserveerd uit het geheugen."""
+    token = _token(_stap1(client, [_A_PDF, ("b.png", b"png", "image/png"), ("c.docx", b"docx", "application/octet-stream")]))
+    r = client.get(f"/upload/{token}")
+    assert r.status_code == 200
+    assert f'<object type="application/pdf" data="/upload/{token}/bestand/a.pdf">' in r.text
+    assert f'<img src="/upload/{token}/bestand/b.png"' in r.text
+    assert f'href="/upload/{token}/bekijk/c.docx">Open</a>' in r.text
+    assert r.text.count(">Open</a>") == 3
+
+    r = client.get(f"/upload/{token}/bestand/a.pdf")
+    assert r.status_code == 200
+    assert r.content == _PDF
+    assert r.headers["content-type"].startswith("application/pdf")
+    assert r.headers["content-disposition"] == 'inline; filename="a.pdf"'
+    assert client.get(f"/upload/{token}/bestand/b.png").content == b"png"
+
+    r = client.get(f"/upload/{token}/bekijk/a.pdf")
+    assert r.status_code == 200
+    assert f'<iframe class="bekijk-vlak" src="/upload/{token}/bestand/a.pdf"' in r.text
+    assert f'href="/upload/{token}">' in r.text and "Terug naar “Nieuw document”" in r.text
+    assert f'<img class="bekijk-vlak" src="/upload/{token}/bestand/b.png"' in client.get(f"/upload/{token}/bekijk/b.png").text
+    assert "kan hier niet getoond worden" in client.get(f"/upload/{token}/bekijk/c.docx").text
+    # nog steeds niets op schijf
+    assert client.app.state.archief.documentmappen() == []  # type: ignore[attr-defined]
+
+
+def test_scherm2_bestand_404(client: TestClient) -> None:
+    token = _token(_stap1(client))
+    assert client.get(f"/upload/{token}/bestand/nietbestaand.pdf").status_code == 404
+    assert client.get(f"/upload/{token}/bekijk/nietbestaand.pdf").status_code == 404
+    assert client.get("/upload/onbekendtoken00/bestand/a.pdf").status_code == 404
+    assert client.get("/upload/x/bestand/a.pdf").status_code == 404  # misvormd token
+    client.post(f"/upload/{token}/annuleer", follow_redirects=False)
+    assert client.get(f"/upload/{token}/bestand/a.pdf").status_code == 404  # weggegooid
+
+
+def test_inbox_bekijken_en_scherm2_uit_inbox_toont_bestand(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
+    """0.15.0: een wachtend inboxbestand is te bekijken vóór (inboxpagina) en tijdens (scherm 2) het opnemen."""
+    mock_cmd.register("pdftotext", stdout=_ZONDER_TITEL)
+    pad = _in_inbox(client)
+    r = client.get("/inbox")
+    assert 'href="/inbox/bekijk/scan.pdf">Bekijken</a>' in r.text
+
+    r = client.get("/inbox/bekijk/scan.pdf")
+    assert r.status_code == 200
+    assert '<iframe class="bekijk-vlak" src="/inbox/bestand/scan.pdf"' in r.text
+    assert 'href="/inbox">' in r.text and "Terug naar “Inbox”" in r.text
+    r = client.get("/inbox/bestand/scan.pdf")
+    assert r.status_code == 200 and r.content == _PDF
+    assert r.headers["content-disposition"].startswith("inline")
+    # bekijken reserveert niet: het bestand staat nog gewoon op de lijst
+    assert [w.naam for w in _reconciler(client).wachtend()] == ["scan.pdf"]
+
+    token = _opnemen(client)
+    r = client.get(f"/upload/{token}")
+    assert f'<object type="application/pdf" data="/upload/{token}/bestand/scan.pdf">' in r.text
+    assert client.get(f"/upload/{token}/bestand/scan.pdf").content == _PDF
+    assert pad.exists()
+
+
+def test_inbox_bekijken_404(client: TestClient) -> None:
+    assert client.get("/inbox/bekijk/nietbestaand.pdf").status_code == 404
+    assert client.get("/inbox/bestand/nietbestaand.pdf").status_code == 404
+    assert client.get("/inbox/bestand/..%5Cmeta.md").status_code == 404
+    (_root(client) / "_inbox" / ".tekst").mkdir(parents=True, exist_ok=True)
+    (_root(client) / "_inbox" / ".tekst" / "x.txt").write_text("geheim", encoding="utf-8")
+    assert client.get("/inbox/bestand/.tekst").status_code == 404
+    assert client.get("/inbox/bestand/.tekst%2Fx.txt").status_code == 404
+
+
 def test_inbox_links_met_ingress_prefix(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
     mock_cmd.register("pdftotext", stdout=_ZONDER_TITEL)
     _in_inbox(client)
@@ -571,8 +642,17 @@ def test_inbox_links_met_ingress_prefix(client: TestClient, mock_cmd) -> None:  
     assert f'href="{_PREFIX}/inbox"' in r.text
     r = client.get("/inbox", headers=headers)
     assert f'action="{_PREFIX}/inbox/opnemen"' in r.text
+    assert f'href="{_PREFIX}/inbox/bekijk/scan.pdf"' in r.text
+    r = client.get("/inbox/bekijk/scan.pdf", headers=headers)
+    assert f'src="{_PREFIX}/inbox/bestand/scan.pdf"' in r.text and f'href="{_PREFIX}/inbox">' in r.text
     r = client.post("/inbox/opnemen", data={"naam": "scan.pdf"}, headers=headers, follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"].startswith(f"{_PREFIX}/upload/")
+    token = r.headers["location"].rsplit("/", 1)[1]
+    r = client.get(f"/upload/{token}", headers=headers)
+    assert f'data="{_PREFIX}/upload/{token}/bestand/scan.pdf"' in r.text
+    assert f'href="{_PREFIX}/upload/{token}/bekijk/scan.pdf">Open</a>' in r.text
+    r = client.get(f"/upload/{token}/bekijk/scan.pdf", headers=headers)
+    assert f'src="{_PREFIX}/upload/{token}/bestand/scan.pdf"' in r.text and f'href="{_PREFIX}/upload/{token}">' in r.text
 
 
 # --- dubbele bestanden (pakket 16) -------------------------------------------

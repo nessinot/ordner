@@ -8,11 +8,22 @@
 
 <section class="paneel">
   <h3>Bestanden</h3>
-  <ul class="bestandslijst">
-    {% for b in bestanden %}
-    <li><span class="bestand-naam">{{ b.naam }}</span> <span class="gedempt klein">{{ b.grootte }}</span></li>
-    {% endfor %}
-  </ul>
+  {% for b in bestanden %}
+  {% set url = url_for('upload_bestand', token=token, naam=b.naam) %}
+  {% set kijk_url = url_for('upload_bekijk', token=token, naam=b.naam) %}
+  <div class="bestand">
+    <div class="bestand-kop">
+      <span class="bestand-naam">{{ b.naam }}</span>
+      <span class="gedempt klein">{{ b.grootte }}</span>
+      <a class="knop" href="{{ kijk_url }}">Open</a>
+    </div>
+    {% if b.soort == 'afbeelding' %}
+    <img src="{{ url }}" alt="{{ b.naam }}" loading="lazy">
+    {% elif b.soort == 'pdf' %}
+    <object type="application/pdf" data="{{ url }}">Kan de pdf hier niet tonen. <a href="{{ kijk_url }}">Open de pdf</a>.</object>
+    {% endif %}
+  </div>
+  {% endfor %}
   <p class="hint">Nog niets is opgeslagen. Controleer de gegevens hieronder en kies Opslaan; de datum en de titel bepalen de mapnaam.</p>
 </section>
 

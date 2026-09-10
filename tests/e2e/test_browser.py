@@ -57,7 +57,11 @@ def test_upload_via_formulier(page: Page, server: Server) -> None:
 
     # scherm 2: bestandslijst en voorgevulde velden (zonder OCR-tools: titel leeg, datum vandaag)
     page.wait_for_url(re.compile(r"/upload/[A-Za-z0-9_-]{8,}$"), timeout=OCR_TIMEOUT_MS)
-    expect(page.locator("ul.bestandslijst .bestand-naam")).to_have_text(["tekst.pdf", "foto.jpg"])
+    expect(page.locator(".bestand .bestand-naam")).to_have_text(["tekst.pdf", "foto.jpg"])
+    # 0.15.0: de bestanden staan in beeld (pdf als object, foto als img) en hebben elk een Open-knop
+    expect(page.locator(".bestand object[type='application/pdf']")).to_have_count(1)
+    expect(page.locator(".bestand img")).to_have_count(1)
+    expect(page.locator(".bestand").get_by_role("link", name="Open")).to_have_count(2)
     expect(page.locator("input[name=documentdatum]")).not_to_have_value("")
     assert not (server.archief / date.today().strftime("%Y")).exists(), "scherm 1 mag niets in het archief schrijven"
     page.fill("input[name=titel]", TITEL)

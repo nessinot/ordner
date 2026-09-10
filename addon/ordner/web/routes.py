@@ -1,4 +1,4 @@
-"""Routes van de webapp (pakket 08: zoeken, upload, bestand-serving; pakket 09: document, beheer, status; pakket 15b: tweestaps upload; pakket 16: dubbele bestanden; pakket 17: inbox wacht op een titel; pakket 18: beheertellers; pakket 19: prullenbak kijken en legen; pakket 20: prullenbak kijken in een document en terugzetten)."""
+"""Routes van de webapp (pakket 08: zoeken, upload, bestand-serving; pakket 09: document, beheer, status; pakket 15b: tweestaps upload; pakket 16: dubbele bestanden; pakket 17: inbox wacht op een titel; pakket 18: beheertellers; pakket 19: prullenbak kijken en legen; pakket 20: prullenbak kijken in een document en terugzetten; 0.15.0: bestanden bekijken op scherm 2 en in de inbox)."""
 
 from __future__ import annotations
 
@@ -203,10 +203,11 @@ def _grootte(aantal: int) -> str:
 
 @dataclass
 class UploadBestand:
-    """Eén bestand in de (niet wijzigbare) bestandslijst op scherm 2."""
+    """Eén bestand in de (niet wijzigbare) bestandslijst op scherm 2; `soort` bepaalt de inline weergave (0.15.0)."""
 
     naam: str
     grootte: str
+    soort: str  # "afbeelding", "pdf" of "overig"
 
 
 def _gegevens_context(upload: OpenstaandeUpload, fout: str = "", **velden: str) -> dict[str, object]:
@@ -214,7 +215,7 @@ def _gegevens_context(upload: OpenstaandeUpload, fout: str = "", **velden: str) 
     vb, sug = upload.voorbereid, upload.suggestie
     ctx: dict[str, object] = {
         "token": upload.token,
-        "bestanden": [UploadBestand(naam, _grootte(len(data))) for naam, data in vb.bestanden],
+        "bestanden": [UploadBestand(naam, _grootte(len(data)), _soort(naam)) for naam, data in vb.bestanden],
         "titel": sug.titel,
         "omschrijving": "",
         "documentdatum": vb.documentdatum.isoformat(),
@@ -389,6 +390,45 @@ async def upload_annuleer(request: Request, token: str) -> Response:
     return _redirect(request, "upload", "Upload geannuleerd")
 
 
+@router.get("/upload/{token}/bekijk/{naam}", name="upload_bekijk")
+async def upload_bekijk(request: Request, token: str, naam: str) -> Response:
+    """Kijkpagina voor één bestand van een openstaande upload (0.15.0): zo zie je wat je een titel geeft.
+
+    Op scherm 2 staat het bestand ook inline, maar op een klein scherm wordt een pdf daar verborgen
+    en in de HA-app is een los geopend bestand een doodlopende weg; deze pagina heeft een weg terug.
+    """
+    _upload_bytes(request, token, naam)  # alleen de controle: 404 als token of naam onbekend is
+    return _bekijk_pagina(
+        request,
+        naam,
+        url=_pad_van(request.url_for("upload_bestand", token=token, naam=naam)),
+        terug_url=_pad_van(request.url_for("upload_gegevens", token=token)),
+        terug_titel="Nieuw document",
+    )
+
+
+@router.get("/upload/{token}/bestand/{naam}", name="upload_bestand")
+async def upload_bestand(request: Request, token: str, naam: str) -> Response:
+    """Eén bestand van een openstaande upload, uit het geheugen; er staat immers nog niets op schijf."""
+    data = _upload_bytes(request, token, naam)
+    return Response(
+        content=data,
+        media_type=mimetypes.guess_type(naam)[0] or "application/octet-stream",
+        headers={"Content-Disposition": f'inline; filename="{naam}"'},
+    )
+
+
+def _upload_bytes(request: Request, token: str, naam: str) -> bytes:
+    """Inhoud van bestand `naam` in de openstaande upload bij `token`; 404 als een van beide onbekend is."""
+    upload = _haal_openstaand(request, token)
+    if upload is None:
+        raise HTTPException(status_code=404, detail="Upload niet gevonden")
+    for bestandsnaam, data in upload.voorbereid.bestanden:
+        if bestandsnaam == naam:
+            return data
+    raise HTTPException(status_code=404, detail="Bestand niet gevonden")
+
+
 def _log_dubbelen(wat: str, dubbelen: list[Dubbel]) -> None:
     log.info("%s: %s", wat, "; ".join(f"{d.naam} staat al in {d.rel}/{d.bestand}" for d in dubbelen))
 
@@ -456,6 +496,41 @@ async def inbox_opnemen(request: Request, naam: str = Form("")) -> Response:
         naam, vb.documentdatum, vb.datumbron, sug.tags, openstaand.token,
     )
     return _redirect(request, "upload_gegevens", token=openstaand.token)
+
+
+@router.get("/inbox/bekijk/{naam}", name="inbox_bekijk")
+async def inbox_bekijk(request: Request, naam: str) -> Response:
+    """Kijkpagina voor een wachtend inboxbestand (0.15.0), zonder het te reserveren; terug naar de inbox."""
+    _inbox_bestand_pad(request, naam)
+    return _bekijk_pagina(
+        request,
+        naam,
+        url=_pad_van(request.url_for("inbox_bestand", naam=naam)),
+        terug_url=_pad_van(request.url_for("inbox")),
+        terug_titel="Inbox",
+    )
+
+
+@router.get("/inbox/bestand/{naam}", name="inbox_bestand")
+async def inbox_bestand(request: Request, naam: str) -> Response:
+    pad = _inbox_bestand_pad(request, naam)
+    return FileResponse(
+        pad,
+        media_type=mimetypes.guess_type(naam)[0] or "application/octet-stream",
+        content_disposition_type="inline",
+        filename=naam,
+    )
+
+
+def _inbox_bestand_pad(request: Request, naam: str) -> Path:
+    """`_inbox/<naam>` als dat een bestaand bestand is; anders 404 (ook bij een ongeldige naam)."""
+    try:
+        pad = _archief(request).inbox_pad(naam)
+    except OngeldigPad:
+        raise HTTPException(status_code=404, detail="Bestand niet gevonden") from None
+    if not pad.is_file():
+        raise HTTPException(status_code=404, detail="Bestand niet gevonden")
+    return pad
 
 
 # --- prullenbak (pakket 19) --------------------------------------------------

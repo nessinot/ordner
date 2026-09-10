@@ -2,6 +2,11 @@
 
 Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. Nieuwste versie bovenaan; de bovenste kop moet gelijk zijn aan `version` in `config.yaml` (dat controleert `tests/test_addon_config.py`).
 
+## 0.15.0 (2026-09-10)
+
+- **Inboxbestand bekijken.** Op de inboxpagina staat bij elk bestand dat op een titel wacht een knop Bekijken, zodat je ziet wat het is voordat je het opneemt. Het bestand blijft gewoon in de inbox staan.
+- **Bestanden zichtbaar bij het opslaan.** Op het scherm met de gegevens van een nieuw document (na Opnemen uit de inbox, en ook na een gewone upload) staat elk bestand nu in beeld: pdf's en foto's inline, met een knop Open voor een volledig scherm. Zo kun je de titel bepalen met het document ernaast in plaats van alleen de bestandsnaam.
+
 ## 0.14.0 (2026-09-10)
 
 - Een document in de prullenbak is weer te openen: klik op de prullenbakpagina op de titel en je ziet de bestanden, de gegevens en de notities, net als op de gewone documentpagina. Bewerken kan daar niet; daarvoor zet je het document eerst terug.
