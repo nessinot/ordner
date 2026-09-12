@@ -268,6 +268,7 @@ def test_scherm2_zonder_treffers(client: TestClient, mock_cmd) -> None:  # type:
     assert f'name="documentdatum" value="{_vandaag().isoformat()}"' in r.text
     assert "geen datum gevonden, vandaag" in r.text
     assert 'name="tags" value=""' in r.text
+    assert "placeholder" not in r.text
 
 
 def test_opslaan_datum_ongewijzigd_bron_tekst(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]

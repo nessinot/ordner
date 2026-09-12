@@ -2,6 +2,10 @@
 
 Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. Nieuwste versie bovenaan; de bovenste kop moet gelijk zijn aan `version` in `config.yaml` (dat controleert `tests/test_addon_config.py`).
 
+## 0.16.1 (2026-09-12)
+
+- **Geen voorbeeldtekst meer in de velden Titel en Tags.** Op het gegevensscherm van een nieuw document stond in een leeg titel- of tagveld een grijze voorbeeldtekst ("factuur, energie"). Die leek op een ingevulde waarde, terwijl de andere velden op dat scherm wél echt voorgevuld zijn. Lege velden zijn nu gewoon leeg; de uitleg "komma-gescheiden" bij de tags blijft staan.
+
 ## 0.16.0 (2026-09-12)
 
 - **Inboxpagina als gewone lijst.** De knoppen Bekijken en Opnemen zijn weg. Klik op de naam van een wachtend bestand en je komt op het gegevensscherm, met het bestand in beeld, om het een titel te geven. Terug naar inbox laat het bestand liggen, zoals voorheen.

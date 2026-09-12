@@ -32,7 +32,7 @@
   <form method="post" action="{{ url_for('upload_gegevens', token=token) }}" class="upload-gegevens">
     <label class="veld">
       <span>Titel</span>
-      <input type="text" name="titel" value="{{ titel }}" required autocomplete="off" placeholder="Bijv. Eneco of Gemeente Amsterdam">
+      <input type="text" name="titel" value="{{ titel }}" required autocomplete="off">
       {% if titelbron != 'geen' %}<span class="hint">voorstel uit het document</span>{% endif %}
     </label>
     <label class="veld">
@@ -48,7 +48,7 @@
       </label>
       <label class="veld">
         <span>Tags <small>komma-gescheiden</small></span>
-        <input type="text" name="tags" value="{{ tags }}" autocomplete="off" placeholder="factuur, energie">
+        <input type="text" name="tags" value="{{ tags }}" autocomplete="off">
       </label>
     </div>
     <div class="knoppen vol">
