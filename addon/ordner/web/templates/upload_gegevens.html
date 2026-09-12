@@ -2,6 +2,14 @@
 {% set nav = 'upload' %}
 {% set paginatitel = 'Uploaden' %}
 {% block content %}
+{% if inbox_naam %}
+<p class="terug">
+  <a href="{{ url_for('inbox') }}">
+    <svg class="icoon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    Terug naar de inbox
+  </a>
+</p>
+{% endif %}
 <div class="kop"><h2>Nieuw document</h2><span class="gedempt">{% if inbox_naam %}uit de inbox{% else %}stap 2 van 2: gegevens{% endif %}</span></div>
 {% if fout %}<p class="fout" role="alert">{{ fout }}</p>{% endif %}
 {% if inbox_naam %}<p class="herkomst">Uit de inbox: <strong>{{ inbox_naam }}</strong>. Het bestand blijft in de inbox tot je opslaat.</p>{% endif %}
@@ -53,7 +61,12 @@
     </div>
     <div class="knoppen vol">
       <button type="submit">Opslaan</button>
-      <button type="submit" class="secundair" formaction="{{ url_for('upload_annuleer', token=token) }}" formnovalidate>{% if inbox_naam %}Terug naar inbox{% else %}Annuleren{% endif %}</button>
+      {% if inbox_naam %}
+      <a class="knop" href="{{ url_for('inbox') }}">Terug naar de inbox</a>
+      <button type="submit" class="gevaar" formaction="{{ url_for('upload_verwijder', token=token) }}" formnovalidate onclick="return confirm('Dit bestand uit de inbox verwijderen? Het wordt van schijf gewist en komt niet in de prullenbak. Dit kan niet ongedaan worden gemaakt.')">Verwijderen</button>
+      {% else %}
+      <button type="submit" class="secundair" formaction="{{ url_for('upload_annuleer', token=token) }}" formnovalidate>Annuleren</button>
+      {% endif %}
     </div>
   </form>
 </section>

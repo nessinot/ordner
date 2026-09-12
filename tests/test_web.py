@@ -456,8 +456,9 @@ def test_inbox_opnemen_scherm2_en_opslaan(client: TestClient, mock_cmd) -> None:
     mock_cmd.register("pdftotext", stdout=_ZONDER_TITEL)
     pad = _in_inbox(client)
     token = _opnemen(client)
-    assert _reconciler(client).wachtend() == []  # gereserveerd: niet meer op de lijst, niet voor de poll
-    assert "in de inbox wacht" not in client.get("/").text
+    # pakket 24: geen reservering; het bestand blijft gewoon in de lijst en in de teller staan
+    assert [w.naam for w in _reconciler(client).wachtend()] == ["scan.pdf"]
+    assert "1 bestand in de inbox wacht op een titel" in client.get("/").text
     assert pad.exists()
 
     r = client.get(f"/upload/{token}")
@@ -467,8 +468,10 @@ def test_inbox_opnemen_scherm2_en_opslaan(client: TestClient, mock_cmd) -> None:
     assert 'name="titel" value=""' in r.text
     assert 'name="documentdatum" value="2024-05-03"' in r.text and "datum uit tekst" in r.text
     assert 'name="tags" value="factuur"' in r.text
-    assert "Terug naar inbox" in r.text and "Annuleren" not in r.text
-    assert f'formaction="/upload/{token}/annuleer"' in r.text
+    assert r.text.count('href="/inbox"') >= 2 and "Terug naar de inbox" in r.text  # link bovenin en onderin
+    assert "Annuleren" not in r.text and "/annuleer" not in r.text
+    assert f'formaction="/upload/{token}/verwijder"' in r.text
+    assert "Dit bestand uit de inbox verwijderen? Het wordt van schijf gewist" in r.text
 
     r = client.post(f"/upload/{token}", data={"titel": "BSR", "documentdatum": "2024-05-03", "tags": "factuur"}, follow_redirects=False)
     assert r.status_code == 303
@@ -485,20 +488,28 @@ def test_inbox_opnemen_scherm2_en_opslaan(client: TestClient, mock_cmd) -> None:
     assert client.get("/inbox").text.count("Opnemen") == 0
 
 
-def test_inbox_opnemen_annuleren_zet_terug(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
+def test_inbox_verwijderen_vanaf_scherm2(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
+    """Pakket 24: Verwijderen op scherm 2 wist het inboxbestand en zijn sidecar definitief; niets in de prullenbak."""
     mock_cmd.register("pdftotext", stdout=_ZONDER_TITEL)
     pad = _in_inbox(client)
+    sidecar = pad.parent / ".tekst" / "scan.pdf.txt"
+    assert sidecar.exists()
     token = _opnemen(client)
-    r = client.post(f"/upload/{token}/annuleer", follow_redirects=False)
+    r = client.post(f"/upload/{token}/verwijder", follow_redirects=False)
     assert r.status_code == 303
-    assert r.headers["location"] == "/inbox?m=Teruggezet+in+de+inbox"
-    assert pad.exists()
-    assert [w.naam for w in _reconciler(client).wachtend()] == ["scan.pdf"]
+    assert r.headers["location"] == "/inbox?m=Verwijderd+uit+de+inbox"
+    assert not pad.exists() and not sidecar.exists()
     assert client.app.state.archief.documentmappen() == []  # type: ignore[attr-defined]
-    assert "Teruggezet in de inbox" in client.get(r.headers["location"]).text
-    # de poll neemt het nog steeds niet zelf op (geen titel) en leest niet opnieuw
-    assert _reconciler(client).verwerk_inbox() == []
-    assert pad.exists()
+    assert not (_root(client) / "_prullenbak").exists() or not any((_root(client) / "_prullenbak").iterdir())
+    assert len(client.app.state.openstaand) == 0  # type: ignore[attr-defined]
+    assert _reconciler(client).wachtend() == []
+    assert "Verwijderd uit de inbox" in client.get(r.headers["location"]).text
+    # nogmaals: de upload is weg -> verlopen-melding; gewone upload heeft geen inboxbestand -> 404; misvormd token -> 404
+    r = client.post(f"/upload/{token}/verwijder", follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"].startswith("/upload?m=Deze+upload+is+verlopen")
+    gewoon = _token(_stap1(client))
+    assert client.post(f"/upload/{gewoon}/verwijder", follow_redirects=False).status_code == 404
+    assert client.post("/upload/x/verwijder", follow_redirects=False).status_code == 404
 
 
 def test_inbox_opslaan_bestand_inmiddels_weg(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
@@ -511,7 +522,6 @@ def test_inbox_opslaan_bestand_inmiddels_weg(client: TestClient, mock_cmd) -> No
     assert r.headers["location"] == "/inbox?m=Bestand+is+niet+meer+in+de+inbox"
     assert client.app.state.archief.documentmappen() == []  # type: ignore[attr-defined]
     assert len(client.app.state.openstaand) == 0  # type: ignore[attr-defined]
-    assert _reconciler(client)._reserveringen == {}
 
 
 def test_inbox_opslaan_hash_inmiddels_bekend(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
@@ -526,7 +536,7 @@ def test_inbox_opslaan_hash_inmiddels_bekend(client: TestClient, mock_cmd) -> No
     mappen = client.app.state.archief.documentmappen()  # type: ignore[attr-defined]
     assert [m.name for m in mappen] == ["2026-03-01_eneco"]
     assert pad.exists()  # niet stilletjes weggegooid...
-    _reconciler(client).verwerk_inbox()  # ...maar de poll behandelt het na de vrijgave als dubbel (pakket 16)
+    _reconciler(client).verwerk_inbox()  # ...maar de poll behandelt het bij de herbeoordeling als dubbel (pakket 16)
     assert not pad.exists()
     assert (pad.parent / "_dubbel" / "scan.pdf").exists()
     assert _reconciler(client).wachtend() == []
@@ -536,7 +546,6 @@ def test_inbox_opnemen_ongeldige_of_onbekende_naam_404(client: TestClient) -> No
     for naam in ("", "..", ".tekst", "../meta.md", "sub/x.pdf", "bestaat-niet.pdf"):
         r = client.post("/inbox/opnemen", data={"naam": naam}, follow_redirects=False)
         assert r.status_code == 404, naam
-    assert _reconciler(client)._reserveringen == {}
     assert len(client.app.state.openstaand) == 0  # type: ignore[attr-defined]
 
 
@@ -633,6 +642,8 @@ def test_inbox_links_met_ingress_prefix(client: TestClient, mock_cmd) -> None:  
     assert r.status_code == 303 and r.headers["location"].startswith(f"{_PREFIX}/upload/")
     token = r.headers["location"].rsplit("/", 1)[1]
     r = client.get(f"/upload/{token}", headers=headers)
+    assert f'href="{_PREFIX}/inbox"' in r.text  # terug-link (pakket 24)
+    assert f'formaction="{_PREFIX}/upload/{token}/verwijder"' in r.text
     assert f'data="{_PREFIX}/upload/{token}/bestand/scan.pdf"' in r.text
     assert f'href="{_PREFIX}/upload/{token}/bekijk/scan.pdf">Open</a>' in r.text
     r = client.get(f"/upload/{token}/bekijk/scan.pdf", headers=headers)

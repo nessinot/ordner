@@ -2,6 +2,11 @@
 
 Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. Nieuwste versie bovenaan; de bovenste kop moet gelijk zijn aan `version` in `config.yaml` (dat controleert `tests/test_addon_config.py`).
 
+## 0.17.0 (2026-09-12)
+
+- **Terug naar de inbox is een gewone link.** Op het gegevensscherm van een inboxbestand staat nu bovenin dezelfde terug-link als op de andere pagina's, en onderin een link in plaats van een knop. Het bestand blijft intussen gewoon in de inboxlijst staan; voorheen verdween het daar een uur uit zodra je het opende.
+- **Inboxbestand verwijderen.** Op datzelfde scherm staat een knop **Verwijderen** voor een bestand dat je helemaal niet in de ordner wilt. Na een bevestiging wordt het definitief van schijf gewist, samen met de gelezen tekst; het komt niet in de prullenbak.
+
 ## 0.16.1 (2026-09-12)
 
 - **Geen voorbeeldtekst meer in de velden Titel en Tags.** Op het gegevensscherm van een nieuw document stond in een leeg titel- of tagveld een grijze voorbeeldtekst ("factuur, energie"). Die leek op een ingevulde waarde, terwijl de andere velden op dat scherm wél echt voorgevuld zijn. Lege velden zijn nu gewoon leeg; de uitleg "komma-gescheiden" bij de tags blijft staan.

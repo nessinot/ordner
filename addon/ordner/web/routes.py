@@ -354,26 +354,23 @@ async def upload_opslaan(
 def _inbox_controle(request: Request, upload: OpenstaandeUpload) -> Response | None:
     """Vóór het opslaan van een inboxbestand (pakket 17): is het intussen al opgenomen of verdwenen?
 
-    De poll heeft het bestand tussen Opnemen en Opslaan normaal niet aangeraakt (reservering), maar
-    de gebruiker kan het intussen via de upload hebben opgeslagen of via Samba hebben weggehaald.
+    De poll kan het bestand intussen zelf hebben opgenomen (een nieuwe titel in het archief maakte het
+    herkenbaar), de gebruiker kan het via de upload hebben opgeslagen of via Samba hebben weggehaald.
     Geeft een redirect terug als er niets meer op te slaan valt, anders None.
     """
     naam = upload.inbox_naam
     assert naam is not None
-    reconciler = _reconciler(request)
     treffer = _index(request).zoek_hash(sha256_van(upload.voorbereid.bestanden[0][1]))
     if treffer is not None:
-        # Al in het archief: geen tweede document. Vrijgeven laat de poll het bestand (als het er nog
-        # ligt) opnieuw beoordelen; die verplaatst het dan als dubbel naar _inbox/_dubbel/ (pakket 16).
+        # Al in het archief: geen tweede document. Ligt het bestand er nog, dan verplaatst de poll het
+        # bij de volgende beoordeling als dubbel naar _inbox/_dubbel/ (pakket 16).
         _openstaand(request).verwijder(upload.token)
-        reconciler.geef_vrij(naam)
         entry, _ = treffer
         log.info("inbox: %s niet nogmaals opgeslagen, staat al in %s", naam, entry.rel)
         jaar, map = _splits_rel(entry.rel)
         return _redirect(request, "document", "Al opgenomen via de inbox", jaar=jaar, map=map)
     if not _archief(request).inbox_pad(naam).is_file():
         _openstaand(request).verwijder(upload.token)
-        reconciler.geef_vrij(naam)
         log.info("inbox: %s niet opgeslagen, bestand ligt niet meer in de inbox", naam)
         return _redirect(request, "inbox", "Bestand is niet meer in de inbox")
     return None
@@ -381,13 +378,25 @@ def _inbox_controle(request: Request, upload: OpenstaandeUpload) -> Response | N
 
 @router.post("/upload/{token}/annuleer", name="upload_annuleer")
 async def upload_annuleer(request: Request, token: str) -> Response:
-    """Openstaande upload weggooien; er is niets op schijf gekomen. Uit de inbox: het bestand blijft daar liggen."""
-    upload = _haal_openstaand(request, token)
+    """Openstaande upload weggooien; er is niets op schijf gekomen. Scherm 2 uit de inbox heeft geen
+    Annuleren maar een gewone link terug (pakket 24); de openstaande upload verloopt dan vanzelf."""
+    _haal_openstaand(request, token)  # alleen de 404 bij een misvormd token
     _openstaand(request).verwijder(token)
-    if upload is not None and upload.inbox_naam is not None:
-        _reconciler(request).geef_vrij(upload.inbox_naam)
-        return _redirect(request, "inbox", "Teruggezet in de inbox")
     return _redirect(request, "upload", "Upload geannuleerd")
+
+
+@router.post("/upload/{token}/verwijder", name="upload_verwijder")
+async def upload_verwijder(request: Request, token: str) -> Response:
+    """Knop Verwijderen op scherm 2 uit de inbox (pakket 24): bestand en sidecar definitief van schijf, niet via de prullenbak."""
+    upload = _haal_openstaand(request, token)
+    if upload is None:
+        return _redirect(request, "upload", _UPLOAD_VERLOPEN)
+    if upload.inbox_naam is None:
+        raise HTTPException(status_code=404, detail="Geen inboxbestand")
+    _openstaand(request).verwijder(token)
+    _reconciler(request).verwijder_uit_inbox(upload.inbox_naam)
+    log.info("inbox: %s via scherm 2 definitief verwijderd", upload.inbox_naam)
+    return _redirect(request, "inbox", "Verwijderd uit de inbox")
 
 
 @router.get("/upload/{token}/bekijk/{naam}", name="upload_bekijk")
@@ -474,21 +483,18 @@ async def inbox(request: Request) -> Response:
 
 @router.post("/inbox/opnemen", name="inbox_opnemen")
 async def inbox_opnemen(request: Request, naam: str = Form("")) -> Response:
-    """Eén inboxbestand naar scherm 2 van de upload: reserveren, tekst uit de sidecar, openstaande upload klaarzetten.
+    """Eén inboxbestand naar scherm 2 van de upload: tekst uit de sidecar, openstaande upload klaarzetten.
 
-    Het bestand blijft in `_inbox/` liggen tot Opslaan; de reservering houdt de poll er intussen vanaf.
+    Het bestand blijft in `_inbox/` liggen tot Opslaan of Verwijderen en staat intussen gewoon in de lijst.
     """
     try:
         _archief(request).inbox_pad(naam)
     except OngeldigPad:
         raise HTTPException(status_code=404, detail="Bestand niet gevonden") from None
-    reconciler = _reconciler(request)
-    reconciler.reserveer(naam)  # vóór het lezen: een lopende poll mag het bestand nu niet meer opnemen
     try:
         # Normaal alleen de sidecar lezen; zonder sidecar kan dit OCR zijn, dus in een thread.
-        vb, sug = await asyncio.to_thread(reconciler.bereid_inbox_voor, naam)
+        vb, sug = await asyncio.to_thread(_reconciler(request).bereid_inbox_voor, naam)
     except FileNotFoundError:
-        reconciler.geef_vrij(naam)
         raise HTTPException(status_code=404, detail="Bestand niet gevonden") from None
     openstaand = _openstaand(request).maak(vb, sug, inbox_naam=naam)
     log.info(

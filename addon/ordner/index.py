@@ -10,7 +10,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Callable
 
-from ordner.config import INBOX_DUBBEL_DIR, INBOX_RESERVERING, INBOX_TEKST_DIR, META_NAAM
+from ordner.config import INBOX_DUBBEL_DIR, INBOX_TEKST_DIR, META_NAAM
 from ordner.dubbel import sha256_van_bestand
 from ordner.ingest import LeesTekst, Voorbereid, maak_document_uit_voorbereid, voorbereid_uit_teksten
 from ordner.meta import (
@@ -136,7 +136,7 @@ class Wachtend:
 class InboxTelling:
     """Drie tellers voor de beheerpagina (pakket 18)."""
 
-    totaal: int  # gewone bestanden direct in _inbox/ (naam niet beginnend met "."); gereserveerde tellen mee
+    totaal: int  # gewone bestanden direct in _inbox/ (naam niet beginnend met ".")
     wachtend: int  # len(wachtend())
     dubbel: int  # gewone bestanden in _inbox/_dubbel/; map ontbreekt -> 0
 
@@ -202,10 +202,9 @@ class Reconciler:
         self.lees_tekst = lees_tekst  # voor de inbox: tekst vooraf lezen om de documentdatum te bepalen
         self._inbox_groottes: dict[Path, int] = {}
         # pakket 17: per wachtend bestand de archieftitels waartegen het voor het laatst is beoordeeld
-        # (gelijke verzameling -> niet opnieuw beoordelen), en de reserveringen van de inboxpagina
-        # (naam -> verloopt op). Beide alleen in het geheugen; de gelezen tekst staat in `_inbox/.tekst/`.
+        # (gelijke verzameling -> niet opnieuw beoordelen). Alleen in het geheugen; de gelezen tekst
+        # staat in `_inbox/.tekst/`.
         self._beoordeeld: dict[str, frozenset[str]] = {}
-        self._reserveringen: dict[str, datetime] = {}
 
     def run(self) -> ReconcileRapport:
         """Synchroon; de app roept aan via asyncio.to_thread."""
@@ -304,8 +303,9 @@ class Reconciler:
         Een bestand dat al in het archief staat (zelfde sha256) gaat naar `_inbox/_dubbel/` (pakket 16).
         Levert de tekst geen afzender op, dan blijft het bestand wachten (pakket 17): de gelezen tekst
         staat in `_inbox/.tekst/<naam>.txt` zodat er maar één keer OCR draait, en het bestand wordt pas
-        opnieuw beoordeeld als de verzameling archieftitels veranderd is. Gereserveerde bestanden
-        (iemand geeft er via de inboxpagina een titel aan) worden overgeslagen.
+        opnieuw beoordeeld als de verzameling archieftitels veranderd is. Een bestand dat iemand op dat
+        moment via de inboxpagina open heeft wordt gewoon meebeoordeeld (pakket 24): Opslaan op scherm 2
+        vangt af dat het intussen al is opgenomen.
         """
         aangemaakt: list[Path] = []
         kandidaten = sorted(
@@ -314,8 +314,6 @@ class Reconciler:
         titels = self._titels()
         for pad in kandidaten:
             naam = pad.name
-            if self._is_gereserveerd(naam):
-                continue
             try:
                 grootte = pad.stat().st_size
                 if self._inbox_groottes.get(pad) != grootte:
@@ -348,11 +346,9 @@ class Reconciler:
         return aangemaakt
 
     def wachtend(self) -> list[Wachtend]:
-        """Beoordeelde inboxbestanden zonder titel die niet gereserveerd zijn; op naam gesorteerd."""
+        """Beoordeelde inboxbestanden zonder titel; op naam gesorteerd."""
         lijst: list[Wachtend] = []
         for naam in sorted(list(self._beoordeeld)):  # kopie: de poll-thread wijzigt het dict
-            if self._is_gereserveerd(naam):
-                continue
             try:
                 st = (self.archief.inbox_dir / naam).stat()
             except OSError:
@@ -380,15 +376,8 @@ class Reconciler:
         vb = voorbereid_uit_teksten([(naam, pad.read_bytes())], {0: tekst} if tekst else {})
         return vb, stel_voor(tekst, self._titels())
 
-    def reserveer(self, naam: str) -> None:
-        """Houdt het bestand buiten de poll tot `geef_vrij`, `verwijder_uit_inbox` of het verlopen van de reservering."""
-        self._reserveringen[naam] = datetime.now() + INBOX_RESERVERING
-
-    def geef_vrij(self, naam: str) -> None:
-        self._reserveringen.pop(naam, None)
-
     def verwijder_uit_inbox(self, naam: str) -> None:
-        """Bestand en sidecar weg (missing_ok) en de reservering vrijgeven; na opname via de inboxpagina."""
+        """Bestand en sidecar weg (missing_ok); na opname of Verwijderen via scherm 2."""
         pad = self.archief.inbox_pad(naam)
         pad.unlink(missing_ok=True)
         self._sidecar(pad).unlink(missing_ok=True)
@@ -397,20 +386,10 @@ class Reconciler:
     def _titels(self) -> frozenset[str]:
         return frozenset(e.meta.titel for e in self.index.alle())
 
-    def _is_gereserveerd(self, naam: str) -> bool:
-        verloopt = self._reserveringen.get(naam)
-        if verloopt is None:
-            return False
-        if verloopt <= datetime.now():
-            self._reserveringen.pop(naam, None)
-            return False
-        return True
-
     def _vergeet(self, pad: Path) -> None:
         """Alle geheugenstaat van een inboxbestand weg (opgenomen, verplaatst, verdwenen)."""
         self._inbox_groottes.pop(pad, None)
         self._beoordeeld.pop(pad.name, None)
-        self._reserveringen.pop(pad.name, None)
 
     def _sidecar(self, pad: Path) -> Path:
         return self.archief.inbox_dir / INBOX_TEKST_DIR / (pad.name + ".txt")

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from pathlib import Path
 
 import pytest
@@ -482,36 +482,6 @@ def test_inbox_sidecar_overleeft_herstart_en_volgt_mtime(archief: Archief, queue
     assert not _sidecar(archief, "brief.pdf").exists()
 
 
-def test_inbox_gereserveerd_wordt_overgeslagen_tot_vrijgave_of_verloop(archief: Archief, queue: Queue) -> None:
-    reconciler = _met_lezer(archief, queue, {"a.pdf": _BSR, "b.pdf": _BSR + "extra\n"})
-    (archief.inbox_dir / "a.pdf").write_bytes(b"a")
-    (archief.inbox_dir / "b.pdf").write_bytes(b"b")
-    reconciler.verwerk_inbox()
-    reconciler.verwerk_inbox()
-    assert [w.naam for w in reconciler.wachtend()] == ["a.pdf", "b.pdf"]
-
-    reconciler.reserveer("a.pdf")
-    assert [w.naam for w in reconciler.wachtend()] == ["b.pdf"]
-    reconciler.index.herlaad(archief, _doc(archief, "BSR", DATUM))
-    docs = reconciler.verwerk_inbox()
-    assert [lees_meta(d).bestanden for d in docs] == [["b.pdf"]]  # a.pdf is gereserveerd en blijft liggen
-    assert (archief.inbox_dir / "a.pdf").exists()
-
-    reconciler.geef_vrij("a.pdf")
-    docs = reconciler.verwerk_inbox()
-    assert [lees_meta(d).bestanden for d in docs] == [["a.pdf"]]
-
-    # verlopen reservering telt niet meer
-    (archief.inbox_dir / "c.pdf").write_bytes(b"c")
-    reconciler.lees_tekst = _lezer({"c.pdf": _BSR + "c\n"})
-    reconciler.reserveer("c.pdf")
-    reconciler._reserveringen["c.pdf"] -= timedelta(hours=2)
-    reconciler.verwerk_inbox()
-    docs = reconciler.verwerk_inbox()
-    assert [lees_meta(d).bestanden for d in docs] == [["c.pdf"]]
-    assert reconciler._reserveringen == {}
-
-
 def test_inbox_mislukte_extractie_lege_sidecar_en_queue_bij_opname(archief: Archief, queue: Queue) -> None:
     reconciler = _met_lezer(archief, queue, {"kapot.pdf": None})
     (archief.inbox_dir / "kapot.pdf").write_bytes(b"%PDF")
@@ -581,11 +551,9 @@ def test_bereid_inbox_voor_en_verwijder_uit_inbox(archief: Archief, queue: Queue
         with pytest.raises(OngeldigPad):
             reconciler.bereid_inbox_voor(naam)
 
-    reconciler.reserveer("scan.pdf")
     reconciler.verwijder_uit_inbox("scan.pdf")
     assert _inbox_bestanden(archief) == []
     assert not _sidecar(archief, "scan.pdf").exists()
-    assert reconciler._reserveringen == {}
     reconciler.verwijder_uit_inbox("scan.pdf")  # missing_ok
 
 
@@ -635,11 +603,6 @@ def test_inbox_telling(archief: Archief, queue: Queue) -> None:
     reconciler.verwerk_inbox()
     reconciler.verwerk_inbox()
     assert reconciler.inbox_telling() == InboxTelling(totaal=1, wachtend=1, dubbel=2)
-
-    reconciler.reserveer("scan.pdf")  # gereserveerd: ligt er nog, maar wacht niet
-    assert reconciler.inbox_telling() == InboxTelling(totaal=1, wachtend=0, dubbel=2)
-    reconciler.geef_vrij("scan.pdf")
-    assert reconciler.inbox_telling().wachtend == 1
 
     reconciler.verwijder_uit_inbox("scan.pdf")
     assert reconciler.inbox_telling() == InboxTelling(0, 0, 2)
