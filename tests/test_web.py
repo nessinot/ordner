@@ -245,7 +245,7 @@ def test_scherm2_voorgevuld_uit_tekst(client: TestClient, mock_cmd) -> None:  # 
     token = _token(_stap1(client, [("factuur.pdf", _PDF, "application/pdf")]))
     r = client.get(f"/upload/{token}")
     assert r.status_code == 200
-    assert 'name="titel" value="Eneco Services B.V."' in r.text
+    assert 'name="titel" value="Eneco Services"' in r.text
     assert "voorstel uit het document" in r.text
     assert 'name="documentdatum" value="2024-03-12"' in r.text
     assert "datum uit tekst" in r.text
@@ -569,7 +569,7 @@ def test_inbox_met_titel_direct_opgenomen(client: TestClient, mock_cmd) -> None:
     mock_cmd.register("pdftotext", stdout=_ENECO)
     pad = _in_inbox(client, "factuur.pdf")
     assert not pad.exists()
-    assert lees_meta(_root(client) / "2024" / "2024-03-12_eneco-services-b-v").titel == "Eneco Services B.V."
+    assert lees_meta(_root(client) / "2024" / "2024-03-12_eneco-services").titel == "Eneco Services"
     assert "De inbox is leeg." in client.get("/inbox").text
     assert "in de inbox wacht" not in client.get("/").text
 

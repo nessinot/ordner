@@ -303,7 +303,7 @@ def test_reconcile_verdwenen_document_uit_index(archief: Archief, reconciler: Re
 # Sinds pakket 17 krijgt een inboxbestand alleen een document als de tekst een afzender oplevert;
 # anders blijft het wachten (`wachtend()`), met de gelezen tekst in `_inbox/.tekst/<naam>.txt`.
 
-_MET_TITEL = "Eneco B.V.        Factuur\nFactuurnummer 123\nFactuurdatum: 01-02-2024\n" + "regel\n" * 30
+_MET_TITEL = "Eneco Services B.V.        Factuur\nFactuurnummer 123\nFactuurdatum: 01-02-2024\n" + "regel\n" * 30
 _ZONDER_TITEL = "Geachte heer,\n" + "lopende tekst zonder afzender\n" * 30
 _BSR = "Geachte heer,\nUw aanslag van BSR is bijgevoegd.\nDatum: 03-05-2024\n" + "lopende tekst\n" * 30
 
@@ -346,9 +346,9 @@ def test_inbox_stabiel_na_twee_polls(archief: Archief, queue: Queue) -> None:
     assert len(docs) == 1
     doc = docs[0]
     assert doc.parent == archief.root / "2024"
-    assert doc.name == "2024-02-01_eneco-b-v"
+    assert doc.name == "2024-02-01_eneco-services"
     meta = lees_meta(doc)
-    assert meta.titel == "Eneco B.V."
+    assert meta.titel == "Eneco Services"
     assert meta.documentdatum == date(2024, 2, 1)
     assert meta.datumbron == "tekst"
     assert meta.bestanden == ["WOZ_beschikking-2026.pdf"]
@@ -370,7 +370,7 @@ def test_inbox_met_tekstlezer_haalt_datum_uit_tekst(archief: Archief, queue: Que
     (archief.inbox_dir / "bon.jpg").write_bytes(b"jpg")
     reconciler.verwerk_inbox()
     docs = reconciler.verwerk_inbox()
-    assert [d.name for d in docs] == ["2023-06-15_eneco-b-v"]
+    assert [d.name for d in docs] == ["2023-06-15_eneco"]
 
     meta = lees_meta(docs[0])
     assert meta.documentdatum == date(2023, 6, 15)
@@ -390,9 +390,9 @@ def test_inbox_titel_en_tags_uit_tekst(archief: Archief, queue: Queue) -> None:
     (archief.inbox_dir / "scan_0001.pdf").write_bytes(b"%PDF")
     reconciler.verwerk_inbox()
     docs = reconciler.verwerk_inbox()
-    assert [d.name for d in docs] == ["2024-02-01_eneco-b-v"]
+    assert [d.name for d in docs] == ["2024-02-01_eneco-services"]
     meta = lees_meta(docs[0])
-    assert meta.titel == "Eneco B.V."
+    assert meta.titel == "Eneco Services"
     assert meta.tags == ["factuur"]
     assert meta.datumbron == "tekst"
     assert meta.bestanden == ["scan_0001.pdf"]
@@ -477,7 +477,7 @@ def test_inbox_sidecar_overleeft_herstart_en_volgt_mtime(archief: Archief, queue
     os.utime(pad, (nieuw, nieuw))
     opnieuw.verwerk_inbox()  # grootte veranderd: eerst weer stabiel worden
     docs = opnieuw.verwerk_inbox()
-    assert [d.name for d in docs] == ["2024-02-01_eneco-b-v"]
+    assert [d.name for d in docs] == ["2024-02-01_eneco-services"]
     assert opnieuw.lees_tekst.gelezen == ["brief.pdf"]  # type: ignore[union-attr]
     assert not _sidecar(archief, "brief.pdf").exists()
 
@@ -566,7 +566,7 @@ def test_inbox_dubbel_naar_dubbelmap(archief: Archief, queue: Queue) -> None:
     reconciler.verwerk_inbox()
     docs = reconciler.verwerk_inbox()
 
-    assert [d.name for d in docs] == ["2024-02-01_eneco"]  # archieftitel "Eneco" wint van "Eneco B.V." uit de tekst
+    assert [d.name for d in docs] == ["2024-02-01_eneco"]  # archieftitel "Eneco" wint van "Eneco Services" uit de tekst
     assert not (archief.inbox_dir / "kopie.pdf").exists()
     assert (archief.inbox_dir / "_dubbel" / "kopie.pdf").read_bytes() == b"x"
     assert reconciler.lees_tekst.gelezen == ["nieuw.pdf"]  # type: ignore[union-attr]  # een dubbel wordt nooit gelezen

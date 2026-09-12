@@ -2,6 +2,10 @@
 
 Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. Nieuwste versie bovenaan; de bovenste kop moet gelijk zijn aan `version` in `config.yaml` (dat controleert `tests/test_addon_config.py`).
 
+## 0.18.0 (2026-09-12)
+
+- **Titelvoorstel zonder rechtsvorm.** Herkent Ordner de afzender aan een rechtsvorm (B.V., N.V., VOF, U.A.) of aan de naam achter "t.n.v.", dan stelt het nu alleen de naam voor: "Coolblue" in plaats van "Coolblue B.V.". Dat geldt voor de inbox en voor het uploadformulier. Bestaande documenten veranderen niet. Let op: een titel die je al eerder mét rechtsvorm hebt opgeslagen wordt bij de volgende factuur van dezelfde afzender opnieuw herkend, inclusief die rechtsvorm; pas zo'n titel één keer aan en de volgende krijgt de korte naam.
+
 ## 0.17.1 (2026-09-12)
 
 - **Eén keer Terug naar de inbox.** De link onderin het gegevensscherm van een inboxbestand is weg; de terug-link bovenin volstaat. Onderin staan nu alleen Opslaan en Verwijderen.

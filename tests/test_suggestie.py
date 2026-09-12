@@ -37,7 +37,7 @@ def test_bekende_titel_matcht_niet_binnen_een_woord() -> None:
 def test_bekende_titel_wint_van_rechtsvorm() -> None:
     tekst = "Vattenfall N.V.\nUw leverancier: Eneco\n" + _LANG
     assert stel_titel_voor(tekst, ["Eneco"]) == ("Eneco", "archief")
-    assert stel_titel_voor(tekst) == ("Vattenfall N.V.", "rechtsvorm")
+    assert stel_titel_voor(tekst) == ("Vattenfall", "rechtsvorm")
 
 
 def test_langste_bekende_titel_wint_dan_vroegste_treffer() -> None:
@@ -64,13 +64,18 @@ def test_bekende_titel_document_en_documenttypewoord_worden_genegeerd() -> None:
     "regel",
     ["IBAN NL12ABCD0123456789 t.n.v. Eneco Services B.V.", "Ten name van: Eneco Services B.V.", "T.N.V Eneco Services B.V."],
 )
-def test_tnv_geeft_de_naam_erachter(regel: str) -> None:
-    assert stel_titel_voor(regel + "\n" + _LANG) == ("Eneco Services B.V.", "tnv")
+def test_tnv_geeft_de_naam_erachter_zonder_rechtsvorm(regel: str) -> None:
+    assert stel_titel_voor(regel + "\n" + _LANG) == ("Eneco Services", "tnv")
 
 
 def test_tnv_stopt_bij_de_kolomcel() -> None:
     tekst = "t.n.v. Eneco Services B.V.        Vervaldatum 01-01-2025\n" + _LANG
-    assert stel_titel_voor(tekst) == ("Eneco Services B.V.", "tnv")
+    assert stel_titel_voor(tekst) == ("Eneco Services", "tnv")
+
+
+def test_tnv_stopt_bij_de_rechtsvorm() -> None:
+    assert stel_titel_voor("t.n.v. Eneco Services B.V. te Rotterdam\n" + _LANG) == ("Eneco Services", "tnv")
+    assert stel_titel_voor("t.n.v. Bakkerij Jansen\n" + _LANG) == ("Bakkerij Jansen", "tnv")
 
 
 def test_tnv_zonder_naam_of_binnen_woord_telt_niet() -> None:
@@ -84,14 +89,14 @@ def test_tnv_zonder_naam_of_binnen_woord_telt_niet() -> None:
 @pytest.mark.parametrize(
     ("cel", "verwacht"),
     [
-        ("Eneco Services B.V.", "Eneco Services B.V."),
-        ("Eneco Services B.V. Postbus 1234", "Eneco Services B.V."),
-        ("Bakkerij Jansen VOF", "Bakkerij Jansen VOF"),
-        ("Coöperatie DELA U.A.", "Coöperatie DELA U.A."),
-        ("Vattenfall N.V.,", "Vattenfall N.V."),
+        ("Eneco Services B.V.", "Eneco Services"),
+        ("Eneco Services B.V. Postbus 1234", "Eneco Services"),
+        ("Bakkerij Jansen VOF", "Bakkerij Jansen"),
+        ("Coöperatie DELA U.A.", "Coöperatie DELA"),
+        ("Vattenfall N.V.,", "Vattenfall"),
     ],
 )
-def test_achtervoegsel_geeft_de_cel_tot_en_met_het_achtervoegsel(cel: str, verwacht: str) -> None:
+def test_achtervoegsel_geeft_de_cel_tot_voor_het_achtervoegsel(cel: str, verwacht: str) -> None:
     assert stel_titel_voor("Geachte heer,\n" + cel + "\n" + _LANG) == (verwacht, "rechtsvorm")
 
 
@@ -128,7 +133,7 @@ def test_los_instantiewoord_geeft_de_hele_cel() -> None:
 
 def test_eerste_regel_met_rechtsvorm_wint_en_kolommen_blijven_gescheiden() -> None:
     tekst = "Klant B.V.        Eneco B.V.\nVattenfall N.V.\n" + _LANG
-    assert stel_titel_voor(tekst) == ("Klant B.V.", "rechtsvorm")
+    assert stel_titel_voor(tekst) == ("Klant", "rechtsvorm")
 
 
 # --- stap 3: domein van e-mailadres of website -------------------------------
@@ -161,7 +166,7 @@ def test_domein_van_emailprovider_telt_niet() -> None:
 
 def test_domein_zonder_passende_cel_valt_door_naar_rechtsvorm() -> None:
     tekst = "Kenmerk 1\ninfo@coolblue.nl\nCoolblue B.V.\n" + _LANG
-    assert stel_titel_voor(tekst) == ("Coolblue B.V.", "rechtsvorm")
+    assert stel_titel_voor(tekst) == ("Coolblue", "rechtsvorm")
 
 
 def test_domein_wint_van_rechtsvorm() -> None:
@@ -195,7 +200,8 @@ def test_lange_tekst_neemt_nooit_blind_de_eerste_regel() -> None:
 
 def test_opschonen_leestekens_en_whitespace() -> None:
     assert stel_titel_voor("Kenmerk\n- Gemeente Utrecht :\n" + _LANG) == ("Gemeente Utrecht", "rechtsvorm")
-    assert stel_titel_voor("Kenmerk\nt.n.v.: Eneco Services B.V.,\n" + _LANG) == ("Eneco Services B.V.", "tnv")
+    assert stel_titel_voor("Kenmerk\nt.n.v.: Eneco Services B.V.,\n" + _LANG) == ("Eneco Services", "tnv")
+    assert stel_titel_voor("Kenmerk\nt.n.v.: Bakkerij Jansen.\n" + _LANG) == ("Bakkerij Jansen", "tnv")
 
 
 def test_afkappen_op_60_tekens_op_woordgrens() -> None:
@@ -208,7 +214,7 @@ def test_afkappen_op_60_tekens_op_woordgrens() -> None:
 
 
 def test_hoofdletters_blijven_zoals_in_de_tekst() -> None:
-    assert stel_titel_voor("Kenmerk\nENECO SERVICES B.V.\n" + _LANG)[0] == "ENECO SERVICES B.V."
+    assert stel_titel_voor("Kenmerk\nENECO SERVICES B.V.\n" + _LANG)[0] == "ENECO SERVICES"
 
 
 # --- tags ---------------------------------------------------------------------
@@ -244,7 +250,7 @@ def test_tags_in_volgorde_zonder_dubbelen() -> None:
 
 def test_stel_voor_combineert() -> None:
     tekst = "Eneco Services B.V.        Factuur\nFactuurdatum 01-02-2024\n" + _LANG
-    assert stel_voor(tekst) == Suggestie(titel="Eneco Services B.V.", titelbron="rechtsvorm", tags=["factuur"])
+    assert stel_voor(tekst) == Suggestie(titel="Eneco Services", titelbron="rechtsvorm", tags=["factuur"])
     assert stel_voor(tekst, ["Eneco"]) == Suggestie(titel="Eneco", titelbron="archief", tags=["factuur"])
 
 

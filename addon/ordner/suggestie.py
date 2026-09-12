@@ -10,6 +10,7 @@ Heuristiek voor de titel, op prioriteit (de eerste stap met resultaat wint):
 3. de naam die hoort bij het domein van een e-mailadres of website in de tekst
    (`info@voorbeeld-installaties.nl` -> de cel "Voorbeeld Installaties");
 4. de eerste kolomcel met een rechtsvorm (B.V., N.V., …) of instantiewoord (Gemeente, Belastingdienst, …);
+   het rechtsvorm-achtervoegsel zelf blijft weg uit de titel ("Coolblue B.V." -> "Coolblue"), ook achter "t.n.v.";
 5. anders leeg.
 """
 
@@ -51,7 +52,7 @@ _DOCUMENTTYPEN: dict[str, str] = {
 }
 _DOCUMENTTYPE_WOORDEN = set(_DOCUMENTTYPEN) | set(_DOCUMENTTYPEN.values())
 
-# Rechtsvormen als achtervoegsel: de cel vanaf het begin tot en met het achtervoegsel.
+# Rechtsvormen als achtervoegsel: herkennen de cel; de titel is het deel ervoor.
 # Bewust hoofdlettergevoelig: "b.v." is in lopende tekst "bijvoorbeeld".
 _ACHTERVOEGSELS: tuple[str, ...] = ("B.V.", "BV", "N.V.", "NV", "V.O.F.", "VOF", "U.A.")
 # Instantiewoorden als voorvoegsel: vanaf het woord tot het eind van de cel ("Gemeente Amsterdam").
@@ -80,14 +81,13 @@ def _alternatie(woorden: Iterable[str]) -> str:
 
 _KOPREGEL_RE = re.compile(rf"^(?P<woord>{_alternatie(_DOCUMENTTYPEN)})(?!{_LETTER})", re.I)
 _TNV_RE = re.compile(rf"{_GRENS_VOOR}(?:t\.n\.v\.?|ten name van){_GRENS_NA}\s*:?\s*(?P<naam>.*)$", re.I)
-_ACHTERVOEGSEL_RE = re.compile(rf"^\S.*?\s+(?:{_alternatie(_ACHTERVOEGSELS)}){_GRENS_NA}")
+_ACHTERVOEGSEL_RE = re.compile(rf"^\S.*?(?P<rest>\s+(?:{_alternatie(_ACHTERVOEGSELS)}){_GRENS_NA}.*)$")
 _VOORVOEGSEL_RE = re.compile(rf"{_GRENS_VOOR}(?:{_alternatie(_VOORVOEGSELS)}){_GRENS_NA}\s+\S", re.I)
 _LOS_WOORD_RE = re.compile(rf"{_GRENS_VOOR}(?:{_alternatie(_LOSSE_WOORDEN)}){_GRENS_NA}", re.I)
 # Host achter "@", "http(s)://" of "www."; minstens twee labels.
 _DOMEIN_RE = re.compile(r"(?:@|https?://|www\.)(?P<host>[a-z0-9-]+(?:\.[a-z0-9-]+)+)", re.I)
 
 _LETTERS_RE = re.compile(_LETTER)
-_AFKORTING_EINDE_RE = re.compile(rf"(?:^|[\s.]){_LETTER}\.$")  # "B.V." / "U.A.": de laatste punt hoort bij de naam
 
 
 @dataclass(frozen=True)
@@ -110,19 +110,19 @@ def cellen(regel: str) -> list[str]:
 
 
 def _schoon(tekst: str) -> str:
-    """Whitespace samenvoegen, leestekens aan de randen weg (de punt van "B.V." blijft), max 60 tekens op woordgrens."""
-    s = " ".join(tekst.split())
-    vorige = None
-    while s != vorige:
-        vorige = s
-        s = s.lstrip(",;:.- ").rstrip(",;:- ")
-        if s.endswith(".") and not _AFKORTING_EINDE_RE.search(s):
-            s = s[:-1]
+    """Whitespace samenvoegen, leestekens aan de randen weg, max 60 tekens op woordgrens."""
+    s = " ".join(tekst.split()).strip(",;:.- ")
     if len(s) > _MAX_TITEL:
         kop = s[:_MAX_TITEL]
         s = kop.rsplit(" ", 1)[0] if " " in kop else kop
         s = s.rstrip(",;:.- ")
     return s
+
+
+def _zonder_rechtsvorm(tekst: str) -> str:
+    """Alles vanaf een rechtsvorm-achtervoegsel weg: "Coolblue B.V. Postbus 1" -> "Coolblue"; anders ongewijzigd."""
+    m = _ACHTERVOEGSEL_RE.match(tekst)
+    return tekst[: m.start("rest")] if m else tekst
 
 
 def _is_documenttypewoord(tekst: str) -> bool:
@@ -159,7 +159,7 @@ def _uit_tnv(regels: list[list[str]]) -> str:
             m = _TNV_RE.search(cel)
             if m is None:
                 continue
-            naam = _schoon(m.group("naam")[:_MAX_TITEL])
+            naam = _schoon(_zonder_rechtsvorm(m.group("naam")[:_MAX_TITEL]))
             if naam:
                 return naam
     return ""
@@ -196,9 +196,8 @@ def _uit_domein(tekst: str, regels: list[list[str]]) -> str:
 def _uit_rechtsvorm(regels: list[list[str]]) -> str:
     for cellen_ in regels:
         for cel in cellen_:
-            m = _ACHTERVOEGSEL_RE.match(cel)
-            if m is not None:
-                naam = _schoon(cel[: m.end()])
+            if _ACHTERVOEGSEL_RE.match(cel):
+                naam = _schoon(_zonder_rechtsvorm(cel))
             else:
                 m = _VOORVOEGSEL_RE.search(cel)
                 if m is not None:
