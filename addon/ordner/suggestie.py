@@ -8,7 +8,7 @@ Heuristiek voor de titel, op prioriteit (de eerste stap met resultaat wint):
 1. een bekende titel uit het archief die als heel woord in de tekst voorkomt;
 2. de naam achter "t.n.v." of "ten name van";
 3. de naam die hoort bij het domein van een e-mailadres of website in de tekst
-   (`info@voorbeeld-installaties.nl` -> de cel "Voorbeeld Installaties");
+   (`info@voorbeeld-installaties.nl` -> de cel "Voorbeeld Installaties", ook als die cel een rechtsvorm heeft);
 4. de eerste kolomcel met een rechtsvorm (B.V., N.V., …) of instantiewoord (Gemeente, Belastingdienst, …);
    het rechtsvorm-achtervoegsel zelf blijft weg uit de titel ("Coolblue B.V." -> "Coolblue"), ook achter "t.n.v.";
 5. anders leeg.
@@ -178,16 +178,20 @@ def _domeinlabels(tekst: str) -> list[str]:
 
 
 def _uit_domein(tekst: str, regels: list[list[str]]) -> str:
-    """Eerste cel waarvan de slug gelijk is aan een domeinlabel (ook zonder koppeltekens); de hoofdletters uit de tekst."""
+    """Eerste cel waarvan de slug gelijk is aan een domeinlabel (ook zonder koppeltekens); de hoofdletters uit de tekst.
+
+    Een rechtsvorm-achtervoegsel telt niet mee: "Coolblue B.V." matcht `coolblue` en geeft "Coolblue".
+    """
     for label in _domeinlabels(tekst):
         kaal = label.replace("-", "")
         for cellen_ in regels:
             for cel in cellen_:
                 if len(_LETTERS_RE.findall(cel)) < 3:
                     continue
-                slug = maak_slug(cel)
+                kern = _zonder_rechtsvorm(cel)
+                slug = maak_slug(kern)
                 if slug == label or slug.replace("-", "") == kaal:
-                    naam = _schoon(cel)
+                    naam = _schoon(kern)
                     if naam:
                         return naam
     return ""

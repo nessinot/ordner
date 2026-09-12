@@ -165,8 +165,15 @@ def test_domein_van_emailprovider_telt_niet() -> None:
 
 
 def test_domein_zonder_passende_cel_valt_door_naar_rechtsvorm() -> None:
-    tekst = "Kenmerk 1\ninfo@coolblue.nl\nCoolblue B.V.\n" + _LANG
-    assert stel_titel_voor(tekst) == ("Coolblue", "rechtsvorm")
+    tekst = "Kenmerk 1\ninfo@coolblue.nl\nWebwinkel B.V.\n" + _LANG
+    assert stel_titel_voor(tekst) == ("Webwinkel", "rechtsvorm")
+
+
+def test_domein_matcht_cel_zonder_rechtsvorm() -> None:
+    assert stel_titel_voor("Kenmerk 1\ninfo@coolblue.nl\nCoolblue B.V.\n" + _LANG) == ("Coolblue", "domein")
+    # Voorwaarden: kopregel met rechtsvorm bovenaan, de naam zelf pas in de voettekst; niet de kopregel.
+    tekst = "Aanvullende voorwaarden Coolblue B.V.\nMail klantenservice@coolblue.nl\n" + _LANG + "Versie 2018        Coolblue B.V.\n"
+    assert stel_titel_voor(tekst) == ("Coolblue", "domein")
 
 
 def test_domein_wint_van_rechtsvorm() -> None:
