@@ -6,7 +6,7 @@ import pytest
 
 from ordner.suggestie import Suggestie, cellen, stel_tags_voor, stel_titel_voor, stel_voor
 
-# Lange "brief" (>= 25 niet-lege regels) zodat de bon-stap niet meedoet.
+# Lange "brief" als opvulling; de titel komt nooit uit vulregels.
 _LANG = "regel tekst\n" * 30
 
 
@@ -121,7 +121,9 @@ def test_voorvoegsel_zonder_naam_erachter_telt_niet() -> None:
 def test_los_instantiewoord_geeft_de_hele_cel() -> None:
     assert stel_titel_voor("Kenmerk 1\nBelastingdienst\n" + _LANG) == ("Belastingdienst", "rechtsvorm")
     assert stel_titel_voor("Kenmerk 1\nUniversiteit Utrecht        Kamer 1\n" + _LANG) == ("Universiteit Utrecht", "rechtsvorm")
-    assert stel_titel_voor("Rabobank\n" + _LANG) == ("", "geen")  # "bank" niet als heel woord
+    assert stel_titel_voor("Rabobank\n" + _LANG) == ("", "geen")
+    assert stel_titel_voor("Kenmerk 1\nBANK TEST 0000000000\n" + _LANG) == ("", "geen")  # "bank" is geen instantiewoord meer
+    assert stel_titel_voor("Kenmerk 1\nUw verzekeraar\n" + _LANG) == ("", "geen")
 
 
 def test_eerste_regel_met_rechtsvorm_wint_en_kolommen_blijven_gescheiden() -> None:
@@ -129,17 +131,59 @@ def test_eerste_regel_met_rechtsvorm_wint_en_kolommen_blijven_gescheiden() -> No
     assert stel_titel_voor(tekst) == ("Klant B.V.", "rechtsvorm")
 
 
-# --- stap 4: korte tekst (bon) ------------------------------------------------
+# --- stap 3: domein van e-mailadres of website -------------------------------
+
+_VOETTEKST = (
+    "    Voorbeeld Installaties  T: 0800-0000000                            BANK TEST 0000000000\n"
+    "    Teststraat 1            E: info@voorbeeld-installaties.nl          IBAN NL00TEST0000000000\n"
+    "    1234 AB Voorbeeldstad   I: https://www.voorbeeld-installaties.nl/  BIC TESTNL2A\n"
+)
 
 
-def test_bon_eerste_bruikbare_regel() -> None:
-    assert stel_titel_voor("ALBERT HEIJN 1234\nKassabon\nMelk 1,09\nDatum 01-02-2024") == ("ALBERT HEIJN 1234", "eerste-regel")
+def test_domein_geeft_de_cel_met_dezelfde_slug() -> None:
+    tekst = "Uw Factuur\nFactuur Nr: 100001\nFactuurdatum: 1 apr. 2018\n" + _VOETTEKST
+    assert stel_titel_voor(tekst) == ("Voorbeeld Installaties", "domein")
 
 
-def test_bon_slaat_documenttypewoord_datum_en_korte_regels_over() -> None:
-    tekst = "Bon\n12\nVervaldatum: 12-04-2024\nFactuurdatum\n01-02-2024\nBakkerij Jansen\n"
-    assert stel_titel_voor(tekst) == ("Bakkerij Jansen", "eerste-regel")
-    assert stel_titel_voor("Factuur nr. 123\n01-02-2024\n") == ("", "geen")
+def test_domein_uit_alleen_email_of_alleen_website() -> None:
+    assert stel_titel_voor("Kenmerk 1\nCoolblue\nklantenservice@coolblue.nl\n" + _LANG) == ("Coolblue", "domein")
+    assert stel_titel_voor("Kenmerk 1\nCoolblue\nwww.coolblue.nl\n" + _LANG) == ("Coolblue", "domein")
+    assert stel_titel_voor("Kenmerk 1\nCoolblue\nhttps://shop.coolblue.nl/x\n" + _LANG) == ("Coolblue", "domein")
+
+
+def test_domein_zonder_koppeltekens_matcht_ook() -> None:
+    assert stel_titel_voor("Kenmerk 1\nVoorbeeld Installaties\ninfo@voorbeeldinstallaties.nl\n" + _LANG) == ("Voorbeeld Installaties", "domein")
+
+
+def test_domein_van_emailprovider_telt_niet() -> None:
+    assert stel_titel_voor("Kenmerk 1\nGmail\njansen@gmail.com\n" + _LANG) == ("", "geen")
+
+
+def test_domein_zonder_passende_cel_valt_door_naar_rechtsvorm() -> None:
+    tekst = "Kenmerk 1\ninfo@coolblue.nl\nCoolblue B.V.\n" + _LANG
+    assert stel_titel_voor(tekst) == ("Coolblue B.V.", "rechtsvorm")
+
+
+def test_domein_wint_van_rechtsvorm() -> None:
+    tekst = "Klant B.V.\nCoolblue\ninfo@coolblue.nl\n" + _LANG
+    assert stel_titel_voor(tekst) == ("Coolblue", "domein")
+
+
+def test_domein_dat_vaker_voorkomt_wint() -> None:
+    tekst = "PostNL\nwww.postnl.nl\nCoolblue\ninfo@coolblue.nl\nwww.coolblue.nl\n" + _LANG
+    assert stel_titel_voor(tekst) == ("Coolblue", "domein")
+
+
+def test_domein_cel_heeft_minstens_drie_letters() -> None:
+    assert stel_titel_voor("Kenmerk 1\nAH\ninfo@ah.nl\n" + _LANG) == ("", "geen")
+
+
+# --- geen bon-regel meer ------------------------------------------------------
+
+
+def test_korte_tekst_neemt_niet_de_eerste_regel() -> None:
+    assert stel_titel_voor("ALBERT HEIJN 1234\nKassabon\nMelk 1,09\nDatum 01-02-2024") == ("", "geen")
+    assert stel_titel_voor("Uw Factuur\nFactuur Nr: 1\n") == ("", "geen")
 
 
 def test_lange_tekst_neemt_nooit_blind_de_eerste_regel() -> None:

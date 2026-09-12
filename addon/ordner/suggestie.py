@@ -7,21 +7,24 @@ Een verkeerde naam is erger dan geen naam: bij twijfel is de titelsuggestie leeg
 Heuristiek voor de titel, op prioriteit (de eerste stap met resultaat wint):
 1. een bekende titel uit het archief die als heel woord in de tekst voorkomt;
 2. de naam achter "t.n.v." of "ten name van";
-3. de eerste kolomcel met een rechtsvorm (B.V., N.V., …) of instantiewoord (Gemeente, Belastingdienst, …);
-4. bij korte teksten (bonnen) de eerste bruikbare regel;
+3. de naam die hoort bij het domein van een e-mailadres of website in de tekst
+   (`info@voorbeeld-installaties.nl` -> de cel "Voorbeeld Installaties");
+4. de eerste kolomcel met een rechtsvorm (B.V., N.V., …) of instantiewoord (Gemeente, Belastingdienst, …);
 5. anders leeg.
 """
 
 from __future__ import annotations
 
 import re
+from collections import Counter
 from dataclasses import dataclass
 from typing import Iterable, Literal
 
-TitelBron = Literal["archief", "tnv", "rechtsvorm", "eerste-regel", "geen"]
+from ordner.slug import maak_slug
+
+TitelBron = Literal["archief", "tnv", "domein", "rechtsvorm", "geen"]
 
 _MAX_TITEL = 60  # tekens; afkappen op woordgrens
-_MAX_REGELS_BON = 25  # minder niet-lege regels dan dit -> "bon", eerste regel mag als titel
 _MIN_BEKENDE_TITEL = 3  # kortere archieftitels worden niet gezocht
 _FALLBACK_TITEL = "document"  # fallback van maak_slug/inbox; nooit als bekende titel gebruiken
 
@@ -55,10 +58,15 @@ _ACHTERVOEGSELS: tuple[str, ...] = ("B.V.", "BV", "N.V.", "NV", "V.O.F.", "VOF",
 _VOORVOEGSELS: tuple[str, ...] = (
     "gemeente", "stichting", "vereniging", "waterschap", "provincie", "coöperatie", "cooperatie", "ministerie",
 )  # fmt: skip
-# Losse instantiewoorden: de hele cel.
+# Losse instantiewoorden: de hele cel. Niet "bank" of "verzekeraar": die staan op vrijwel elke
+# factuur als bankgegevens of in lopende tekst; echte banken hebben een rechtsvorm.
 _LOSSE_WOORDEN: tuple[str, ...] = (
-    "belastingdienst", "bank", "verzekeringen", "verzekeraar", "zorgverzekeraar", "ziekenhuis", "universiteit", "hogeschool",
+    "belastingdienst", "zorgverzekeraar", "ziekenhuis", "universiteit", "hogeschool",
 )  # fmt: skip
+# Domeinlabels van e-mailproviders: zeggen niets over de afzender.
+_PROVIDERS: frozenset[str] = frozenset(
+    {"gmail", "googlemail", "hotmail", "outlook", "live", "icloud", "yahoo", "protonmail", "kpnmail"}
+)
 
 # Woordgrenzen via lookarounds op alnum: `\b` faalt aan de rand van "B.V." (eindigt op een leesteken).
 _GRENS_VOOR = r"(?<![^\W_])"
@@ -75,16 +83,9 @@ _TNV_RE = re.compile(rf"{_GRENS_VOOR}(?:t\.n\.v\.?|ten name van){_GRENS_NA}\s*:?
 _ACHTERVOEGSEL_RE = re.compile(rf"^\S.*?\s+(?:{_alternatie(_ACHTERVOEGSELS)}){_GRENS_NA}")
 _VOORVOEGSEL_RE = re.compile(rf"{_GRENS_VOOR}(?:{_alternatie(_VOORVOEGSELS)}){_GRENS_NA}\s+\S", re.I)
 _LOS_WOORD_RE = re.compile(rf"{_GRENS_VOOR}(?:{_alternatie(_LOSSE_WOORDEN)}){_GRENS_NA}", re.I)
+# Host achter "@", "http(s)://" of "www."; minstens twee labels.
+_DOMEIN_RE = re.compile(r"(?:@|https?://|www\.)(?P<host>[a-z0-9-]+(?:\.[a-z0-9-]+)+)", re.I)
 
-_MAANDEN = (
-    "januari|january|februari|february|maart|march|april|mei|may|juni|june|juli|july|augustus|august|"
-    "september|oktober|october|november|december|jan|feb|mrt|maa|mar|apr|jun|jul|aug|sept|sep|okt|oct|nov|dec"
-)
-_DATUM_RE = re.compile(
-    rf"(?<!\d)(?:\d{{1,2}}[-/.]\d{{1,2}}[-/.]\d{{2,4}}|\d{{4}}-\d{{1,2}}-\d{{1,2}}|\d{{1,2}}\.?\s+(?:{_MAANDEN})\.?,?\s+\d{{2,4}})(?!\d)",
-    re.I,
-)
-_DATUMLABEL_RE = re.compile(r"datum", re.I)
 _LETTERS_RE = re.compile(_LETTER)
 _AFKORTING_EINDE_RE = re.compile(rf"(?:^|[\s.]){_LETTER}\.$")  # "B.V." / "U.A.": de laatste punt hoort bij de naam
 
@@ -128,11 +129,6 @@ def _is_documenttypewoord(tekst: str) -> bool:
     return tekst.strip().lower() in _DOCUMENTTYPE_WOORDEN
 
 
-def _is_datumachtig(cel: str) -> bool:
-    """Bevat een datum of een datumlabel ("Factuurdatum", "Vervaldatum:")."""
-    return bool(_DATUM_RE.search(cel) or _DATUMLABEL_RE.search(cel))
-
-
 def _bekende_titel_re(titel: str) -> re.Pattern[str]:
     woorden = [re.escape(w) for w in titel.split()]
     return re.compile(_GRENS_VOOR + r"\s+".join(woorden) + _GRENS_NA, re.I)
@@ -169,6 +165,34 @@ def _uit_tnv(regels: list[list[str]]) -> str:
     return ""
 
 
+def _domeinlabels(tekst: str) -> list[str]:
+    """Voorlaatste hostonderdeel van elk domein in de tekst ("shop.coolblue.nl" -> "coolblue"), zonder
+    e-mailproviders; uniek, op aantal voorkomens aflopend en dan op eerste voorkomen.
+
+    De afzender staat er meestal twee keer (e-mail én website), de klant hooguit één keer.
+    """
+    labels = [m.group("host").lower().split(".")[-2] for m in _DOMEIN_RE.finditer(tekst)]
+    telling = Counter(labels)
+    volgorde = list(dict.fromkeys(labels))
+    return [lab for lab in sorted(volgorde, key=lambda lab: (-telling[lab], volgorde.index(lab))) if lab not in _PROVIDERS]
+
+
+def _uit_domein(tekst: str, regels: list[list[str]]) -> str:
+    """Eerste cel waarvan de slug gelijk is aan een domeinlabel (ook zonder koppeltekens); de hoofdletters uit de tekst."""
+    for label in _domeinlabels(tekst):
+        kaal = label.replace("-", "")
+        for cellen_ in regels:
+            for cel in cellen_:
+                if len(_LETTERS_RE.findall(cel)) < 3:
+                    continue
+                slug = maak_slug(cel)
+                if slug == label or slug.replace("-", "") == kaal:
+                    naam = _schoon(cel)
+                    if naam:
+                        return naam
+    return ""
+
+
 def _uit_rechtsvorm(regels: list[list[str]]) -> str:
     for cellen_ in regels:
         for cel in cellen_:
@@ -183,20 +207,6 @@ def _uit_rechtsvorm(regels: list[list[str]]) -> str:
                     naam = _schoon(cel)
                 else:
                     continue
-            if naam:
-                return naam
-    return ""
-
-
-def _uit_eerste_regel(regels: list[list[str]]) -> str:
-    """Korte tekst (bon): de eerste cel met minstens drie letters die geen documenttype-kopregel of datum is."""
-    if len(regels) >= _MAX_REGELS_BON:
-        return ""
-    for cellen_ in regels:
-        for cel in cellen_:
-            if len(_LETTERS_RE.findall(cel)) < 3 or _KOPREGEL_RE.match(cel) or _is_datumachtig(cel):
-                continue
-            naam = _schoon(cel)
             if naam:
                 return naam
     return ""
@@ -217,8 +227,8 @@ def stel_titel_voor(tekst: str, bekende_titels: Iterable[str] = ()) -> tuple[str
     regels = _regels(tekst)
     stappen: tuple[tuple[TitelBron, str], ...] = (
         ("tnv", _uit_tnv(regels)),
+        ("domein", _uit_domein(tekst, regels)),
         ("rechtsvorm", _uit_rechtsvorm(regels)),
-        ("eerste-regel", _uit_eerste_regel(regels)),
     )
     for bron, titel in stappen:
         if titel:

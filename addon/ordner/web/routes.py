@@ -498,41 +498,6 @@ async def inbox_opnemen(request: Request, naam: str = Form("")) -> Response:
     return _redirect(request, "upload_gegevens", token=openstaand.token)
 
 
-@router.get("/inbox/bekijk/{naam}", name="inbox_bekijk")
-async def inbox_bekijk(request: Request, naam: str) -> Response:
-    """Kijkpagina voor een wachtend inboxbestand (0.15.0), zonder het te reserveren; terug naar de inbox."""
-    _inbox_bestand_pad(request, naam)
-    return _bekijk_pagina(
-        request,
-        naam,
-        url=_pad_van(request.url_for("inbox_bestand", naam=naam)),
-        terug_url=_pad_van(request.url_for("inbox")),
-        terug_titel="Inbox",
-    )
-
-
-@router.get("/inbox/bestand/{naam}", name="inbox_bestand")
-async def inbox_bestand(request: Request, naam: str) -> Response:
-    pad = _inbox_bestand_pad(request, naam)
-    return FileResponse(
-        pad,
-        media_type=mimetypes.guess_type(naam)[0] or "application/octet-stream",
-        content_disposition_type="inline",
-        filename=naam,
-    )
-
-
-def _inbox_bestand_pad(request: Request, naam: str) -> Path:
-    """`_inbox/<naam>` als dat een bestaand bestand is; anders 404 (ook bij een ongeldige naam)."""
-    try:
-        pad = _archief(request).inbox_pad(naam)
-    except OngeldigPad:
-        raise HTTPException(status_code=404, detail="Bestand niet gevonden") from None
-    if not pad.is_file():
-        raise HTTPException(status_code=404, detail="Bestand niet gevonden")
-    return pad
-
-
 # --- prullenbak (pakket 19) --------------------------------------------------
 
 

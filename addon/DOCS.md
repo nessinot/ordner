@@ -122,7 +122,7 @@ Bestanden die je in `/share/ordner/_inbox/` zet worden automatisch opgenomen zod
 - herkent Ordner in de tekst de naam van het bedrijf of de instantie (zie "Titel en tags uit de tekst"), dan wordt er direct een document van gemaakt: die naam als titel, het documenttype als tag, de datum uit de tekst (anders vandaag, zie "Documentdatum"). Het bestand verhuist naar de nieuwe documentmap, samen met de al gelezen tekst;
 - is er geen herkenbare afzender, dan blijft het bestand in de inbox **wachten op een titel**. Ordner raadt geen titel meer uit de bestandsnaam, want de mapnaam wordt daarna nooit meer aangepast.
 
-**Wachtende bestanden een titel geven.** Het startscherm meldt hoeveel bestanden wachten, met een link naar de pagina **Inbox** (ook bereikbaar via de beheerpagina; de tabel Inbox daar toont ook hoeveel bestanden er in totaal in `_inbox/` liggen en hoeveel er als dubbel in `_inbox/_dubbel/` zijn gezet, zie "Beheerpagina"). Daar staat per bestand de naam, de grootte en sinds wanneer het wacht, met een knop **Opnemen**. Die brengt je naar het bekende gegevensscherm van de upload: datum en tags staan al ingevuld uit de tekst, jij typt de titel en kiest **Opslaan**. Het bestand wordt dan een document en verdwijnt uit de inbox. **Terug naar inbox** laat het liggen. Zolang je op dat scherm bezig bent, blijft Ordner van het bestand af (een uur lang; daarna wordt het weer gewoon beoordeeld).
+**Wachtende bestanden een titel geven.** Het startscherm meldt hoeveel bestanden wachten, met een link naar de pagina **Inbox** (ook bereikbaar via de beheerpagina; de tabel Inbox daar toont ook hoeveel bestanden er in totaal in `_inbox/` liggen en hoeveel er als dubbel in `_inbox/_dubbel/` zijn gezet, zie "Beheerpagina"). Daar staat per bestand de naam, de grootte en sinds wanneer het wacht. Klik op de naam en je komt op het bekende gegevensscherm van de upload, met het bestand in beeld: datum en tags staan al ingevuld uit de tekst, jij typt de titel en kiest **Opslaan**. Het bestand wordt dan een document en verdwijnt uit de inbox. **Terug naar inbox** laat het liggen. Zolang je op dat scherm bezig bent, blijft Ordner van het bestand af (een uur lang; daarna wordt het weer gewoon beoordeeld).
 
 **Leren van je titels.** Zodra een titel in de ordner staat, kijkt Ordner opnieuw naar alle wachtende bestanden. Staat die naam letterlijk in de tekst van een ander wachtend bestand, dan wordt dat automatisch opgenomen. Zet je tien oude brieven van dezelfde onbekende afzender in de inbox, dan geef je er één een titel en volgen de andere negen vanzelf.
 
@@ -138,10 +138,10 @@ De **titel** is alleen de naam van de afzender, dus "Eneco Services B.V." of "Ge
 
 1. Een titel die je al eerder in de ordner hebt gebruikt en die letterlijk in de tekst voorkomt. Heb je eenmaal "Eneco" getypt, dan wordt dat bij de volgende Eneco-factuur herkend.
 2. De naam achter "t.n.v." of "ten name van", zoals bij de betaalgegevens op een factuur.
-3. De eerste regel met een rechtsvorm (B.V., N.V., VOF, U.A.) of een instantiewoord (Gemeente, Stichting, Vereniging, Waterschap, Provincie, Coöperatie, Ministerie, Belastingdienst, Bank, Verzekeraar, Ziekenhuis, Universiteit, Hogeschool).
-4. Bij een korte tekst, zoals een kassabon, de eerste regel met tekst.
+3. De naam die hoort bij het e-mailadres of de website in de tekst: staat er `info@voorbeeld-installaties.nl` of `www.voorbeeld-installaties.nl`, dan zoekt Ordner de regel "Voorbeeld Installaties". Adressen bij gmail, hotmail, outlook en dergelijke tellen niet mee.
+4. De eerste regel met een rechtsvorm (B.V., N.V., VOF, U.A.) of een instantiewoord (Gemeente, Stichting, Vereniging, Waterschap, Provincie, Coöperatie, Ministerie, Belastingdienst, Zorgverzekeraar, Ziekenhuis, Universiteit, Hogeschool).
 
-Bij een langere brief zonder zo'n aanknopingspunt blijft de titel leeg, want de bovenste regel van een brief is meestal de ontvanger. Bij uploaden is dat een leeg veld dat je zelf invult; in de inbox blijft het bestand wachten tot je het via de inboxpagina een titel geeft (zie "Inbox"). Hoofdletters blijven zoals ze in de tekst staan.
+Zonder zo'n aanknopingspunt blijft de titel leeg; Ordner neemt nooit zomaar de bovenste regel, want die is bij een brief meestal de ontvanger en bij een bon vaak leesruis. Een kassabon van een nieuwe winkel geef je dus één keer zelf een titel, daarna herkent Ordner de winkel (stap 1). Bij uploaden is dat een leeg veld dat je zelf invult; in de inbox blijft het bestand wachten tot je het via de inboxpagina een titel geeft (zie "Inbox"). Hoofdletters blijven zoals ze in de tekst staan.
 
 De **tags** zijn de documenttypen die als kopje in de tekst staan: factuur, creditnota, offerte, polis, beschikking, nota, bon (ook kassabon), herinnering (ook betalingsherinnering), aanmaning, contract, overeenkomst, aanslag, jaaroverzicht, jaarafrekening en garantie (garantiebewijs). Het woord moet een regel of kolom beginnen ("Factuur nr. 123" telt, "Factuurdatum" of "deze factuur" niet).
 
@@ -187,7 +187,7 @@ De beheerpagina toont drie tabellen met tellers, wat er nu gelezen wordt en het 
 
 **Inbox** telt bestanden in `/share/ordner/_inbox/` (zie "Inbox"):
 
-- **Totaal**: alle bestanden die direct in de inboxmap liggen, ook de bestanden die Ordner nog aan het beoordelen of lezen is en de bestanden waar iemand op dat moment via **Opnemen** een titel aan geeft. De submappen `.tekst/` en `_dubbel/` tellen niet mee.
+- **Totaal**: alle bestanden die direct in de inboxmap liggen, ook de bestanden die Ordner nog aan het beoordelen of lezen is en de bestanden waar iemand op dat moment via de inboxpagina een titel aan geeft. De submappen `.tekst/` en `_dubbel/` tellen niet mee.
 - **Wacht op titel**: de bestanden zonder herkende afzender, met een link naar de inboxpagina. Het verschil met het totaal is wat nog beoordeeld wordt of waar iemand mee bezig is.
 - **Dubbel**: bestanden die al in de ordner stonden en daarom naar `_inbox/_dubbel/` zijn verplaatst. Ordner ruimt die map niet op; kijk er af en toe in en gooi weg wat je niet meer nodig hebt.
 

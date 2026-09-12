@@ -259,9 +259,10 @@ p.inbox-wacht { display: flex; align-items: center; gap: 0.6rem; margin: -0.5rem
 p.inbox-wacht .icoon { width: 1.3rem; height: 1.3rem; flex: none; }
 p.inbox-wacht a { color: inherit; font-weight: 500; }
 .hint-inbox { margin: 0 0 0.75rem; }
-ul.bestandslijst.inbox li .knop { margin-left: auto; min-height: 34px; padding: 0.2rem 1rem; }
-ul.bestandslijst.inbox li .knop + form { margin-left: 0; }
-ul.bestandslijst.inbox li button { min-height: 34px; padding: 0.2rem 1rem; }
+/* Pakket 22: de bestandsnaam is de enige actie (opnemen = POST, dus een knop opgemaakt als link) */
+ul.bestandslijst.inbox li form { min-width: 0; }
+ul.bestandslijst.inbox li button.als-link { background: none; border: 0; padding: 0; min-height: 0; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+ul.bestandslijst.inbox li button.als-link:hover { filter: none; color: var(--accent); }
 /* --- prullenbak (pakket 19) -------------------------------------------------- */
 ul.bestandslijst.prullenbak li form { margin-left: auto; }
 ul.bestandslijst.prullenbak li button { min-height: 34px; padding: 0.2rem 1rem; }

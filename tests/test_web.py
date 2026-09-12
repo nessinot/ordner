@@ -432,7 +432,8 @@ def test_inbox_wachtend_op_pagina_startpagina_en_beheer(client: TestClient, mock
     assert "scan.pdf" in r.text and "1 bestand wacht op een titel" in r.text
     assert 'action="/inbox/opnemen"' in r.text
     assert 'name="naam" value="scan.pdf"' in r.text
-    assert "Opnemen" in r.text
+    assert '<button type="submit" class="als-link bestand-naam">scan.pdf</button>' in r.text
+    assert "Bekijken" not in r.text and "Opnemen" not in r.text  # pakket 22: de naam is de enige actie
 
     r = client.get("/")
     assert "1 bestand in de inbox wacht op een titel" in r.text
@@ -600,23 +601,10 @@ def test_scherm2_bestand_404(client: TestClient) -> None:
     assert client.get(f"/upload/{token}/bestand/a.pdf").status_code == 404  # weggegooid
 
 
-def test_inbox_bekijken_en_scherm2_uit_inbox_toont_bestand(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
-    """0.15.0: een wachtend inboxbestand is te bekijken vóór (inboxpagina) en tijdens (scherm 2) het opnemen."""
+def test_scherm2_uit_inbox_toont_bestand(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
+    """0.15.0: een wachtend inboxbestand staat tijdens het opnemen in beeld op scherm 2 (uit het geheugen)."""
     mock_cmd.register("pdftotext", stdout=_ZONDER_TITEL)
     pad = _in_inbox(client)
-    r = client.get("/inbox")
-    assert 'href="/inbox/bekijk/scan.pdf">Bekijken</a>' in r.text
-
-    r = client.get("/inbox/bekijk/scan.pdf")
-    assert r.status_code == 200
-    assert '<iframe class="bekijk-vlak" src="/inbox/bestand/scan.pdf"' in r.text
-    assert 'href="/inbox">' in r.text and "Terug naar “Inbox”" in r.text
-    r = client.get("/inbox/bestand/scan.pdf")
-    assert r.status_code == 200 and r.content == _PDF
-    assert r.headers["content-disposition"].startswith("inline")
-    # bekijken reserveert niet: het bestand staat nog gewoon op de lijst
-    assert [w.naam for w in _reconciler(client).wachtend()] == ["scan.pdf"]
-
     token = _opnemen(client)
     r = client.get(f"/upload/{token}")
     assert f'<object type="application/pdf" data="/upload/{token}/bestand/scan.pdf">' in r.text
@@ -624,14 +612,12 @@ def test_inbox_bekijken_en_scherm2_uit_inbox_toont_bestand(client: TestClient, m
     assert pad.exists()
 
 
-def test_inbox_bekijken_404(client: TestClient) -> None:
-    assert client.get("/inbox/bekijk/nietbestaand.pdf").status_code == 404
-    assert client.get("/inbox/bestand/nietbestaand.pdf").status_code == 404
-    assert client.get("/inbox/bestand/..%5Cmeta.md").status_code == 404
-    (_root(client) / "_inbox" / ".tekst").mkdir(parents=True, exist_ok=True)
-    (_root(client) / "_inbox" / ".tekst" / "x.txt").write_text("geheim", encoding="utf-8")
-    assert client.get("/inbox/bestand/.tekst").status_code == 404
-    assert client.get("/inbox/bestand/.tekst%2Fx.txt").status_code == 404
+def test_inbox_kijkpagina_bestaat_niet_meer(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
+    """Pakket 22: de aparte kijkpagina en bestandsroute van de inbox zijn weg; scherm 2 toont het bestand."""
+    mock_cmd.register("pdftotext", stdout=_ZONDER_TITEL)
+    _in_inbox(client)
+    assert client.get("/inbox/bekijk/scan.pdf").status_code == 404
+    assert client.get("/inbox/bestand/scan.pdf").status_code == 404
 
 
 def test_inbox_links_met_ingress_prefix(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
@@ -642,9 +628,6 @@ def test_inbox_links_met_ingress_prefix(client: TestClient, mock_cmd) -> None:  
     assert f'href="{_PREFIX}/inbox"' in r.text
     r = client.get("/inbox", headers=headers)
     assert f'action="{_PREFIX}/inbox/opnemen"' in r.text
-    assert f'href="{_PREFIX}/inbox/bekijk/scan.pdf"' in r.text
-    r = client.get("/inbox/bekijk/scan.pdf", headers=headers)
-    assert f'src="{_PREFIX}/inbox/bestand/scan.pdf"' in r.text and f'href="{_PREFIX}/inbox">' in r.text
     r = client.post("/inbox/opnemen", data={"naam": "scan.pdf"}, headers=headers, follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"].startswith(f"{_PREFIX}/upload/")
     token = r.headers["location"].rsplit("/", 1)[1]

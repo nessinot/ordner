@@ -2,6 +2,12 @@
 
 Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. Nieuwste versie bovenaan; de bovenste kop moet gelijk zijn aan `version` in `config.yaml` (dat controleert `tests/test_addon_config.py`).
 
+## 0.16.0 (2026-09-12)
+
+- **Inboxpagina als gewone lijst.** De knoppen Bekijken en Opnemen zijn weg. Klik op de naam van een wachtend bestand en je komt op het gegevensscherm, met het bestand in beeld, om het een titel te geven. Terug naar inbox laat het bestand liggen, zoals voorheen.
+- **Titelvoorstel strenger.** Ordner koos te vaak een onzinnige titel, zoals de bankregel uit de voettekst van een factuur of de bovenste regel van een korte tekst. Beide regels zijn geschrapt: bij twijfel blijft de titel leeg en wacht het bestand in de inbox op jou.
+- **Afzender via e-mailadres of website.** Staat er een e-mailadres of website van de afzender in de tekst, dan zoekt Ordner de bijbehorende naam in het document (`info@voorbeeld-installaties.nl` → "Voorbeeld Installaties").
+
 ## 0.15.0 (2026-09-10)
 
 - **Inboxbestand bekijken.** Op de inboxpagina staat bij elk bestand dat op een titel wacht een knop Bekijken, zodat je ziet wat het is voordat je het opneemt. Het bestand blijft gewoon in de inbox staan.

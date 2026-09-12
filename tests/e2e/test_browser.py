@@ -241,7 +241,7 @@ def test_prullenbak_legen_met_confirm(page: Page, server: Server) -> None:
 
 
 def test_inbox(page: Page, server: Server) -> None:
-    """Pakket 17: zonder herkende afzender wacht het bestand op de inboxpagina; met tesseract (bon-titel) wordt het zelf opgenomen."""
+    """Pakket 17/22: zonder herkende afzender wacht het bestand op de inboxpagina; klikken op de naam neemt het op. Herkent tesseract een afzender in de foto, dan is het al opgenomen."""
     inbox = server.archief / "_inbox" / "foto.jpg"
     shutil.copy(FIXTURES / "foto.jpg", inbox)
 
@@ -252,7 +252,7 @@ def test_inbox(page: Page, server: Server) -> None:
         page.reload()
     if inbox.exists():
         expect(page.locator("ul.inbox .bestand-naam").first).to_have_text("foto.jpg")
-        page.get_by_role("button", name="Opnemen").click()
+        page.locator("ul.inbox button.bestand-naam").first.click()
         page.wait_for_url(re.compile(r"/upload/[A-Za-z0-9_-]{8,}$"))
         expect(page.locator("p.herkomst")).to_contain_text("foto.jpg")
         expect(page.get_by_role("button", name="Terug naar inbox")).to_be_visible()

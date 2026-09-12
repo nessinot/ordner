@@ -8,17 +8,15 @@
 
 <section class="paneel">
 {% if wachtend %}
-  <p class="hint hint-inbox">Van deze bestanden kon Ordner geen afzender in de tekst vinden. Kies <strong>Bekijken</strong> om te zien wat het is, en <strong>Opnemen</strong> om er zelf een titel aan te geven; datum en tags staan dan al ingevuld en het bestand staat er ook bij. Zodra die titel in de ordner staat, herkent Ordner de andere bestanden van dezelfde afzender vanzelf.</p>
+  <p class="hint hint-inbox">Van deze bestanden kon Ordner geen afzender in de tekst vinden. Klik op een bestand om het te bekijken en er zelf een titel aan te geven; datum en tags staan dan al ingevuld. Zodra die titel in de ordner staat, herkent Ordner de andere bestanden van dezelfde afzender vanzelf.</p>
   <ul class="bestandslijst inbox">
     {% for w in wachtend %}
     <li>
-      <span class="bestand-naam">{{ w.naam }}</span>
-      <span class="gedempt klein">{{ w.grootte }} · sinds {{ w.sinds.strftime('%Y-%m-%d %H:%M') }}</span>
-      <a class="knop" href="{{ url_for('inbox_bekijk', naam=w.naam) }}">Bekijken</a>
       <form method="post" action="{{ url_for('inbox_opnemen') }}">
         <input type="hidden" name="naam" value="{{ w.naam }}">
-        <button type="submit" class="secundair">Opnemen</button>
+        <button type="submit" class="als-link bestand-naam">{{ w.naam }}</button>
       </form>
+      <span class="gedempt klein">{{ w.grootte }} · sinds {{ w.sinds.strftime('%Y-%m-%d %H:%M') }}</span>
     </li>
     {% endfor %}
   </ul>
