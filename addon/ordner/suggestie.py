@@ -11,6 +11,7 @@ Heuristiek voor de titel, op prioriteit (de eerste stap met resultaat wint):
    (`info@voorbeeld-installaties.nl` -> de cel "Voorbeeld Installaties", ook als die cel een rechtsvorm heeft);
 4. de eerste kolomcel met een rechtsvorm (B.V., N.V., …) of instantiewoord (Gemeente, Belastingdienst, …);
    het rechtsvorm-achtervoegsel zelf blijft weg uit de titel ("Voorbeeldshop B.V." -> "Voorbeeldshop"), ook achter "t.n.v.";
+   een instantiewoord telt alleen in een korte cel (hooguit 6 woorden), niet midden in een zin;
 5. anders leeg.
 """
 
@@ -28,6 +29,9 @@ TitelBron = Literal["archief", "tnv", "domein", "rechtsvorm", "geen"]
 _MAX_TITEL = 60  # tekens; afkappen op woordgrens
 _MIN_BEKENDE_TITEL = 3  # kortere archieftitels worden niet gezocht
 _FALLBACK_TITEL = "document"  # fallback van maak_slug/inbox; nooit als bekende titel gebruiken
+# Een instantiewoord telt alleen in een cel die op een naam lijkt; een langere cel is lopende tekst
+# ("Raadpleeg hiervoor de website van de Belastingdienst …" mag geen titel worden).
+_MAX_NAAMWOORDEN = 6
 
 # Documenttypewoord -> tag. Telt alleen als kopregel (cel gelijk aan het woord, of het woord
 # gevolgd door een niet-letter): "Factuur", "FACTUUR", "Factuur nr. 123"; niet "Factuurdatum".
@@ -202,6 +206,8 @@ def _uit_rechtsvorm(regels: list[list[str]]) -> str:
         for cel in cellen_:
             if _ACHTERVOEGSEL_RE.match(cel):
                 naam = _schoon(_zonder_rechtsvorm(cel))
+            elif len(cel.split()) > _MAX_NAAMWOORDEN:
+                continue
             else:
                 m = _VOORVOEGSEL_RE.search(cel)
                 if m is not None:

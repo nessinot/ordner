@@ -2,6 +2,10 @@
 
 Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. Nieuwste versie bovenaan; de bovenste kop moet gelijk zijn aan `version` in `config.yaml` (dat controleert `tests/test_addon_config.py`).
 
+## 0.18.2 (2026-09-12)
+
+- **Geen zin meer als titelvoorstel.** Stond ergens in de tekst een zin als "Raadpleeg hiervoor de website van de Belastingdienst", dan kon die (afgekapt) het titelvoorstel worden. Een instantiewoord zoals Belastingdienst, Gemeente of Stichting telt nu alleen nog op een korte regel die op een naam lijkt. Herkent Ordner de afzender niet, dan blijft de titel leeg; typ hem één keer en de volgende factuur van dezelfde afzender wordt herkend. Bestaande documenten veranderen niet.
+
 ## 0.18.1 (2026-09-12)
 
 - **Afzender via e-mailadres of website ook met rechtsvorm.** Staat er `info@voorbeeld.nl` in de tekst en verderop "Voorbeeld B.V.", dan wordt de titel nu "Voorbeeld". Voorheen matchte die regel niet door de rechtsvorm erachter, en kon een kopregel als "Algemene voorwaarden Voorbeeld B.V." de titel worden. Bestaande documenten veranderen niet.

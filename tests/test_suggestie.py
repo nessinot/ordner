@@ -131,6 +131,15 @@ def test_los_instantiewoord_geeft_de_hele_cel() -> None:
     assert stel_titel_voor("Kenmerk 1\nUw verzekeraar\n" + _LANG) == ("", "geen")
 
 
+def test_instantiewoord_in_lopende_tekst_telt_niet() -> None:
+    zin = "Dit kunt u eenvoudig regelen. Raadpleeg hiervoor de website van de Belastingdienst www.voorbeeld.nl."
+    assert stel_titel_voor("Kenmerk 1\n" + zin + "\n" + _LANG) == ("", "geen")
+    zin = "Voor vragen kunt u terecht bij de gemeente Voorbeeldstad, afdeling Belastingen."
+    assert stel_titel_voor("Kenmerk 1\n" + zin + "\n" + _LANG) == ("", "geen")
+    kort = "Belastingdienst Toeslagen, Postbus 1 Voorbeeldstad"  # 6 woorden: nog een naamcel
+    assert stel_titel_voor("Kenmerk 1\n" + kort + "\n" + _LANG) == (kort, "rechtsvorm")
+
+
 def test_eerste_regel_met_rechtsvorm_wint_en_kolommen_blijven_gescheiden() -> None:
     tekst = "Klant B.V.        Voltaria B.V.\nAmpera N.V.\n" + _LANG
     assert stel_titel_voor(tekst) == ("Klant", "rechtsvorm")
@@ -212,11 +221,11 @@ def test_opschonen_leestekens_en_whitespace() -> None:
 
 
 def test_afkappen_op_60_tekens_op_woordgrens() -> None:
-    naam = "Stichting " + " ".join(["Woord"] * 20)
+    naam = " ".join(["Woord"] * 20) + " B.V."  # achtervoegselregel: geen woordlimiet
     titel, bron = stel_titel_voor("Kenmerk\n" + naam + "\n" + _LANG)
     assert bron == "rechtsvorm"
     assert len(titel) <= 60
-    assert titel == "Stichting Woord Woord Woord Woord Woord Woord Woord Woord"
+    assert titel == "Woord Woord Woord Woord Woord Woord Woord Woord Woord Woord"
     assert not titel.endswith(" ")
 
 
