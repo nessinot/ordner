@@ -2,6 +2,10 @@
 
 Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. Nieuwste versie bovenaan; de bovenste kop moet gelijk zijn aan `version` in `config.yaml` (dat controleert `tests/test_addon_config.py`).
 
+## 0.17.1 (2026-09-12)
+
+- **Eén keer Terug naar de inbox.** De link onderin het gegevensscherm van een inboxbestand is weg; de terug-link bovenin volstaat. Onderin staan nu alleen Opslaan en Verwijderen.
+
 ## 0.17.0 (2026-09-12)
 
 - **Terug naar de inbox is een gewone link.** Op het gegevensscherm van een inboxbestand staat nu bovenin dezelfde terug-link als op de andere pagina's, en onderin een link in plaats van een knop. Het bestand blijft intussen gewoon in de inboxlijst staan; voorheen verdween het daar een uur uit zodra je het opende.

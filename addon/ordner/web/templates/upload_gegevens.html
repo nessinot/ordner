@@ -62,7 +62,6 @@
     <div class="knoppen vol">
       <button type="submit">Opslaan</button>
       {% if inbox_naam %}
-      <a class="knop" href="{{ url_for('inbox') }}">Terug naar de inbox</a>
       <button type="submit" class="gevaar" formaction="{{ url_for('upload_verwijder', token=token) }}" formnovalidate onclick="return confirm('Dit bestand uit de inbox verwijderen? Het wordt van schijf gewist en komt niet in de prullenbak. Dit kan niet ongedaan worden gemaakt.')">Verwijderen</button>
       {% else %}
       <button type="submit" class="secundair" formaction="{{ url_for('upload_annuleer', token=token) }}" formnovalidate>Annuleren</button>

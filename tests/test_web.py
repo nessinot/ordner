@@ -468,7 +468,7 @@ def test_inbox_opnemen_scherm2_en_opslaan(client: TestClient, mock_cmd) -> None:
     assert 'name="titel" value=""' in r.text
     assert 'name="documentdatum" value="2024-05-03"' in r.text and "datum uit tekst" in r.text
     assert 'name="tags" value="factuur"' in r.text
-    assert r.text.count('href="/inbox"') >= 2 and "Terug naar de inbox" in r.text  # link bovenin en onderin
+    assert r.text.count('href="/inbox"') == 1 and "Terug naar de inbox" in r.text  # alleen de link bovenin (0.17.1)
     assert "Annuleren" not in r.text and "/annuleer" not in r.text
     assert f'formaction="/upload/{token}/verwijder"' in r.text
     assert "Dit bestand uit de inbox verwijderen? Het wordt van schijf gewist" in r.text
