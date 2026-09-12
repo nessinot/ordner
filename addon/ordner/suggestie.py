@@ -10,7 +10,7 @@ Heuristiek voor de titel, op prioriteit (de eerste stap met resultaat wint):
 3. de naam die hoort bij het domein van een e-mailadres of website in de tekst
    (`info@voorbeeld-installaties.nl` -> de cel "Voorbeeld Installaties", ook als die cel een rechtsvorm heeft);
 4. de eerste kolomcel met een rechtsvorm (B.V., N.V., …) of instantiewoord (Gemeente, Belastingdienst, …);
-   het rechtsvorm-achtervoegsel zelf blijft weg uit de titel ("Coolblue B.V." -> "Coolblue"), ook achter "t.n.v.";
+   het rechtsvorm-achtervoegsel zelf blijft weg uit de titel ("Voorbeeldshop B.V." -> "Voorbeeldshop"), ook achter "t.n.v.";
 5. anders leeg.
 """
 
@@ -55,7 +55,7 @@ _DOCUMENTTYPE_WOORDEN = set(_DOCUMENTTYPEN) | set(_DOCUMENTTYPEN.values())
 # Rechtsvormen als achtervoegsel: herkennen de cel; de titel is het deel ervoor.
 # Bewust hoofdlettergevoelig: "b.v." is in lopende tekst "bijvoorbeeld".
 _ACHTERVOEGSELS: tuple[str, ...] = ("B.V.", "BV", "N.V.", "NV", "V.O.F.", "VOF", "U.A.")
-# Instantiewoorden als voorvoegsel: vanaf het woord tot het eind van de cel ("Gemeente Amsterdam").
+# Instantiewoorden als voorvoegsel: vanaf het woord tot het eind van de cel ("Gemeente Voorbeeldstad").
 _VOORVOEGSELS: tuple[str, ...] = (
     "gemeente", "stichting", "vereniging", "waterschap", "provincie", "coöperatie", "cooperatie", "ministerie",
 )  # fmt: skip
@@ -104,7 +104,7 @@ def cellen(regel: str) -> list[str]:
     """Splitst een regel op twee of meer spaties (tabs geëxpandeerd) in niet-lege, gestripte cellen.
 
     `pdftotext -layout` zet adresblokken en tabelkolommen naast elkaar; per cel kijken voorkomt
-    dat "Eneco B.V.        Factuurnummer 123" in zijn geheel een titel wordt.
+    dat "Voltaria B.V.        Factuurnummer 123" in zijn geheel een titel wordt.
     """
     return [cel.strip() for cel in re.split(r" {2,}", regel.expandtabs()) if cel.strip()]
 
@@ -120,7 +120,7 @@ def _schoon(tekst: str) -> str:
 
 
 def _zonder_rechtsvorm(tekst: str) -> str:
-    """Alles vanaf een rechtsvorm-achtervoegsel weg: "Coolblue B.V. Postbus 1" -> "Coolblue"; anders ongewijzigd."""
+    """Alles vanaf een rechtsvorm-achtervoegsel weg: "Voorbeeldshop B.V. Postbus 1" -> "Voorbeeldshop"; anders ongewijzigd."""
     m = _ACHTERVOEGSEL_RE.match(tekst)
     return tekst[: m.start("rest")] if m else tekst
 
@@ -166,7 +166,7 @@ def _uit_tnv(regels: list[list[str]]) -> str:
 
 
 def _domeinlabels(tekst: str) -> list[str]:
-    """Voorlaatste hostonderdeel van elk domein in de tekst ("shop.coolblue.nl" -> "coolblue"), zonder
+    """Voorlaatste hostonderdeel van elk domein in de tekst ("winkel.voorbeeldshop.nl" -> "voorbeeldshop"), zonder
     e-mailproviders; uniek, op aantal voorkomens aflopend en dan op eerste voorkomen.
 
     De afzender staat er meestal twee keer (e-mail én website), de klant hooguit één keer.
@@ -180,7 +180,7 @@ def _domeinlabels(tekst: str) -> list[str]:
 def _uit_domein(tekst: str, regels: list[list[str]]) -> str:
     """Eerste cel waarvan de slug gelijk is aan een domeinlabel (ook zonder koppeltekens); de hoofdletters uit de tekst.
 
-    Een rechtsvorm-achtervoegsel telt niet mee: "Coolblue B.V." matcht `coolblue` en geeft "Coolblue".
+    Een rechtsvorm-achtervoegsel telt niet mee: "Voorbeeldshop B.V." matcht `voorbeeldshop` en geeft "Voorbeeldshop".
     """
     for label in _domeinlabels(tekst):
         kaal = label.replace("-", "")

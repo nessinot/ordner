@@ -110,7 +110,7 @@ Het tabblad **Documenten** (het startscherm) toont de 20 nieuwste documenten. St
 
 Zoeken werkt op alle woorden tegelijk (elk woord moet voorkomen), zonder onderscheid in hoofdletters, over titel, omschrijving, tags, documentdatum, notities en de gelezen tekst van de bestanden. Een datum of jaartal (`2024`, `2024-03`) telt als zoekwoord, dus `energie 2024` vindt alleen energiedocumenten uit 2024. Bij meer dan 50 treffers worden de 50 nieuwste getoond; de kop noemt het echte aantal en onder de lijst staat een link **Toon alle** voor de volledige lijst. Meestal is een extra zoekwoord sneller.
 
-Tags staan als labels in de resultatenlijst en op de documentpagina. Klik op een label om alle documenten met die tag te zien; de tag komt dan in het zoekveld in plaats van je vorige zoekopdracht. Een tag met een spatie (bijvoorbeeld `gemeente amsterdam`) zoekt op beide woorden.
+Tags staan als labels in de resultatenlijst en op de documentpagina. Klik op een label om alle documenten met die tag te zien; de tag komt dan in het zoekveld in plaats van je vorige zoekopdracht. Een tag met een spatie (bijvoorbeeld `gemeente voorbeeldstad`) zoekt op beide woorden.
 
 Open je een document vanuit de resultaten, dan staat bovenaan de documentpagina **Terug naar zoekresultaten**; die brengt je terug bij dezelfde zoekopdracht, ook na opslaan of verwijderen. Vanuit het startscherm heet die link **Terug naar documenten**.
 
@@ -134,12 +134,12 @@ Handig voor scanners, e-mailregels of een gedeelde map op de telefoon. Controlee
 
 Ordner probeert uit de gelezen tekst af te leiden van wie een document komt en wat voor document het is. Bij uploaden staan die als voorstel in het formulier van de tweede stap (onder de titel staat dan "voorstel uit het document"); de inbox gebruikt ze direct.
 
-De **titel** is alleen de naam van de afzender, dus "Eneco Services" of "Gemeente Amsterdam", nooit het soort document of een jaartal. Ordner kijkt in deze volgorde en neemt het eerste wat lukt:
+De **titel** is alleen de naam van de afzender, dus "Voltaria Services" of "Gemeente Voorbeeldstad", nooit het soort document of een jaartal. Ordner kijkt in deze volgorde en neemt het eerste wat lukt:
 
-1. Een titel die je al eerder in de ordner hebt gebruikt en die letterlijk in de tekst voorkomt. Heb je eenmaal "Eneco" getypt, dan wordt dat bij de volgende Eneco-factuur herkend.
+1. Een titel die je al eerder in de ordner hebt gebruikt en die letterlijk in de tekst voorkomt. Heb je eenmaal "Voltaria" getypt, dan wordt dat bij de volgende Voltaria-factuur herkend.
 2. De naam achter "t.n.v." of "ten name van", zoals bij de betaalgegevens op een factuur.
 3. De naam die hoort bij het e-mailadres of de website in de tekst: staat er `info@voorbeeld-installaties.nl` of `www.voorbeeld-installaties.nl`, dan zoekt Ordner de regel "Voorbeeld Installaties" (ook als daar "Voorbeeld Installaties B.V." staat). Adressen bij gmail, hotmail, outlook en dergelijke tellen niet mee.
-4. De eerste regel met een rechtsvorm (B.V., N.V., VOF, U.A.) of een instantiewoord (Gemeente, Stichting, Vereniging, Waterschap, Provincie, Coöperatie, Ministerie, Belastingdienst, Zorgverzekeraar, Ziekenhuis, Universiteit, Hogeschool). De rechtsvorm zelf komt niet in de titel: "Eneco Services B.V." wordt "Eneco Services", ook achter "t.n.v.".
+4. De eerste regel met een rechtsvorm (B.V., N.V., VOF, U.A.) of een instantiewoord (Gemeente, Stichting, Vereniging, Waterschap, Provincie, Coöperatie, Ministerie, Belastingdienst, Zorgverzekeraar, Ziekenhuis, Universiteit, Hogeschool). De rechtsvorm zelf komt niet in de titel: "Voltaria Services B.V." wordt "Voltaria Services", ook achter "t.n.v.".
 
 Zonder zo'n aanknopingspunt blijft de titel leeg; Ordner neemt nooit zomaar de bovenste regel, want die is bij een brief meestal de ontvanger en bij een bon vaak leesruis. Een kassabon van een nieuwe winkel geef je dus één keer zelf een titel, daarna herkent Ordner de winkel (stap 1). Bij uploaden is dat een leeg veld dat je zelf invult; in de inbox blijft het bestand wachten tot je het via de inboxpagina een titel geeft (zie "Inbox"). Hoofdletters blijven zoals ze in de tekst staan.
 

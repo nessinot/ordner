@@ -194,14 +194,14 @@ def test_lezer_krijgt_alleen_extraheerbare_bestanden(archief: Archief, naam: str
 
 
 def test_lees_vooraf_zonder_datum_leest_en_vindt(archief: Archief) -> None:
-    lezer = _lezer({"a.pdf": "Eneco B.V.\nFactuurdatum: 12-03-2024", "b.jpg": "bon"})
+    lezer = _lezer({"a.pdf": "Voltaria B.V.\nFactuurdatum: 12-03-2024", "b.jpg": "bon"})
     vb = lees_vooraf(
         [("a.pdf", _PDF), ("brief.docx", b"x"), ("b.jpg", b"x")], documentdatum=None, lees_tekst=lezer, vandaag=VANDAAG
     )
     assert vb.documentdatum == date(2024, 3, 12)
     assert vb.datumbron == "tekst"
-    assert vb.teksten == {0: "Eneco B.V.\nFactuurdatum: 12-03-2024", 2: "bon"}
-    assert vb.tekst == "Eneco B.V.\nFactuurdatum: 12-03-2024\n\nbon"
+    assert vb.teksten == {0: "Voltaria B.V.\nFactuurdatum: 12-03-2024", 2: "bon"}
+    assert vb.tekst == "Voltaria B.V.\nFactuurdatum: 12-03-2024\n\nbon"
     assert vb.bestanden[1] == ("brief.docx", b"x")
     assert lezer.gelezen == ["a.pdf", "b.jpg"]  # type: ignore[attr-defined]
     assert sorted(archief.root.iterdir()) == sorted([archief.inbox_dir, archief.trash_dir])  # niets aangemaakt
@@ -224,22 +224,22 @@ def test_lees_vooraf_zonder_treffer_wordt_upload(archief: Archief) -> None:
 def test_maak_document_uit_voorbereid_schrijft_txt_en_queued_de_rest(archief: Archief) -> None:
     q = _Queue()
     vb = Voorbereid([("a.pdf", _PDF), ("b.pdf", _PDF)], {0: "tekst van a"}, date(2024, 3, 12), "tekst")
-    doc = maak_document_uit_voorbereid(archief, "Eneco", vb, tags=["factuur"], omschrijving="maart", queue_fn=q)
-    assert doc.name == "2024-03-12_eneco"
+    doc = maak_document_uit_voorbereid(archief, "Voltaria", vb, tags=["factuur"], omschrijving="maart", queue_fn=q)
+    assert doc.name == "2024-03-12_voltaria"
     meta = lees_meta(doc)
     assert (meta.documentdatum, meta.datumbron) == (date(2024, 3, 12), "tekst")
     assert (meta.tags, meta.omschrijving, meta.bestanden) == (["factuur"], "maart", ["a.pdf", "b.pdf"])
     assert (doc / "a.pdf.txt").read_text(encoding="utf-8") == "tekst van a"
     assert not (doc / "b.pdf.txt").exists()
     assert meta.ocr == "pending"
-    assert q.items == [("2024-03-12_eneco", "b.pdf")]  # a.pdf is al gelezen en wordt niet gequeued
+    assert q.items == [("2024-03-12_voltaria", "b.pdf")]  # a.pdf is al gelezen en wordt niet gequeued
 
 
 def test_maak_document_uit_voorbereid_met_afwijkende_datum_zet_bron_gebruiker(archief: Archief) -> None:
     q = _Queue()
     vb = Voorbereid([("a.pdf", _PDF)], {0: "Factuurdatum: 12-03-2024"}, date(2024, 3, 12), "tekst")
-    doc = maak_document_uit_voorbereid(archief, "Eneco", vb, queue_fn=q, documentdatum=date(2025, 1, 1))
-    assert doc.name == "2025-01-01_eneco"
+    doc = maak_document_uit_voorbereid(archief, "Voltaria", vb, queue_fn=q, documentdatum=date(2025, 1, 1))
+    assert doc.name == "2025-01-01_voltaria"
     meta = lees_meta(doc)
     assert (meta.documentdatum, meta.datumbron, meta.ocr) == (date(2025, 1, 1), "gebruiker", "done")
     assert (doc / "a.pdf.txt").exists()

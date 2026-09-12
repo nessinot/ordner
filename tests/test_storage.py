@@ -42,12 +42,12 @@ def test_maak_document_mapnaam_en_collision(archief: Archief) -> None:
 
 
 def test_maak_document_meta(archief: Archief) -> None:
-    doc = archief.maak_document("  Bon ", DATUM, omschrijving="AH", tags=["bon", "ah"], nu=NU)
+    doc = archief.maak_document("  Bon ", DATUM, omschrijving="Super", tags=["bon", "super"], nu=NU)
     meta = lees_meta(doc)
     assert meta.titel == "Bon"
     assert meta.documentdatum == DATUM
-    assert meta.omschrijving == "AH"
-    assert meta.tags == ["bon", "ah"]
+    assert meta.omschrijving == "Super"
+    assert meta.tags == ["bon", "super"]
     assert meta.bestanden == []
     assert meta.ocr == "done"
     assert meta.uploaddatum == datetime(2026, 9, 3, 14, 12)

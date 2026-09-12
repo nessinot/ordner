@@ -14,8 +14,8 @@ _LANG = "regel tekst\n" * 30
 
 
 def test_cellen_splitst_op_twee_of_meer_spaties_en_tabs() -> None:
-    assert cellen("Eneco B.V.        Factuurnummer 123") == ["Eneco B.V.", "Factuurnummer 123"]
-    assert cellen("Gemeente Amsterdam\tPostbus 1") == ["Gemeente Amsterdam", "Postbus 1"]
+    assert cellen("Voltaria B.V.        Factuurnummer 123") == ["Voltaria B.V.", "Factuurnummer 123"]
+    assert cellen("Gemeente Voorbeeldstad\tPostbus 1") == ["Gemeente Voorbeeldstad", "Postbus 1"]
     assert cellen("een enkele spatie blijft één cel") == ["een enkele spatie blijft één cel"]
     assert cellen("   ") == []
     assert cellen("  aan de randen  ") == ["aan de randen"]
@@ -25,36 +25,36 @@ def test_cellen_splitst_op_twee_of_meer_spaties_en_tabs() -> None:
 
 
 def test_bekende_titel_als_heel_woord() -> None:
-    tekst = "Aan: J. Jansen\nAfzender ENECO Services\n" + _LANG
-    assert stel_titel_voor(tekst, ["Eneco", "Vattenfall"]) == ("Eneco", "archief")
+    tekst = "Aan: J. Jansen\nAfzender VOLTARIA Services\n" + _LANG
+    assert stel_titel_voor(tekst, ["Voltaria", "Ampera"]) == ("Voltaria", "archief")
 
 
 def test_bekende_titel_matcht_niet_binnen_een_woord() -> None:
-    assert stel_titel_voor("Wij verkopen rozenecobloemen\n" + _LANG, ["Eneco"]) == ("", "geen")
-    assert stel_titel_voor("Zie Eneco2024 voor details\n" + _LANG, ["Eneco"]) == ("", "geen")
+    assert stel_titel_voor("Wij verkopen rozenvoltariabloemen\n" + _LANG, ["Voltaria"]) == ("", "geen")
+    assert stel_titel_voor("Zie Voltaria2024 voor details\n" + _LANG, ["Voltaria"]) == ("", "geen")
 
 
 def test_bekende_titel_wint_van_rechtsvorm() -> None:
-    tekst = "Vattenfall N.V.\nUw leverancier: Eneco\n" + _LANG
-    assert stel_titel_voor(tekst, ["Eneco"]) == ("Eneco", "archief")
-    assert stel_titel_voor(tekst) == ("Vattenfall", "rechtsvorm")
+    tekst = "Ampera N.V.\nUw leverancier: Voltaria\n" + _LANG
+    assert stel_titel_voor(tekst, ["Voltaria"]) == ("Voltaria", "archief")
+    assert stel_titel_voor(tekst) == ("Ampera", "rechtsvorm")
 
 
 def test_langste_bekende_titel_wint_dan_vroegste_treffer() -> None:
-    tekst = "Gemeente Amsterdam, afdeling Belastingen\n" + _LANG
-    assert stel_titel_voor(tekst, ["Amsterdam", "Gemeente Amsterdam"]) == ("Gemeente Amsterdam", "archief")
+    tekst = "Gemeente Voorbeeldstad, afdeling Belastingen\n" + _LANG
+    assert stel_titel_voor(tekst, ["Voorbeeldstad", "Gemeente Voorbeeldstad"]) == ("Gemeente Voorbeeldstad", "archief")
     assert stel_titel_voor("Ziggo en Odido\n" + _LANG, ["Odido", "Ziggo"]) == ("Ziggo", "archief")
 
 
 def test_bekende_titel_met_leesteken_aan_de_rand() -> None:
-    tekst = "Klantnummer 1\nEneco B.V.\n" + _LANG
-    assert stel_titel_voor(tekst, ["Eneco B.V."]) == ("Eneco B.V.", "archief")
+    tekst = "Klantnummer 1\nVoltaria B.V.\n" + _LANG
+    assert stel_titel_voor(tekst, ["Voltaria B.V."]) == ("Voltaria B.V.", "archief")
     assert stel_titel_voor("Gemeente    Utrecht\n" + _LANG, ["Gemeente Utrecht"]) == ("Gemeente Utrecht", "archief")
 
 
 def test_bekende_titel_document_en_documenttypewoord_worden_genegeerd() -> None:
-    tekst = "Factuur\nDit document is een kopie\nAH\n" + _LANG
-    assert stel_titel_voor(tekst, ["document", "Factuur", "AH", "Document"]) == ("", "geen")
+    tekst = "Factuur\nDit document is een kopie\nVB\n" + _LANG
+    assert stel_titel_voor(tekst, ["document", "Factuur", "VB", "Document"]) == ("", "geen")
 
 
 # --- stap 2: t.n.v. ----------------------------------------------------------
@@ -62,19 +62,19 @@ def test_bekende_titel_document_en_documenttypewoord_worden_genegeerd() -> None:
 
 @pytest.mark.parametrize(
     "regel",
-    ["IBAN NL12ABCD0123456789 t.n.v. Eneco Services B.V.", "Ten name van: Eneco Services B.V.", "T.N.V Eneco Services B.V."],
+    ["IBAN NL12ABCD0123456789 t.n.v. Voltaria Services B.V.", "Ten name van: Voltaria Services B.V.", "T.N.V Voltaria Services B.V."],
 )
 def test_tnv_geeft_de_naam_erachter_zonder_rechtsvorm(regel: str) -> None:
-    assert stel_titel_voor(regel + "\n" + _LANG) == ("Eneco Services", "tnv")
+    assert stel_titel_voor(regel + "\n" + _LANG) == ("Voltaria Services", "tnv")
 
 
 def test_tnv_stopt_bij_de_kolomcel() -> None:
-    tekst = "t.n.v. Eneco Services B.V.        Vervaldatum 01-01-2025\n" + _LANG
-    assert stel_titel_voor(tekst) == ("Eneco Services", "tnv")
+    tekst = "t.n.v. Voltaria Services B.V.        Vervaldatum 01-01-2025\n" + _LANG
+    assert stel_titel_voor(tekst) == ("Voltaria Services", "tnv")
 
 
 def test_tnv_stopt_bij_de_rechtsvorm() -> None:
-    assert stel_titel_voor("t.n.v. Eneco Services B.V. te Rotterdam\n" + _LANG) == ("Eneco Services", "tnv")
+    assert stel_titel_voor("t.n.v. Voltaria Services B.V. te Rotterdam\n" + _LANG) == ("Voltaria Services", "tnv")
     assert stel_titel_voor("t.n.v. Bakkerij Jansen\n" + _LANG) == ("Bakkerij Jansen", "tnv")
 
 
@@ -89,11 +89,11 @@ def test_tnv_zonder_naam_of_binnen_woord_telt_niet() -> None:
 @pytest.mark.parametrize(
     ("cel", "verwacht"),
     [
-        ("Eneco Services B.V.", "Eneco Services"),
-        ("Eneco Services B.V. Postbus 1234", "Eneco Services"),
+        ("Voltaria Services B.V.", "Voltaria Services"),
+        ("Voltaria Services B.V. Postbus 1234", "Voltaria Services"),
         ("Bakkerij Jansen VOF", "Bakkerij Jansen"),
         ("Coöperatie DELA U.A.", "Coöperatie DELA"),
-        ("Vattenfall N.V.,", "Vattenfall"),
+        ("Ampera N.V.,", "Ampera"),
     ],
 )
 def test_achtervoegsel_geeft_de_cel_tot_voor_het_achtervoegsel(cel: str, verwacht: str) -> None:
@@ -109,8 +109,8 @@ def test_achtervoegsel_is_hoofdlettergevoelig_en_heel_woord() -> None:
 @pytest.mark.parametrize(
     ("cel", "verwacht"),
     [
-        ("Gemeente Amsterdam", "Gemeente Amsterdam"),
-        ("Aan de Gemeente Amsterdam, afdeling Belastingen", "Gemeente Amsterdam, afdeling Belastingen"),
+        ("Gemeente Voorbeeldstad", "Gemeente Voorbeeldstad"),
+        ("Aan de Gemeente Voorbeeldstad, afdeling Belastingen", "Gemeente Voorbeeldstad, afdeling Belastingen"),
         ("STICHTING PENSIOENFONDS ABP", "STICHTING PENSIOENFONDS ABP"),
         ("Ministerie van Financiën", "Ministerie van Financiën"),
     ],
@@ -132,7 +132,7 @@ def test_los_instantiewoord_geeft_de_hele_cel() -> None:
 
 
 def test_eerste_regel_met_rechtsvorm_wint_en_kolommen_blijven_gescheiden() -> None:
-    tekst = "Klant B.V.        Eneco B.V.\nVattenfall N.V.\n" + _LANG
+    tekst = "Klant B.V.        Voltaria B.V.\nAmpera N.V.\n" + _LANG
     assert stel_titel_voor(tekst) == ("Klant", "rechtsvorm")
 
 
@@ -151,9 +151,9 @@ def test_domein_geeft_de_cel_met_dezelfde_slug() -> None:
 
 
 def test_domein_uit_alleen_email_of_alleen_website() -> None:
-    assert stel_titel_voor("Kenmerk 1\nCoolblue\nklantenservice@coolblue.nl\n" + _LANG) == ("Coolblue", "domein")
-    assert stel_titel_voor("Kenmerk 1\nCoolblue\nwww.coolblue.nl\n" + _LANG) == ("Coolblue", "domein")
-    assert stel_titel_voor("Kenmerk 1\nCoolblue\nhttps://shop.coolblue.nl/x\n" + _LANG) == ("Coolblue", "domein")
+    assert stel_titel_voor("Kenmerk 1\nVoorbeeldshop\nklantenservice@voorbeeldshop.nl\n" + _LANG) == ("Voorbeeldshop", "domein")
+    assert stel_titel_voor("Kenmerk 1\nVoorbeeldshop\nwww.voorbeeldshop.nl\n" + _LANG) == ("Voorbeeldshop", "domein")
+    assert stel_titel_voor("Kenmerk 1\nVoorbeeldshop\nhttps://winkel.voorbeeldshop.nl/x\n" + _LANG) == ("Voorbeeldshop", "domein")
 
 
 def test_domein_zonder_koppeltekens_matcht_ook() -> None:
@@ -165,36 +165,36 @@ def test_domein_van_emailprovider_telt_niet() -> None:
 
 
 def test_domein_zonder_passende_cel_valt_door_naar_rechtsvorm() -> None:
-    tekst = "Kenmerk 1\ninfo@coolblue.nl\nWebwinkel B.V.\n" + _LANG
+    tekst = "Kenmerk 1\ninfo@voorbeeldshop.nl\nWebwinkel B.V.\n" + _LANG
     assert stel_titel_voor(tekst) == ("Webwinkel", "rechtsvorm")
 
 
 def test_domein_matcht_cel_zonder_rechtsvorm() -> None:
-    assert stel_titel_voor("Kenmerk 1\ninfo@coolblue.nl\nCoolblue B.V.\n" + _LANG) == ("Coolblue", "domein")
+    assert stel_titel_voor("Kenmerk 1\ninfo@voorbeeldshop.nl\nVoorbeeldshop B.V.\n" + _LANG) == ("Voorbeeldshop", "domein")
     # Voorwaarden: kopregel met rechtsvorm bovenaan, de naam zelf pas in de voettekst; niet de kopregel.
-    tekst = "Aanvullende voorwaarden Coolblue B.V.\nMail klantenservice@coolblue.nl\n" + _LANG + "Versie 2018        Coolblue B.V.\n"
-    assert stel_titel_voor(tekst) == ("Coolblue", "domein")
+    tekst = "Aanvullende voorwaarden Voorbeeldshop B.V.\nMail klantenservice@voorbeeldshop.nl\n" + _LANG + "Versie 2018        Voorbeeldshop B.V.\n"
+    assert stel_titel_voor(tekst) == ("Voorbeeldshop", "domein")
 
 
 def test_domein_wint_van_rechtsvorm() -> None:
-    tekst = "Klant B.V.\nCoolblue\ninfo@coolblue.nl\n" + _LANG
-    assert stel_titel_voor(tekst) == ("Coolblue", "domein")
+    tekst = "Klant B.V.\nVoorbeeldshop\ninfo@voorbeeldshop.nl\n" + _LANG
+    assert stel_titel_voor(tekst) == ("Voorbeeldshop", "domein")
 
 
 def test_domein_dat_vaker_voorkomt_wint() -> None:
-    tekst = "PostNL\nwww.postnl.nl\nCoolblue\ninfo@coolblue.nl\nwww.coolblue.nl\n" + _LANG
-    assert stel_titel_voor(tekst) == ("Coolblue", "domein")
+    tekst = "Pakketvoorbeeld\nwww.pakketvoorbeeld.nl\nVoorbeeldshop\ninfo@voorbeeldshop.nl\nwww.voorbeeldshop.nl\n" + _LANG
+    assert stel_titel_voor(tekst) == ("Voorbeeldshop", "domein")
 
 
 def test_domein_cel_heeft_minstens_drie_letters() -> None:
-    assert stel_titel_voor("Kenmerk 1\nAH\ninfo@ah.nl\n" + _LANG) == ("", "geen")
+    assert stel_titel_voor("Kenmerk 1\nVB\ninfo@vb.nl\n" + _LANG) == ("", "geen")
 
 
 # --- geen bon-regel meer ------------------------------------------------------
 
 
 def test_korte_tekst_neemt_niet_de_eerste_regel() -> None:
-    assert stel_titel_voor("ALBERT HEIJN 1234\nKassabon\nMelk 1,09\nDatum 01-02-2024") == ("", "geen")
+    assert stel_titel_voor("SUPERMARKT VOORBEELD 1234\nKassabon\nMelk 1,09\nDatum 01-02-2024") == ("", "geen")
     assert stel_titel_voor("Uw Factuur\nFactuur Nr: 1\n") == ("", "geen")
 
 
@@ -207,7 +207,7 @@ def test_lange_tekst_neemt_nooit_blind_de_eerste_regel() -> None:
 
 def test_opschonen_leestekens_en_whitespace() -> None:
     assert stel_titel_voor("Kenmerk\n- Gemeente Utrecht :\n" + _LANG) == ("Gemeente Utrecht", "rechtsvorm")
-    assert stel_titel_voor("Kenmerk\nt.n.v.: Eneco Services B.V.,\n" + _LANG) == ("Eneco Services", "tnv")
+    assert stel_titel_voor("Kenmerk\nt.n.v.: Voltaria Services B.V.,\n" + _LANG) == ("Voltaria Services", "tnv")
     assert stel_titel_voor("Kenmerk\nt.n.v.: Bakkerij Jansen.\n" + _LANG) == ("Bakkerij Jansen", "tnv")
 
 
@@ -221,7 +221,7 @@ def test_afkappen_op_60_tekens_op_woordgrens() -> None:
 
 
 def test_hoofdletters_blijven_zoals_in_de_tekst() -> None:
-    assert stel_titel_voor("Kenmerk\nENECO SERVICES B.V.\n" + _LANG)[0] == "ENECO SERVICES"
+    assert stel_titel_voor("Kenmerk\nVOLTARIA SERVICES B.V.\n" + _LANG)[0] == "VOLTARIA SERVICES"
 
 
 # --- tags ---------------------------------------------------------------------
@@ -233,7 +233,7 @@ def test_hoofdletters_blijven_zoals_in_de_tekst() -> None:
         ("Factuur", ["factuur"]),
         ("FACTUUR", ["factuur"]),
         ("Factuur nr. 123", ["factuur"]),
-        ("Eneco B.V.        Factuur", ["factuur"]),
+        ("Voltaria B.V.        Factuur", ["factuur"]),
         ("Kassabon", ["bon"]),
         ("Betalingsherinnering", ["herinnering"]),
         ("Garantiebewijs", ["garantie"]),
@@ -256,11 +256,11 @@ def test_tags_in_volgorde_zonder_dubbelen() -> None:
 
 
 def test_stel_voor_combineert() -> None:
-    tekst = "Eneco Services B.V.        Factuur\nFactuurdatum 01-02-2024\n" + _LANG
-    assert stel_voor(tekst) == Suggestie(titel="Eneco Services", titelbron="rechtsvorm", tags=["factuur"])
-    assert stel_voor(tekst, ["Eneco"]) == Suggestie(titel="Eneco", titelbron="archief", tags=["factuur"])
+    tekst = "Voltaria Services B.V.        Factuur\nFactuurdatum 01-02-2024\n" + _LANG
+    assert stel_voor(tekst) == Suggestie(titel="Voltaria Services", titelbron="rechtsvorm", tags=["factuur"])
+    assert stel_voor(tekst, ["Voltaria"]) == Suggestie(titel="Voltaria", titelbron="archief", tags=["factuur"])
 
 
 def test_lege_tekst_geeft_lege_suggestie() -> None:
     assert stel_voor("") == Suggestie(titel="", titelbron="geen", tags=[])
-    assert stel_voor("  \n\t\n", ["Eneco"]) == Suggestie(titel="", titelbron="geen", tags=[])
+    assert stel_voor("  \n\t\n", ["Voltaria"]) == Suggestie(titel="", titelbron="geen", tags=[])

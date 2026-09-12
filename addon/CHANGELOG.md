@@ -8,7 +8,7 @@ Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. 
 
 ## 0.18.0 (2026-09-12)
 
-- **Titelvoorstel zonder rechtsvorm.** Herkent Ordner de afzender aan een rechtsvorm (B.V., N.V., VOF, U.A.) of aan de naam achter "t.n.v.", dan stelt het nu alleen de naam voor: "Coolblue" in plaats van "Coolblue B.V.". Dat geldt voor de inbox en voor het uploadformulier. Bestaande documenten veranderen niet. Let op: een titel die je al eerder mét rechtsvorm hebt opgeslagen wordt bij de volgende factuur van dezelfde afzender opnieuw herkend, inclusief die rechtsvorm; pas zo'n titel één keer aan en de volgende krijgt de korte naam.
+- **Titelvoorstel zonder rechtsvorm.** Herkent Ordner de afzender aan een rechtsvorm (B.V., N.V., VOF, U.A.) of aan de naam achter "t.n.v.", dan stelt het nu alleen de naam voor: "Voorbeeldshop" in plaats van "Voorbeeldshop B.V.". Dat geldt voor de inbox en voor het uploadformulier. Bestaande documenten veranderen niet. Let op: een titel die je al eerder mét rechtsvorm hebt opgeslagen wordt bij de volgende factuur van dezelfde afzender opnieuw herkend, inclusief die rechtsvorm; pas zo'n titel één keer aan en de volgende krijgt de korte naam.
 
 ## 0.17.1 (2026-09-12)
 
@@ -105,7 +105,7 @@ Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. 
 
 ## 0.8.0 (2026-09-04)
 
-- Documenten uit de inbox krijgen hun titel uit de tekst: de naam van het bedrijf of de instantie (bijvoorbeeld "Eneco Services B.V." of "Gemeente Amsterdam"). Staat er geen herkenbare naam in, dan blijft de bestandsnaam de titel. Titels die je al eerder in het archief gebruikt hebt, worden het eerst herkend.
+- Documenten uit de inbox krijgen hun titel uit de tekst: de naam van het bedrijf of de instantie (bijvoorbeeld "Voltaria Services B.V." of "Gemeente Voorbeeldstad"). Staat er geen herkenbare naam in, dan blijft de bestandsnaam de titel. Titels die je al eerder in het archief gebruikt hebt, worden het eerst herkend.
 - Het documenttype (factuur, offerte, polis, beschikking, bon, herinnering, aanmaning, contract, aanslag, jaaroverzicht en meer) wordt bij inboxdocumenten als tag toegevoegd, zodat je er meteen op kunt klikken.
 - Nieuwe sectie "Titel en tags uit de tekst" in de documentatie. Het uploadformulier verandert nog niet; daar komt de suggestie in een volgende versie.
 

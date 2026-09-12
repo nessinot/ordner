@@ -26,7 +26,7 @@ def _vb(naam: str = "a.pdf") -> Voorbereid:
 
 
 def _sug() -> Suggestie:
-    return Suggestie("Eneco B.V.", "rechtsvorm", ["factuur"])
+    return Suggestie("Voltaria B.V.", "rechtsvorm", ["factuur"])
 
 
 def test_maak_en_haal() -> None:
@@ -36,7 +36,7 @@ def test_maak_en_haal() -> None:
     assert re.fullmatch(r"[A-Za-z0-9_-]{8,64}", upload.token)
     assert store.haal(upload.token) is upload
     assert upload.voorbereid.bestanden == [("a.pdf", b"%PDF")]
-    assert upload.suggestie.titel == "Eneco B.V."
+    assert upload.suggestie.titel == "Voltaria B.V."
     assert upload.inbox_naam is None
     assert len(store) == 1
 

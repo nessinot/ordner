@@ -20,13 +20,13 @@ def test_sha256_van_en_van_bestand(tmp_path: Path) -> None:
 
 
 def test_zoek_dubbelen(archief: Archief) -> None:
-    doc = archief.maak_document("Eneco", date(2026, 3, 1))
-    archief.voeg_bestand_toe(doc, "factuur.pdf", b"%PDF eneco")
+    doc = archief.maak_document("Voltaria", date(2026, 3, 1))
+    archief.voeg_bestand_toe(doc, "factuur.pdf", b"%PDF voltaria")
     index = bouw_index(archief)
 
-    dubbelen = zoek_dubbelen(index, [("nieuw.pdf", b"%PDF nieuw"), ("kopie.pdf", b"%PDF eneco")])
+    dubbelen = zoek_dubbelen(index, [("nieuw.pdf", b"%PDF nieuw"), ("kopie.pdf", b"%PDF voltaria")])
 
-    assert dubbelen == [Dubbel("kopie.pdf", "2026/2026-03-01_eneco", "factuur.pdf", "Eneco", date(2026, 3, 1))]
-    assert dubbelen[0].jaar == "2026" and dubbelen[0].map == "2026-03-01_eneco"
+    assert dubbelen == [Dubbel("kopie.pdf", "2026/2026-03-01_voltaria", "factuur.pdf", "Voltaria", date(2026, 3, 1))]
+    assert dubbelen[0].jaar == "2026" and dubbelen[0].map == "2026-03-01_voltaria"
     assert zoek_dubbelen(index, []) == []
     assert zoek_dubbelen(index, [("x.pdf", b"anders")]) == []

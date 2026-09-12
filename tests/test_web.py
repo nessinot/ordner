@@ -155,20 +155,20 @@ def _geneste_links(html: str) -> int:
 
 
 def test_tags_als_labels_in_resultatenlijst(client: TestClient) -> None:
-    _upload(client, titel="WOZ beschikking", tags="woz, gemeente amsterdam")
+    _upload(client, titel="WOZ beschikking", tags="woz, gemeente voorbeeldstad")
     for pad in ("/", "/?q=woz"):
         r = client.get(pad)
         assert r.status_code == 200, pad
         assert '<span class="tags">' in r.text, pad
         assert '<a class="badge badge-tag" href="/?q=woz">woz</a>' in r.text, pad
-        assert '<a class="badge badge-tag" href="/?q=gemeente%20amsterdam">gemeente amsterdam</a>' in r.text, pad
+        assert '<a class="badge badge-tag" href="/?q=gemeente%20voorbeeldstad">gemeente voorbeeldstad</a>' in r.text, pad
         # titel blijft een link naar het document; de kaartrij zelf is geen link meer
         assert '<a class="titel" href="/doc/2026/2026-03-01_woz-beschikking' in r.text, pad
         assert '<a class="rij"' not in r.text, pad
         assert _geneste_links(r.text) == 0, pad
     # volgorde zoals in meta.md
     r = client.get("/")
-    assert r.text.index("?q=woz") < r.text.index("?q=gemeente%20amsterdam")
+    assert r.text.index("?q=woz") < r.text.index("?q=gemeente%20voorbeeldstad")
 
 
 def test_tags_labels_met_ingress_prefix(client: TestClient) -> None:
@@ -187,20 +187,20 @@ def test_kaart_zonder_tags_heeft_geen_tags_span(client: TestClient) -> None:
 
 
 def test_tag_label_op_documentpagina(client: TestClient) -> None:
-    _upload(client, tags="woz, gemeente amsterdam")
+    _upload(client, tags="woz, gemeente voorbeeldstad")
     r = client.get(_DOC)
     assert '<a class="badge badge-tag" href="/?q=woz">woz</a>' in r.text
-    assert '<a class="badge badge-tag" href="/?q=gemeente%20amsterdam">gemeente amsterdam</a>' in r.text
+    assert '<a class="badge badge-tag" href="/?q=gemeente%20voorbeeldstad">gemeente voorbeeldstad</a>' in r.text
     assert _geneste_links(r.text) == 0
     # de tag-zoekopdracht vindt het document
-    r = client.get("/?q=gemeente amsterdam")
+    r = client.get("/?q=gemeente voorbeeldstad")
     assert "1 resultaat" in r.text
-    assert f'href="{_DOC}?q=gemeente%20amsterdam"' in r.text
+    assert f'href="{_DOC}?q=gemeente%20voorbeeldstad"' in r.text
 
 
 # --- upload (tweestaps sinds pakket 15b) ------------------------------------
 
-_ENECO = b"Factuur                     Factuurnummer 2024-0031\nEneco Services B.V.\nFactuurdatum 12-03-2024\nVervaldatum 12-04-2024\n" + b" x" * 30
+_VOLTARIA = b"Factuur                     Factuurnummer 2024-0031\nVoltaria Services B.V.\nFactuurdatum 12-03-2024\nVervaldatum 12-04-2024\n" + b" x" * 30
 
 
 def test_upload_formulier_scherm1_alleen_bestanden(client: TestClient) -> None:
@@ -241,11 +241,11 @@ def test_stap1_schrijft_niets_en_stuurt_door(client: TestClient) -> None:
 
 
 def test_scherm2_voorgevuld_uit_tekst(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
-    mock_cmd.register("pdftotext", stdout=_ENECO)
+    mock_cmd.register("pdftotext", stdout=_VOLTARIA)
     token = _token(_stap1(client, [("factuur.pdf", _PDF, "application/pdf")]))
     r = client.get(f"/upload/{token}")
     assert r.status_code == 200
-    assert 'name="titel" value="Eneco Services"' in r.text
+    assert 'name="titel" value="Voltaria Services"' in r.text
     assert "voorstel uit het document" in r.text
     assert 'name="documentdatum" value="2024-03-12"' in r.text
     assert "datum uit tekst" in r.text
@@ -272,18 +272,18 @@ def test_scherm2_zonder_treffers(client: TestClient, mock_cmd) -> None:  # type:
 
 
 def test_opslaan_datum_ongewijzigd_bron_tekst(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
-    mock_cmd.register("pdftotext", stdout=_ENECO)
+    mock_cmd.register("pdftotext", stdout=_VOLTARIA)
     token = _token(_stap1(client, [("factuur.pdf", _PDF, "application/pdf")]))
     r = client.post(
         f"/upload/{token}",
-        data={"titel": "Eneco Services B.V.", "documentdatum": "2024-03-12", "tags": "factuur"},
+        data={"titel": "Voltaria Services B.V.", "documentdatum": "2024-03-12", "tags": "factuur"},
         follow_redirects=False,
     )
     assert r.status_code == 303
-    assert r.headers["location"] == "/doc/2024/2024-03-12_eneco-services-b-v?m=Opgeslagen"
-    doc = _root(client) / "2024" / "2024-03-12_eneco-services-b-v"
+    assert r.headers["location"] == "/doc/2024/2024-03-12_voltaria-services-b-v?m=Opgeslagen"
+    doc = _root(client) / "2024" / "2024-03-12_voltaria-services-b-v"
     meta = lees_meta(doc)
-    assert meta.titel == "Eneco Services B.V."
+    assert meta.titel == "Voltaria Services B.V."
     assert meta.documentdatum.isoformat() == "2024-03-12"
     assert meta.datumbron == "tekst"
     assert meta.tags == ["factuur"]
@@ -297,13 +297,13 @@ def test_opslaan_datum_ongewijzigd_bron_tekst(client: TestClient, mock_cmd) -> N
 
 
 def test_opslaan_datum_gewijzigd_bron_gebruiker(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
-    mock_cmd.register("pdftotext", stdout=_ENECO)
-    r = _upload(client, titel="Eneco", datum="2026-03-01")  # voorgevuld was 2024-03-12
-    assert r.headers["location"] == "/doc/2026/2026-03-01_eneco?m=Opgeslagen"
-    meta = lees_meta(_root(client) / "2026" / "2026-03-01_eneco")
+    mock_cmd.register("pdftotext", stdout=_VOLTARIA)
+    r = _upload(client, titel="Voltaria", datum="2026-03-01")  # voorgevuld was 2024-03-12
+    assert r.headers["location"] == "/doc/2026/2026-03-01_voltaria?m=Opgeslagen"
+    meta = lees_meta(_root(client) / "2026" / "2026-03-01_voltaria")
     assert meta.datumbron == "gebruiker"
     assert meta.documentdatum.isoformat() == "2026-03-01"
-    r = client.get("/doc/2026/2026-03-01_eneco")
+    r = client.get("/doc/2026/2026-03-01_voltaria")
     assert "datum uit tekst" not in r.text and "datum van upload" not in r.text
 
 
@@ -529,12 +529,12 @@ def test_inbox_opslaan_hash_inmiddels_bekend(client: TestClient, mock_cmd) -> No
     pad = _in_inbox(client)
     token = _opnemen(client)
     # intussen hetzelfde bestand via de gewone upload opgeslagen
-    _upload(client, titel="Eneco", bestanden=[("los.pdf", _PDF, "application/pdf")])
+    _upload(client, titel="Voltaria", bestanden=[("los.pdf", _PDF, "application/pdf")])
     r = client.post(f"/upload/{token}", data={"titel": "BSR", "documentdatum": "2024-05-03"}, follow_redirects=False)
     assert r.status_code == 303
-    assert r.headers["location"] == "/doc/2026/2026-03-01_eneco?m=Al+opgenomen+via+de+inbox"
+    assert r.headers["location"] == "/doc/2026/2026-03-01_voltaria?m=Al+opgenomen+via+de+inbox"
     mappen = client.app.state.archief.documentmappen()  # type: ignore[attr-defined]
-    assert [m.name for m in mappen] == ["2026-03-01_eneco"]
+    assert [m.name for m in mappen] == ["2026-03-01_voltaria"]
     assert pad.exists()  # niet stilletjes weggegooid...
     _reconciler(client).verwerk_inbox()  # ...maar de poll behandelt het bij de herbeoordeling als dubbel (pakket 16)
     assert not pad.exists()
@@ -566,10 +566,10 @@ def test_inbox_mislukte_extractie_na_opname_naar_queue(client: TestClient, mock_
 
 
 def test_inbox_met_titel_direct_opgenomen(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
-    mock_cmd.register("pdftotext", stdout=_ENECO)
+    mock_cmd.register("pdftotext", stdout=_VOLTARIA)
     pad = _in_inbox(client, "factuur.pdf")
     assert not pad.exists()
-    assert lees_meta(_root(client) / "2024" / "2024-03-12_eneco-services").titel == "Eneco Services"
+    assert lees_meta(_root(client) / "2024" / "2024-03-12_voltaria-services").titel == "Voltaria Services"
     assert "De inbox is leeg." in client.get("/inbox").text
     assert "in de inbox wacht" not in client.get("/").text
 
@@ -654,15 +654,15 @@ def test_inbox_links_met_ingress_prefix(client: TestClient, mock_cmd) -> None:  
 
 
 def test_upload_dubbel_geweigerd_met_link(client: TestClient) -> None:
-    _upload(client, titel="Eneco")
+    _upload(client, titel="Voltaria")
     store = client.app.state.openstaand  # type: ignore[attr-defined]
     mappen_voor = client.app.state.archief.documentmappen()  # type: ignore[attr-defined]
     r = _stap1(client, [("kopie.pdf", _PDF, "application/pdf")])
     assert r.status_code == 409
     assert "staat al in de ordner" in r.text
     assert "kopie.pdf" in r.text
-    assert 'href="/doc/2026/2026-03-01_eneco"' in r.text
-    assert "Eneco (2026-03-01)" in r.text
+    assert 'href="/doc/2026/2026-03-01_voltaria"' in r.text
+    assert "Voltaria (2026-03-01)" in r.text
     assert "als <code>a.pdf</code>" in r.text  # andere naam dan in het archief
     assert len(store) == 0  # geen openstaande upload
     assert client.app.state.archief.documentmappen() == mappen_voor  # type: ignore[attr-defined]
@@ -670,7 +670,7 @@ def test_upload_dubbel_geweigerd_met_link(client: TestClient) -> None:
 
 
 def test_upload_deels_dubbel_weigert_alles(client: TestClient) -> None:
-    _upload(client, titel="Eneco")
+    _upload(client, titel="Voltaria")
     r = _stap1(client, [("nieuw.pdf", b"%PDF nieuw", "application/pdf"), ("a.pdf", _PDF, "application/pdf")])
     assert r.status_code == 409
     assert r.text.count("<li>") == 1  # alleen het dubbele bestand wordt genoemd
@@ -680,17 +680,17 @@ def test_upload_deels_dubbel_weigert_alles(client: TestClient) -> None:
 
 
 def test_upload_dubbel_met_ingress_prefix(client: TestClient) -> None:
-    _upload(client, titel="Eneco")
+    _upload(client, titel="Voltaria")
     r = _stap1(client, headers={"X-Ingress-Path": _PREFIX})
     assert r.status_code == 409
-    assert f'href="{_PREFIX}/doc/2026/2026-03-01_eneco"' in r.text
+    assert f'href="{_PREFIX}/doc/2026/2026-03-01_voltaria"' in r.text
 
 
 def test_toevoegen_dubbel_geweigerd(client: TestClient) -> None:
-    _upload(client, titel="Eneco")
+    _upload(client, titel="Voltaria")
     _upload(client, titel="Ander", bestanden=[("b.pdf", b"%PDF ander", "application/pdf")])
     doc = _root(client) / "2026" / "2026-03-01_ander"
-    # kopie.pdf staat in Eneco; één dubbel -> ook nieuw.jpg wordt niet toegevoegd
+    # kopie.pdf staat in Voltaria; één dubbel -> ook nieuw.jpg wordt niet toegevoegd
     r = client.post(
         "/doc/2026/2026-03-01_ander/bestanden",
         files=[("bestanden", ("nieuw.jpg", b"jpgdata", "image/jpeg")), ("bestanden", ("kopie.pdf", _PDF, "application/pdf"))],
@@ -698,7 +698,7 @@ def test_toevoegen_dubbel_geweigerd(client: TestClient) -> None:
         follow_redirects=False,
     )
     assert r.status_code == 409
-    assert "kopie.pdf" in r.text and 'href="/doc/2026/2026-03-01_eneco"' in r.text
+    assert "kopie.pdf" in r.text and 'href="/doc/2026/2026-03-01_voltaria"' in r.text
     assert 'name="q" value="ander"' in r.text  # herkomst blijft
     assert lees_meta(doc).bestanden == ["b.pdf"]
     assert not (doc / "nieuw.jpg").exists()
@@ -722,8 +722,8 @@ def test_sha256_in_meta_na_upload(client: TestClient) -> None:
 
 
 def test_prullenbak_telt_niet_mee_als_dubbel(client: TestClient) -> None:
-    _upload(client, titel="Eneco")
-    r = client.post("/doc/2026/2026-03-01_eneco/verwijder", follow_redirects=False)
+    _upload(client, titel="Voltaria")
+    r = client.post("/doc/2026/2026-03-01_voltaria/verwijder", follow_redirects=False)
     assert r.status_code == 303
     r = _stap1(client)
     assert r.status_code == 303  # weggegooid document telt niet mee; opnieuw uploaden mag
@@ -789,10 +789,10 @@ def test_meta_bewerken_zet_datumbron_op_gebruiker(client: TestClient, mock_cmd) 
 
 
 def test_bekende_titel_uit_archief_voorgesteld(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
-    _upload(client, titel="Eneco")
-    mock_cmd.register("pdftotext", stdout=b"\n".join(b"regel %d" % i for i in range(30)) + b"\nBetaling aan Eneco voor levering\n")
+    _upload(client, titel="Voltaria")
+    mock_cmd.register("pdftotext", stdout=b"\n".join(b"regel %d" % i for i in range(30)) + b"\nBetaling aan Voltaria voor levering\n")
     token = _token(_stap1(client, [("b.pdf", _PDF + b" ander", "application/pdf")]))  # andere inhoud dan a.pdf (pakket 16)
-    assert 'name="titel" value="Eneco"' in client.get(f"/upload/{token}").text
+    assert 'name="titel" value="Voltaria"' in client.get(f"/upload/{token}").text
 
 
 def _vandaag():  # type: ignore[no-untyped-def]
