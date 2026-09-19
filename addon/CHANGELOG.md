@@ -2,6 +2,10 @@
 
 Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. Nieuwste versie bovenaan; de bovenste kop moet gelijk zijn aan `version` in `config.yaml` (dat controleert `tests/test_addon_config.py`).
 
+## 0.19.4 (2026-09-19)
+
+- **Na een update meteen het nieuwe scherm.** De browser (ook de Home Assistant-app) kon na een update van Ordner nog een oude versie van de opmaak en het script uit zijn cache gebruiken, waardoor bijvoorbeeld het uploadscherm er nog uitzag als voor 0.19.0. Ordner geeft die bestanden nu een kenmerk mee dat verandert zodra hun inhoud verandert, zodat de browser ze na een update altijd opnieuw ophaalt. Zie je toch nog een oud scherm, wis dan nog één keer de cache (in de Android-app: **Clear web view cache**).
+
 ## 0.19.3 (2026-09-19)
 
 - **Eén knop op het uploadscherm.** De knop **Foto maken** is weg: de bestandskiezer achter **Bestanden kiezen** biedt op de telefoon zelf al de mogelijkheid om een foto te maken, en elke foto komt bij de lijst. Foto's uit de camera heten allemaal `image.jpg`; het lijstje toont nu meteen de naam waaronder elke foto wordt opgeslagen (`image.jpg`, `image_2.jpg`, …), ook na het weghalen van een foto.

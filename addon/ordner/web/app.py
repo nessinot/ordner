@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -33,16 +34,33 @@ def url_pad(request: Request, naam: str, /, **path_params: str) -> str:
     return request.url_for(naam, **path_params).path
 
 
+def _static_hashes(static_dir: Path) -> dict[str, str]:
+    """Bestandsnaam → korte SHA-256 van de inhoud, als cache-buster in de static-links (pakket 33)."""
+    return {
+        p.name: hashlib.sha256(p.read_bytes()).hexdigest()[:8] for p in sorted(static_dir.iterdir()) if p.is_file()
+    }
+
+
 def maak_templates() -> Jinja2Templates:
-    """Jinja2-omgeving waarin `url_for(naam, ...)` een pad met Ingress-prefix oplevert."""
+    """Jinja2-omgeving waarin `url_for(naam, ...)` een pad met Ingress-prefix oplevert.
+
+    `static_url(naam)` geeft de static-link met `?v=<inhouds-hash>`, zodat een browser na een update
+    nooit een oude `app.js` of `style.css` uit zijn cache hergebruikt (pakket 33).
+    """
     templates = Jinja2Templates(directory=TEMPLATES_DIR)
+    hashes = _static_hashes(STATIC_DIR)
 
     def url_for(context: dict[str, object], naam: str, /, **path_params: str) -> str:
         request = context["request"]
         assert isinstance(request, Request)
         return url_pad(request, naam, **path_params)
 
+    def static_url(context: dict[str, object], naam: str, /) -> str:
+        pad = url_for(context, "static", path=naam)
+        return f"{pad}?v={hashes[naam]}" if naam in hashes else pad
+
     templates.env.globals["url_for"] = pass_context(url_for)
+    templates.env.globals["static_url"] = pass_context(static_url)
     return templates
 
 

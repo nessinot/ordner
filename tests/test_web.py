@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 import time
 from html.parser import HTMLParser
@@ -8,6 +9,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from ordner.meta import lees_meta, schrijf_meta
+from ordner.web.app import STATIC_DIR
 
 _PREFIX = "/api/hassio_ingress/abc"
 _PDF = b"%PDF-1.4 testinhoud"
@@ -831,7 +833,7 @@ def test_ingress_prefix_in_alle_links(client: TestClient) -> None:
         assert urls, pad
         for url in urls:
             assert url.startswith(_PREFIX + "/"), (pad, url)
-    assert f'href="{_PREFIX}/static/style.css"' in r.text
+    assert f'href="{_PREFIX}/static/style.css?v=' in r.text
 
 
 def test_ingress_prefix_in_redirect(client: TestClient) -> None:
@@ -873,7 +875,7 @@ def test_ingress_static_bereikbaar(client: TestClient) -> None:
 
 def test_zonder_ingress_geen_prefix(client: TestClient) -> None:
     r = client.get("/")
-    assert 'href="/static/style.css"' in r.text
+    assert 'href="/static/style.css?v=' in r.text
     assert 'action="/"' in r.text
 
 
@@ -974,6 +976,17 @@ def test_document_niet_in_index_wordt_herladen(client: TestClient) -> None:
 def test_static(client: TestClient) -> None:
     assert client.get("/static/style.css").status_code == 200
     assert client.get("/static/app.js").status_code == 200
+
+
+def test_static_links_met_hash(client: TestClient) -> None:
+    """Pakket 33: `?v=<8 hex van sha256(inhoud)>` achter de static-links, ook achter het Ingress-prefix."""
+    for prefix, headers in (("", {}), (_PREFIX, {"X-Ingress-Path": _PREFIX})):
+        r = client.get("/", headers=headers)
+        for naam in ("style.css", "app.js"):
+            m = re.search(rf'"{prefix}/static/{re.escape(naam)}\?v=([0-9a-f]{{8}})"', r.text)
+            assert m, (prefix, naam)
+            assert m.group(1) == hashlib.sha256((STATIC_DIR / naam).read_bytes()).hexdigest()[:8]
+            assert client.get(f"/static/{naam}?v={m.group(1)}", headers=headers).status_code == 200
 
 
 # --- documentpagina en -acties (pakket 09) ---------------------------------
