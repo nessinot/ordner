@@ -210,12 +210,11 @@ def test_upload_formulier_scherm1_alleen_bestanden(client: TestClient) -> None:
     assert 'enctype="multipart/form-data"' in r.text
     # geen `capture` op het hoofdveld: iOS toont dan het keuzemenu (bibliotheek / camera / bestanden)
     assert '<input type="file" name="bestanden" multiple accept="image/*,application/pdf" required>' in r.text
-    # pakket 29: cameraveld zonder name, knop Foto maken; verborgen tot app.js het blok toont
-    assert '<input type="file" accept="image/*" capture="environment" hidden data-camera>' in r.text
-    assert "Foto maken" in r.text and "data-verzamel hidden" in r.text
-    # pakket 30: twee gelijke knoppen in het blok; het kruisje maakt app.js, de knop Weg bestaat niet meer
+    # pakket 29/30: verzamelblok verborgen tot app.js het toont, met de knop Bestanden kiezen; het kruisje maakt app.js
+    assert "data-verzamel hidden" in r.text
     assert '<button type="button" class="secundair" data-bestanden-kiezen>Bestanden kiezen</button>' in r.text
-    assert '<button type="button" class="secundair" data-foto-maken>Foto maken</button>' in r.text
+    # pakket 32: knop Foto maken en het cameraveld zijn weg (de bestandskiezer biedt zelf de camera)
+    assert "Foto maken" not in r.text and "data-camera" not in r.text
     assert ">Weg<" not in r.text
     assert "Verder" in r.text
     for veld in ("titel", "omschrijving", "documentdatum", "tags"):

@@ -33,29 +33,39 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // --- upload, scherm 1: foto's verzamelen (pakket 29) ----------------------
-  // Op de iPhone levert "Foto maken" één foto en vervangt een tweede keuze de eerste. De pagina houdt
-  // daarom zelf een lijst bij en schrijft die na elke wijziging terug in het veld `bestanden`
-  // (DataTransfer), zodat required, de XHR-submit en de fallback hierboven ongewijzigd werken.
-  // Zonder DataTransfer (oude browsers) blijft het blok verborgen en werkt het veld zoals altijd.
+  // --- upload, scherm 1: bestanden verzamelen (pakket 29, 30, 32) -----------
+  // Het browserveld vervangt bij elke keuze zijn selectie (op de iPhone geeft "Maak foto" er één per keer).
+  // De pagina houdt daarom zelf een lijst bij en schrijft die na elke wijziging terug in het veld `bestanden`
+  // (DataTransfer), zodat required, de XHR-submit en de fallback hierboven ongewijzigd werken. Gelijke namen
+  // (de camera noemt elke foto image.jpg) krijgen hier al `_2`, `_3`, … zoals `routes._unieke_namen`, en het
+  // bestand gaat onder die naam mee: wat de lijst toont is wat op schijf komt. Zonder DataTransfer (oude
+  // browsers) blijft het blok verborgen en werkt het veld zoals altijd; de server nummert dan zelf.
   const verzamel = form && form.querySelector("[data-verzamel]");
   if (verzamel) {
     let kan = false;
     try { kan = new DataTransfer().files.length === 0; } catch (_) { kan = false; }
     if (kan) {
       const veld = form.querySelector("input[name=bestanden]");
-      const camera = verzamel.querySelector("[data-camera]");
       const lijst = verzamel.querySelector("[data-gekozen]");
       let gekozen = [];
+      const uniekeNaam = (naam, gezien) => {
+        const punt = naam.lastIndexOf(".");
+        const stam = punt > 0 ? naam.slice(0, punt) : naam, ext = punt > 0 ? naam.slice(punt) : "";
+        let kandidaat = naam;
+        for (let n = 2; gezien.has(kandidaat); n++) kandidaat = stam + "_" + n + ext;
+        return kandidaat;
+      };
       const toon = () => {
         const dt = new DataTransfer();
-        gekozen.forEach((f) => dt.items.add(f));
+        const gezien = new Set();
+        const namen = gekozen.map((f) => { const n = uniekeNaam(f.name, gezien); gezien.add(n); return n; });
+        gekozen.forEach((f, i) => dt.items.add(namen[i] === f.name ? f : new File([f], namen[i], { type: f.type })));
         veld.files = dt.files;
         lijst.textContent = "";
         gekozen.forEach((f, i) => {
           const li = document.createElement("li");
           const naam = document.createElement("span");
-          naam.className = "bestand-naam"; naam.textContent = f.name;
+          naam.className = "bestand-naam"; naam.textContent = namen[i];
           const verwijder = document.createElement("button");
           verwijder.type = "button"; verwijder.className = "verwijder"; verwijder.textContent = "×";
           verwijder.setAttribute("aria-label", "Verwijder");
@@ -66,10 +76,8 @@ document.addEventListener("DOMContentLoaded", () => {
       };
       // Het hoofdveld vervangt bij een nieuwe keuze zijn selectie; wij voegen toe aan wat er al was.
       veld.addEventListener("change", () => { gekozen = gekozen.concat(Array.from(veld.files)); toon(); });
-      camera.addEventListener("change", () => { gekozen = gekozen.concat(Array.from(camera.files)); camera.value = ""; toon(); });
-      // Pakket 30: twee gelijke knoppen; het browserveld blijft in het formulier maar wordt visueel verborgen (CSS).
+      // Pakket 30: de knop klikt het browserveld aan, dat in het formulier blijft maar visueel verborgen is (CSS).
       verzamel.querySelector("[data-bestanden-kiezen]").addEventListener("click", () => veld.click());
-      verzamel.querySelector("[data-foto-maken]").addEventListener("click", () => camera.click());
       form.classList.add("verzamelt");
       verzamel.hidden = false;
     }

@@ -2,6 +2,10 @@
 
 Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. Nieuwste versie bovenaan; de bovenste kop moet gelijk zijn aan `version` in `config.yaml` (dat controleert `tests/test_addon_config.py`).
 
+## 0.19.3 (2026-09-19)
+
+- **Eén knop op het uploadscherm.** De knop **Foto maken** is weg: de bestandskiezer achter **Bestanden kiezen** biedt op de telefoon zelf al de mogelijkheid om een foto te maken, en elke foto komt bij de lijst. Foto's uit de camera heten allemaal `image.jpg`; het lijstje toont nu meteen de naam waaronder elke foto wordt opgeslagen (`image.jpg`, `image_2.jpg`, …), ook na het weghalen van een foto.
+
 ## 0.19.2 (2026-09-19)
 
 - **Gedraaide foto's worden nu goed gelezen.** Een foto van de telefoon staat vaak liggend in het bestand met een aantekening "draai bij weergave"; de tekstlezer negeerde die aantekening en las de tekst gedraaid, met onzin als resultaat. Ordner zet zo'n foto nu eerst rechtop voordat de tekst wordt gelezen. Het bestand zelf verandert niet. Heeft een eerder document onzintekst gekregen, kies dan **OCR opnieuw** op de documentpagina.

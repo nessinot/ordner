@@ -250,17 +250,17 @@ ul.bestandslijst { list-style: none; margin: 0 0 0.75rem; padding: 0; }
 ul.bestandslijst li { display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem; align-items: baseline; padding: 0.4rem 0; border-bottom: 1px solid var(--hairline); }
 ul.bestandslijst li:last-child { border-bottom: 0; }
 .bestand-toevoegen .veld { margin-bottom: 0.75rem; }
-/* Pakket 29/30, scherm 1: Bestanden kiezen, Foto maken en de verzamelde bestanden (alleen met JS zichtbaar).
+/* Pakket 29/30/32, scherm 1: Bestanden kiezen en de verzamelde bestanden (alleen met JS zichtbaar).
    Met JS (`form.verzamelt`) is het browserveld visueel verborgen maar nog focusbaar, zodat `required` werkt. */
 form.verzamelt input[name="bestanden"] { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 form.verzamelt .veld { position: relative; margin-bottom: 0; }
 form.verzamelt .hint-bestanden { margin-top: 0; }
-.foto-maken { margin: 0 0 1rem; }
-.foto-maken .knoppen { margin-top: 0; }
-.foto-maken ul.bestandslijst { margin: 0.5rem 0 0; }
-.foto-maken ul.bestandslijst li { align-items: center; padding: 0; }
-.foto-maken ul.bestandslijst li .verwijder { margin-left: auto; min-width: 40px; min-height: 40px; padding: 0; border: 0; background: none; color: var(--gedempt); font-size: 1.4rem; line-height: 1; }
-.foto-maken ul.bestandslijst li .verwijder:hover, .foto-maken ul.bestandslijst li .verwijder:focus-visible { color: var(--failed); filter: none; }
+.verzamel { margin: 0 0 1rem; }
+.verzamel .knoppen { margin-top: 0; }
+.verzamel ul.bestandslijst { margin: 0.5rem 0 0; }
+.verzamel ul.bestandslijst li { align-items: center; padding: 0; }
+.verzamel ul.bestandslijst li .verwijder { margin-left: auto; min-width: 40px; min-height: 40px; padding: 0; border: 0; background: none; color: var(--gedempt); font-size: 1.4rem; line-height: 1; }
+.verzamel ul.bestandslijst li .verwijder:hover, .verzamel ul.bestandslijst li .verwijder:focus-visible { color: var(--failed); filter: none; }
 pre.notities { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; margin: 0; }
 .mapinfo { color: var(--gedempt); font-size: 0.85rem; margin-top: 0.75rem; overflow-wrap: anywhere; }
 

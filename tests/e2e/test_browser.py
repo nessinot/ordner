@@ -53,12 +53,12 @@ def test_upload_via_formulier(page: Page, server: Server) -> None:
     page.goto(server.url + "/upload")
     expect(page.locator("input[name=titel]")).to_have_count(0)  # scherm 1 heeft geen titelveld
     page.locator("input[name=bestanden]").set_input_files(str(FIXTURES / "tekst.pdf"))
-    # pakket 29: de foto komt via het cameraveld achter "Foto maken"; app.js voegt hem bij het hoofdveld
-    page.locator("input[data-camera]").set_input_files(str(FIXTURES / "foto.jpg"))
-    # pakket 30: een tweede foto en die met het kruisje (Verwijder) weer weghalen
-    page.locator("input[data-camera]").set_input_files(str(FIXTURES / "foto.jpg"))
-    expect(page.locator("[data-gekozen] li .bestand-naam")).to_have_text(["tekst.pdf", "foto.jpg", "foto.jpg"])
-    page.locator("[data-gekozen] li").last.get_by_role("button", name="Verwijder").click()
+    # pakket 29/32: elke keuze komt bij de lijst; een gelijke naam krijgt in de browser al `_2`
+    page.locator("input[name=bestanden]").set_input_files(str(FIXTURES / "foto.jpg"))
+    page.locator("input[name=bestanden]").set_input_files(str(FIXTURES / "foto.jpg"))
+    expect(page.locator("[data-gekozen] li .bestand-naam")).to_have_text(["tekst.pdf", "foto.jpg", "foto_2.jpg"])
+    # pakket 30/32: de middelste met het kruisje (Verwijder) weghalen; de rest nummert opnieuw
+    page.locator("[data-gekozen] li").nth(1).get_by_role("button", name="Verwijder").click()
     expect(page.locator("[data-gekozen] li .bestand-naam")).to_have_text(["tekst.pdf", "foto.jpg"])
     page.get_by_role("button", name="Verder").click()
 
