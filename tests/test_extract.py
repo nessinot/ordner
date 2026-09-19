@@ -127,12 +127,12 @@ async def test_jpg_via_tesseract(mock_cmd: CmdMock, tmp_path: Path) -> None:
 async def test_heic_wordt_eerst_jpg(
     mock_cmd: CmdMock, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    def nep_heic_naar_jpg(pad: Path, tmpdir: Path) -> Path:
+    def nep_bereid_voor(pad: Path, tmpdir: Path) -> Path:
         doel = tmpdir / (pad.stem + ".jpg")
         doel.write_bytes(b"")
         return doel
 
-    monkeypatch.setattr("ordner.extract._heic_naar_jpg", nep_heic_naar_jpg)
+    monkeypatch.setattr("ordner.extract._bereid_afbeelding_voor", nep_bereid_voor)
     mock_cmd.register("tesseract", stdout=b"foto")
     heic = tmp_path / "Foto.HEIC"
     heic.write_bytes(b"")
@@ -153,6 +153,52 @@ async def test_kapotte_heic_geeft_extractiefout(mock_cmd: CmdMock, tmp_path: Pat
     with pytest.raises(ExtractieFout, match="heic niet leesbaar"):
         await extract_afbeelding(heic, TALEN)
     assert mock_cmd.calls == []  # tesseract is niet aangeroepen
+
+
+def _jpeg(pad: Path, orientatie: int | None) -> None:
+    """Echte JPEG van 400x1200 pixels, optioneel met EXIF-oriëntatietag (6 = 90° draaien bij weergave)."""
+    from PIL import Image
+
+    img = Image.new("RGB", (400, 1200), "white")
+    if orientatie is None:
+        img.save(pad)
+        return
+    exif = Image.Exif()
+    exif[0x0112] = orientatie
+    img.save(pad, exif=exif)
+
+
+async def test_jpg_met_exif_orientatie_wordt_rechtop_gezet(mock_cmd: CmdMock, tmp_path: Path) -> None:
+    """Tesseract negeert EXIF; een foto van de telefoon (pakket 29) wordt eerst rechtop gezet (pakket 31)."""
+    from PIL import Image
+
+    gezien: list[tuple[tuple[int, int], int | None]] = []
+
+    def tesseract(args: list[str]) -> tuple[int, bytes, bytes]:
+        with Image.open(args[1]) as img:  # de tijdelijke map bestaat alleen tijdens de aanroep
+            gezien.append((img.size, img.getexif().get(0x0112)))
+        return 0, b"recht", b""
+
+    mock_cmd.register("tesseract", handler=tesseract)
+    jpg = tmp_path / "image.jpg"
+    _jpeg(jpg, 6)
+    origineel = jpg.read_bytes()
+
+    assert await extract_afbeelding(jpg, TALEN) == "recht"
+    bron = Path(mock_cmd.calls[0][1])
+    assert bron != jpg and bron.parent != tmp_path
+    assert bron.suffix == ".jpg" and bron.stem == "image"
+    assert gezien == [((1200, 400), None)]
+    assert jpg.read_bytes() == origineel
+
+
+async def test_jpg_zonder_orientatie_gaat_ongewijzigd_naar_tesseract(mock_cmd: CmdMock, tmp_path: Path) -> None:
+    mock_cmd.register("tesseract", stdout=b"recht")
+    jpg = tmp_path / "bon.jpg"
+    _jpeg(jpg, None)
+
+    assert await extract_afbeelding(jpg, TALEN) == "recht"
+    assert mock_cmd.calls == [["tesseract", str(jpg), "-", "-l", TALEN]]
 
 
 async def test_tesseract_faalt(mock_cmd: CmdMock, tmp_path: Path) -> None:

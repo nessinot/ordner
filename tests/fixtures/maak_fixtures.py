@@ -64,7 +64,11 @@ def main() -> None:
     img.save(HIER / "foto.jpg", quality=85)
     img.save(HIER / "foto.heic", quality=80)
     img.save(HIER / "scan.pdf")  # afbeelding-pdf zonder tekstlaag: het ocrmypdf-pad
-    for naam in ("tekst.pdf", "foto.png", "foto.jpg", "foto.heic", "scan.pdf"):
+    # Telefoonfoto: pixels liggend opgeslagen, EXIF-oriëntatie 6 zegt "90° draaien bij weergave" (pakket 31)
+    exif = Image.Exif()
+    exif[0x0112] = 6
+    img.rotate(90, expand=True).save(HIER / "foto_gedraaid.jpg", quality=85, exif=exif)
+    for naam in ("tekst.pdf", "foto.png", "foto.jpg", "foto.heic", "scan.pdf", "foto_gedraaid.jpg"):
         print(f"{naam}: {(HIER / naam).stat().st_size} bytes")
 
 

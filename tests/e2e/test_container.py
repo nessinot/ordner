@@ -84,6 +84,13 @@ def test_heic(container: Container) -> None:
     assert lees_meta(doc).ocr == "done"
 
 
+def test_gedraaide_jpg(container: Container) -> None:
+    """Foto met EXIF-oriëntatie 6 (telefoon): tesseract leest hem pas goed na exif_transpose (pakket 31)."""
+    doc = _upload(container, "Container gedraaide foto", FIXTURES / "foto_gedraaid.jpg")
+    _wacht(_txt_bevat(doc, "foto_gedraaid.jpg", "BONNETJE"), 60, "OCR via exif_transpose→tesseract")
+    assert lees_meta(doc).ocr == "done"
+
+
 def test_zoeken_op_ocr_tekst(container: Container) -> None:
     r = httpx.get(container.url + "/", params={"q": "bonnetje"})
     assert r.status_code == 200
@@ -119,7 +126,11 @@ def test_inbox_via_volume(container: Container) -> None:
 
 def test_herstart(container: Container) -> None:
     voor = httpx.get(container.url + "/").text
-    titels = [t for t in ("Container digitale pdf", "Container gescande pdf", "Container heic bon") if t in voor]
+    titels = [
+        t
+        for t in ("Container digitale pdf", "Container gescande pdf", "Container heic bon", "Container gedraaide foto")
+        if t in voor
+    ]
     assert titels, "geen eerder gemaakte documenten zichtbaar vóór herstart"
 
     herstart = _docker("restart", CONTAINER_NAAM, timeout=120)

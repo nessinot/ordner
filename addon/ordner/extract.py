@@ -86,24 +86,35 @@ async def extract_pdf(pad: Path, talen: str) -> str:
         return _normaliseer(sidecar.read_text("utf-8", errors="replace"))
 
 
-def _heic_naar_jpg(pad: Path, tmpdir: Path) -> Path:
-    """Zet een .heic om naar een tijdelijke .jpg (tesseract kan geen heic lezen)."""
+def _bereid_afbeelding_voor(pad: Path, tmpdir: Path) -> Path:
+    """Geeft het pad dat tesseract moet lezen: een tijdelijke, rechtop gezette .jpg als dat nodig is.
+
+    `.heic` gaat altijd naar .jpg (tesseract kan geen heic lezen). Andere afbeeldingen
+    alleen als de EXIF-oriëntatie niet 1 is; tesseract negeert die tag en zou de tekst
+    gedraaid lezen. Anders, of als Pillow het bestand niet kan openen, het origineel zelf.
+    """
     import pillow_heif
-    from PIL import Image
+    from PIL import Image, ImageOps
 
     pillow_heif.register_heif_opener()
+    heic = pad.suffix.lower() == ".heic"
     doel = tmpdir / (pad.stem + ".jpg")
     try:
-        Image.open(pad).convert("RGB").save(doel, quality=90)
+        with Image.open(pad) as img:
+            if not heic and img.getexif().get(0x0112, 1) == 1:
+                return pad
+            ImageOps.exif_transpose(img).convert("RGB").save(doel, quality=90)
     except (OSError, ValueError) as e:  # PIL: UnidentifiedImageError (OSError), kapotte of lege data
-        raise ExtractieFout(f"heic niet leesbaar: {pad.name}: {e}") from e
+        if heic:
+            raise ExtractieFout(f"heic niet leesbaar: {pad.name}: {e}") from e
+        return pad
     return doel
 
 
 async def extract_afbeelding(pad: Path, talen: str) -> str:
-    """OCR van een afbeelding via tesseract; .heic wordt eerst naar .jpg omgezet."""
+    """OCR van een afbeelding via tesseract; .heic en gedraaide foto's worden eerst een rechte .jpg."""
     with tempfile.TemporaryDirectory() as tmp:
-        bron = _heic_naar_jpg(pad, Path(tmp)) if pad.suffix.lower() == ".heic" else pad
+        bron = _bereid_afbeelding_voor(pad, Path(tmp))
         rc, out, err = await run_cmd(["tesseract", str(bron), "-", "-l", talen])
         if rc != 0:
             raise ExtractieFout(f"tesseract faalde ({rc}): {_decode(err[-500:]).strip()}")

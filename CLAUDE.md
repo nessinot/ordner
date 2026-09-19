@@ -16,7 +16,7 @@ Werkpakketten en het bindende interface-contract staan in `werk/`. Die map is **
 | `ocr`-status | `pending` (extraheerbare bestanden zonder `.txt`), `done` (alle extraheerbare bestanden hebben een `.txt`, of er zijn er geen), `failed` (extractie mislukt; reconciler probeert niet opnieuw tot "OCR opnieuw" de status reset). |
 | Extraheerbaar | Extensies `.pdf .jpg .jpeg .png .heic` (case-insensitive). Andere bestanden worden opgeslagen en in `bestanden` opgenomen, maar niet geëxtraheerd. |
 | Extractie pdf | `pdftotext -layout`; paginatelling via `pdfinfo`; te weinig tekst (< 50 tekens per pagina) → `ocrmypdf --force-ocr` met sidecar. |
-| Extractie afbeelding | `.heic` → tijdelijke `.jpg` via `pillow_heif` + Pillow; daarna `tesseract`. |
+| Extractie afbeelding | `extract._bereid_afbeelding_voor`: `.heic` → tijdelijke `.jpg` via `pillow_heif` + Pillow; `.jpg/.png` met EXIF-oriëntatie ≠ 1 → `ImageOps.exif_transpose` → tijdelijke `.jpg` (tesseract negeert EXIF; pakket 31); anders, of onleesbaar voor Pillow, het origineel zelf. Daarna `tesseract`. |
 | Subprocess | Uitsluitend via `extract.run_cmd` (asyncio subprocess, timeout 600 s). Tests mocken alleen deze functie. |
 | Index | In-memory (`index.Index`), gebouwd bij start, bijgewerkt door app/worker, herbouwd door reconciler. Geen indexbestand op schijf. |
 | Reconciler | Bij start, elke `reconcile_interval` s, en op knop. Synchroniseert `bestanden`, queued ontbrekende `.txt`, maakt `meta.md` voor mappen zonder, ingest `_inbox/`. |
