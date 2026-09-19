@@ -2,6 +2,10 @@
 
 Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. Nieuwste versie bovenaan; de bovenste kop moet gelijk zijn aan `version` in `config.yaml` (dat controleert `tests/test_addon_config.py`).
 
+## 0.19.1 (2026-09-19)
+
+- **Uploadscherm opgeruimd.** **Bestanden kiezen** en **Foto maken** zijn nu twee gelijke knoppen, op de telefoon onder elkaar; het losse bestandsveld van de browser is weg (zonder JavaScript blijft het gewoon staan). Een gekozen bestand haal je met een kruisje achter de regel weer uit de lijst, in plaats van met **Weg**.
+
 ## 0.19.0 (2026-09-19)
 
 - **Meerdere foto's maken op de telefoon.** Op het uploadscherm staat een knop **Foto maken**. Elke foto komt in een lijstje onder de knop, je maakt er zoveel als je pagina's hebt, en met **Weg** haal je er een weer uit. Daarna één keer Verder, en de foto's vormen samen één document. Ze hoeven niet eerst in je fotobibliotheek. Foto's uit de camera heten allemaal `image.jpg`; Ordner nummert ze door (`image_2.jpg`, …). Het gewone veld Bestanden werkt zoals altijd, ook op de computer.

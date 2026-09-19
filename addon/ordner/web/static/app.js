@@ -56,17 +56,21 @@ document.addEventListener("DOMContentLoaded", () => {
           const li = document.createElement("li");
           const naam = document.createElement("span");
           naam.className = "bestand-naam"; naam.textContent = f.name;
-          const weg = document.createElement("button");
-          weg.type = "button"; weg.className = "als-link weg"; weg.textContent = "Weg";
-          weg.addEventListener("click", () => { gekozen.splice(i, 1); toon(); });
-          li.append(naam, weg);
+          const verwijder = document.createElement("button");
+          verwijder.type = "button"; verwijder.className = "verwijder"; verwijder.textContent = "×";
+          verwijder.setAttribute("aria-label", "Verwijder");
+          verwijder.addEventListener("click", () => { gekozen.splice(i, 1); toon(); });
+          li.append(naam, verwijder);
           lijst.appendChild(li);
         });
       };
       // Het hoofdveld vervangt bij een nieuwe keuze zijn selectie; wij voegen toe aan wat er al was.
       veld.addEventListener("change", () => { gekozen = gekozen.concat(Array.from(veld.files)); toon(); });
       camera.addEventListener("change", () => { gekozen = gekozen.concat(Array.from(camera.files)); camera.value = ""; toon(); });
+      // Pakket 30: twee gelijke knoppen; het browserveld blijft in het formulier maar wordt visueel verborgen (CSS).
+      verzamel.querySelector("[data-bestanden-kiezen]").addEventListener("click", () => veld.click());
       verzamel.querySelector("[data-foto-maken]").addEventListener("click", () => camera.click());
+      form.classList.add("verzamelt");
       verzamel.hidden = false;
     }
   }

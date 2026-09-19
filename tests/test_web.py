@@ -213,6 +213,10 @@ def test_upload_formulier_scherm1_alleen_bestanden(client: TestClient) -> None:
     # pakket 29: cameraveld zonder name, knop Foto maken; verborgen tot app.js het blok toont
     assert '<input type="file" accept="image/*" capture="environment" hidden data-camera>' in r.text
     assert "Foto maken" in r.text and "data-verzamel hidden" in r.text
+    # pakket 30: twee gelijke knoppen in het blok; het kruisje maakt app.js, de knop Weg bestaat niet meer
+    assert '<button type="button" class="secundair" data-bestanden-kiezen>Bestanden kiezen</button>' in r.text
+    assert '<button type="button" class="secundair" data-foto-maken>Foto maken</button>' in r.text
+    assert ">Weg<" not in r.text
     assert "Verder" in r.text
     for veld in ("titel", "omschrijving", "documentdatum", "tags"):
         assert f'name="{veld}"' not in r.text, veld

@@ -55,6 +55,10 @@ def test_upload_via_formulier(page: Page, server: Server) -> None:
     page.locator("input[name=bestanden]").set_input_files(str(FIXTURES / "tekst.pdf"))
     # pakket 29: de foto komt via het cameraveld achter "Foto maken"; app.js voegt hem bij het hoofdveld
     page.locator("input[data-camera]").set_input_files(str(FIXTURES / "foto.jpg"))
+    # pakket 30: een tweede foto en die met het kruisje (Verwijder) weer weghalen
+    page.locator("input[data-camera]").set_input_files(str(FIXTURES / "foto.jpg"))
+    expect(page.locator("[data-gekozen] li .bestand-naam")).to_have_text(["tekst.pdf", "foto.jpg", "foto.jpg"])
+    page.locator("[data-gekozen] li").last.get_by_role("button", name="Verwijder").click()
     expect(page.locator("[data-gekozen] li .bestand-naam")).to_have_text(["tekst.pdf", "foto.jpg"])
     page.get_by_role("button", name="Verder").click()
 

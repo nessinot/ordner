@@ -250,10 +250,17 @@ ul.bestandslijst { list-style: none; margin: 0 0 0.75rem; padding: 0; }
 ul.bestandslijst li { display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem; align-items: baseline; padding: 0.4rem 0; border-bottom: 1px solid var(--hairline); }
 ul.bestandslijst li:last-child { border-bottom: 0; }
 .bestand-toevoegen .veld { margin-bottom: 0.75rem; }
-/* Pakket 29, scherm 1: Foto maken en de verzamelde bestanden (alleen met JS zichtbaar) */
+/* Pakket 29/30, scherm 1: Bestanden kiezen, Foto maken en de verzamelde bestanden (alleen met JS zichtbaar).
+   Met JS (`form.verzamelt`) is het browserveld visueel verborgen maar nog focusbaar, zodat `required` werkt. */
+form.verzamelt input[name="bestanden"] { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+form.verzamelt .veld { position: relative; margin-bottom: 0; }
+form.verzamelt .hint-bestanden { margin-top: 0; }
 .foto-maken { margin: 0 0 1rem; }
+.foto-maken .knoppen { margin-top: 0; }
 .foto-maken ul.bestandslijst { margin: 0.5rem 0 0; }
-.foto-maken ul.bestandslijst li .weg { margin-left: auto; color: var(--gedempt); }
+.foto-maken ul.bestandslijst li { align-items: center; padding: 0; }
+.foto-maken ul.bestandslijst li .verwijder { margin-left: auto; min-width: 40px; min-height: 40px; padding: 0; border: 0; background: none; color: var(--gedempt); font-size: 1.4rem; line-height: 1; }
+.foto-maken ul.bestandslijst li .verwijder:hover, .foto-maken ul.bestandslijst li .verwijder:focus-visible { color: var(--failed); filter: none; }
 pre.notities { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; margin: 0; }
 .mapinfo { color: var(--gedempt); font-size: 0.85rem; margin-top: 0.75rem; overflow-wrap: anywhere; }
 
@@ -263,8 +270,7 @@ p.inbox-wacht { display: flex; align-items: center; gap: 0.6rem; margin: -0.5rem
 p.inbox-wacht .icoon { width: 1.3rem; height: 1.3rem; flex: none; }
 p.inbox-wacht a { color: inherit; font-weight: 500; }
 .hint-inbox { margin: 0 0 0.75rem; }
-/* Pakket 22: de bestandsnaam is de enige actie (opnemen = POST, dus een knop opgemaakt als link);
-   sinds pakket 29 ook de knop Weg op scherm 1 van de upload */
+/* Pakket 22: de bestandsnaam is de enige actie (opnemen = POST, dus een knop opgemaakt als link) */
 ul.bestandslijst.inbox li form { min-width: 0; }
 ul.bestandslijst li button.als-link { background: none; border: 0; padding: 0; min-height: 0; font: inherit; color: inherit; cursor: pointer; text-align: left; }
 ul.bestandslijst li button.als-link:hover { filter: none; color: var(--accent); }

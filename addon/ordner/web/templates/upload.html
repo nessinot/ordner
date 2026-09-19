@@ -9,14 +9,18 @@
     <span>Bestanden</span>
     <input type="file" name="bestanden" multiple accept="image/*,application/pdf" required>
   </label>
-  <p class="hint hint-bestanden">Pdf's en foto's; meerdere tegelijk mag, ze vormen samen één document. Ordner leest de tekst en vult daarna titel, datum en tags voor je in; die kun je in de volgende stap nog aanpassen.</p>
-  {# Pakket 29: foto's verzamelen. Alleen zichtbaar met JS (app.js); het cameraveld heeft geen name, de
-     gekozen bestanden komen via DataTransfer in het veld `bestanden` hierboven. #}
+  {# Pakket 29/30: bestanden verzamelen. Alleen zichtbaar met JS (app.js), dat dan het browserveld hierboven
+     visueel verbergt (klasse `verzamelt` op het formulier) en twee gelijke knoppen toont. Het cameraveld heeft
+     geen name; alles wat gekozen wordt komt via DataTransfer in het veld `bestanden`. #}
   <div class="foto-maken" data-verzamel hidden>
-    <button type="button" class="secundair" data-foto-maken>Foto maken</button>
+    <div class="knoppen vol">
+      <button type="button" class="secundair" data-bestanden-kiezen>Bestanden kiezen</button>
+      <button type="button" class="secundair" data-foto-maken>Foto maken</button>
+    </div>
     <input type="file" accept="image/*" capture="environment" hidden data-camera>
     <ul class="bestandslijst" data-gekozen></ul>
   </div>
+  <p class="hint hint-bestanden">Pdf's en foto's; meerdere tegelijk mag, ze vormen samen één document. Ordner leest de tekst en vult daarna titel, datum en tags voor je in; die kun je in de volgende stap nog aanpassen.</p>
   <progress hidden></progress>
   <p class="hint" data-bezig hidden>Bestanden ontvangen, tekst lezen…</p>
   <div class="knoppen vol">
