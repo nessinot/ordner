@@ -52,7 +52,10 @@ def test_upload_via_formulier(page: Page, server: Server) -> None:
     """Tweestaps upload (pakket 15b): scherm 1 alleen bestanden, scherm 2 de voorgevulde gegevens."""
     page.goto(server.url + "/upload")
     expect(page.locator("input[name=titel]")).to_have_count(0)  # scherm 1 heeft geen titelveld
-    page.locator("input[name=bestanden]").set_input_files([str(FIXTURES / "tekst.pdf"), str(FIXTURES / "foto.jpg")])
+    page.locator("input[name=bestanden]").set_input_files(str(FIXTURES / "tekst.pdf"))
+    # pakket 29: de foto komt via het cameraveld achter "Foto maken"; app.js voegt hem bij het hoofdveld
+    page.locator("input[data-camera]").set_input_files(str(FIXTURES / "foto.jpg"))
+    expect(page.locator("[data-gekozen] li .bestand-naam")).to_have_text(["tekst.pdf", "foto.jpg"])
     page.get_by_role("button", name="Verder").click()
 
     # scherm 2: bestandslijst en voorgevulde velden (zonder OCR-tools: titel leeg, datum vandaag)

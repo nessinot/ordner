@@ -208,8 +208,11 @@ def test_upload_formulier_scherm1_alleen_bestanden(client: TestClient) -> None:
     assert r.status_code == 200
     assert "data-upload" in r.text
     assert 'enctype="multipart/form-data"' in r.text
-    assert 'name="bestanden"' in r.text
-    assert "capture" not in r.text
+    # geen `capture` op het hoofdveld: iOS toont dan het keuzemenu (bibliotheek / camera / bestanden)
+    assert '<input type="file" name="bestanden" multiple accept="image/*,application/pdf" required>' in r.text
+    # pakket 29: cameraveld zonder name, knop Foto maken; verborgen tot app.js het blok toont
+    assert '<input type="file" accept="image/*" capture="environment" hidden data-camera>' in r.text
+    assert "Foto maken" in r.text and "data-verzamel hidden" in r.text
     assert "Verder" in r.text
     for veld in ("titel", "omschrijving", "documentdatum", "tags"):
         assert f'name="{veld}"' not in r.text, veld
@@ -572,6 +575,18 @@ def test_inbox_met_titel_direct_opgenomen(client: TestClient, mock_cmd) -> None:
     assert lees_meta(_root(client) / "2024" / "2024-03-12_voltaria-services").titel == "Voltaria Services"
     assert "De inbox is leeg." in client.get("/inbox").text
     assert "in de inbox wacht" not in client.get("/").text
+
+
+def test_stap1_gelijke_namen_worden_uniek(client: TestClient) -> None:
+    """Pakket 29: de iPhone-camera noemt elke foto image.jpg; scherm 2 zoekt op naam, dus de namen worden uniek."""
+    fotos = [("image.jpg", b"eerste", "image/jpeg"), ("image.jpg", b"tweede", "image/jpeg"), ("image.jpg", b"derde", "image/jpeg")]
+    token = _token(_stap1(client, fotos))
+    r = client.get(f"/upload/{token}")
+    assert r.status_code == 200
+    assert [m for m in re.findall(r'class="bestand-naam">([^<]+)<', r.text)] == ["image.jpg", "image_2.jpg", "image_3.jpg"]
+    assert client.get(f"/upload/{token}/bestand/image.jpg").content == b"eerste"
+    assert client.get(f"/upload/{token}/bestand/image_2.jpg").content == b"tweede"
+    assert client.get(f"/upload/{token}/bestand/image_3.jpg").content == b"derde"
 
 
 def test_scherm2_toont_bestanden_inline_en_serveert_ze(client: TestClient) -> None:

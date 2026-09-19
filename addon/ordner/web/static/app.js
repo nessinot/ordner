@@ -33,6 +33,44 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // --- upload, scherm 1: foto's verzamelen (pakket 29) ----------------------
+  // Op de iPhone levert "Foto maken" één foto en vervangt een tweede keuze de eerste. De pagina houdt
+  // daarom zelf een lijst bij en schrijft die na elke wijziging terug in het veld `bestanden`
+  // (DataTransfer), zodat required, de XHR-submit en de fallback hierboven ongewijzigd werken.
+  // Zonder DataTransfer (oude browsers) blijft het blok verborgen en werkt het veld zoals altijd.
+  const verzamel = form && form.querySelector("[data-verzamel]");
+  if (verzamel) {
+    let kan = false;
+    try { kan = new DataTransfer().files.length === 0; } catch (_) { kan = false; }
+    if (kan) {
+      const veld = form.querySelector("input[name=bestanden]");
+      const camera = verzamel.querySelector("[data-camera]");
+      const lijst = verzamel.querySelector("[data-gekozen]");
+      let gekozen = [];
+      const toon = () => {
+        const dt = new DataTransfer();
+        gekozen.forEach((f) => dt.items.add(f));
+        veld.files = dt.files;
+        lijst.textContent = "";
+        gekozen.forEach((f, i) => {
+          const li = document.createElement("li");
+          const naam = document.createElement("span");
+          naam.className = "bestand-naam"; naam.textContent = f.name;
+          const weg = document.createElement("button");
+          weg.type = "button"; weg.className = "als-link weg"; weg.textContent = "Weg";
+          weg.addEventListener("click", () => { gekozen.splice(i, 1); toon(); });
+          li.append(naam, weg);
+          lijst.appendChild(li);
+        });
+      };
+      // Het hoofdveld vervangt bij een nieuwe keuze zijn selectie; wij voegen toe aan wat er al was.
+      veld.addEventListener("change", () => { gekozen = gekozen.concat(Array.from(veld.files)); toon(); });
+      camera.addEventListener("change", () => { gekozen = gekozen.concat(Array.from(camera.files)); camera.value = ""; toon(); });
+      verzamel.querySelector("[data-foto-maken]").addEventListener("click", () => camera.click());
+      verzamel.hidden = false;
+    }
+  }
+
   if (!statusUrl || !window.fetch) return;
 
   // --- documentpagina: herladen zodra OCR klaar is ---------------------

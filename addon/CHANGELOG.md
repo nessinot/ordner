@@ -2,6 +2,10 @@
 
 Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. Nieuwste versie bovenaan; de bovenste kop moet gelijk zijn aan `version` in `config.yaml` (dat controleert `tests/test_addon_config.py`).
 
+## 0.19.0 (2026-09-19)
+
+- **Meerdere foto's maken op de telefoon.** Op het uploadscherm staat een knop **Foto maken**. Elke foto komt in een lijstje onder de knop, je maakt er zoveel als je pagina's hebt, en met **Weg** haal je er een weer uit. Daarna één keer Verder, en de foto's vormen samen één document. Ze hoeven niet eerst in je fotobibliotheek. Foto's uit de camera heten allemaal `image.jpg`; Ordner nummert ze door (`image_2.jpg`, …). Het gewone veld Bestanden werkt zoals altijd, ook op de computer.
+
 ## 0.18.2 (2026-09-12)
 
 - **Geen zin meer als titelvoorstel.** Stond ergens in de tekst een zin als "Raadpleeg hiervoor de website van de Belastingdienst", dan kon die (afgekapt) het titelvoorstel worden. Een instantiewoord zoals Belastingdienst, Gemeente of Stichting telt nu alleen nog op een korte regel die op een naam lijkt. Herkent Ordner de afzender niet, dan blijft de titel leeg; typ hem één keer en de volgende factuur van dezelfde afzender wordt herkend. Bestaande documenten veranderen niet.

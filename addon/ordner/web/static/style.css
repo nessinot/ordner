@@ -250,6 +250,10 @@ ul.bestandslijst { list-style: none; margin: 0 0 0.75rem; padding: 0; }
 ul.bestandslijst li { display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem; align-items: baseline; padding: 0.4rem 0; border-bottom: 1px solid var(--hairline); }
 ul.bestandslijst li:last-child { border-bottom: 0; }
 .bestand-toevoegen .veld { margin-bottom: 0.75rem; }
+/* Pakket 29, scherm 1: Foto maken en de verzamelde bestanden (alleen met JS zichtbaar) */
+.foto-maken { margin: 0 0 1rem; }
+.foto-maken ul.bestandslijst { margin: 0.5rem 0 0; }
+.foto-maken ul.bestandslijst li .weg { margin-left: auto; color: var(--gedempt); }
 pre.notities { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; margin: 0; }
 .mapinfo { color: var(--gedempt); font-size: 0.85rem; margin-top: 0.75rem; overflow-wrap: anywhere; }
 
@@ -259,10 +263,11 @@ p.inbox-wacht { display: flex; align-items: center; gap: 0.6rem; margin: -0.5rem
 p.inbox-wacht .icoon { width: 1.3rem; height: 1.3rem; flex: none; }
 p.inbox-wacht a { color: inherit; font-weight: 500; }
 .hint-inbox { margin: 0 0 0.75rem; }
-/* Pakket 22: de bestandsnaam is de enige actie (opnemen = POST, dus een knop opgemaakt als link) */
+/* Pakket 22: de bestandsnaam is de enige actie (opnemen = POST, dus een knop opgemaakt als link);
+   sinds pakket 29 ook de knop Weg op scherm 1 van de upload */
 ul.bestandslijst.inbox li form { min-width: 0; }
-ul.bestandslijst.inbox li button.als-link { background: none; border: 0; padding: 0; min-height: 0; font: inherit; color: inherit; cursor: pointer; text-align: left; }
-ul.bestandslijst.inbox li button.als-link:hover { filter: none; color: var(--accent); }
+ul.bestandslijst li button.als-link { background: none; border: 0; padding: 0; min-height: 0; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+ul.bestandslijst li button.als-link:hover { filter: none; color: var(--accent); }
 /* --- prullenbak (pakket 19) -------------------------------------------------- */
 ul.bestandslijst.prullenbak li form { margin-left: auto; }
 ul.bestandslijst.prullenbak li button { min-height: 34px; padding: 0.2rem 1rem; }

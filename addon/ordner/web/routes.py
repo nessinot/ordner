@@ -236,6 +236,25 @@ def _haal_openstaand(request: Request, token: str) -> OpenstaandeUpload | None:
     return _openstaand(request).haal(token)
 
 
+def _unieke_namen(uploads: list[tuple[str, bytes]]) -> list[tuple[str, bytes]]:
+    """Gelijke bestandsnamen in één upload krijgen `_2`, `_3`, … (pakket 29).
+
+    De iPhone-camera noemt elke foto `image.jpg`, en scherm 2 zoekt bestanden op naam (`_upload_bytes`).
+    Zelfde conventie als `storage._vrije_naam`, zodat de namen op scherm 2 en op schijf gelijk zijn.
+    """
+    gezien: set[str] = set()
+    uit: list[tuple[str, bytes]] = []
+    for naam, data in uploads:
+        stam, ext = Path(naam).stem, Path(naam).suffix
+        kandidaat, n = naam, 2
+        while kandidaat in gezien:
+            kandidaat = f"{stam}_{n}{ext}"
+            n += 1
+        gezien.add(kandidaat)
+        uit.append((kandidaat, data))
+    return uit
+
+
 @router.get("/upload", name="upload")
 async def upload_formulier(request: Request) -> Response:
     """Scherm 1: alleen bestanden kiezen."""
@@ -249,7 +268,7 @@ async def upload(request: Request, bestanden: list[UploadFile] = File(default=[]
     Er komt niets op schijf: geen map in het archief, niets in `_inbox/`. Andere formuliervelden
     (titel, datum, ...) worden genegeerd; die horen bij scherm 2.
     """
-    uploads = [(f.filename, await f.read()) for f in bestanden if f.filename]
+    uploads = _unieke_namen([(f.filename, await f.read()) for f in bestanden if f.filename])
     if not uploads:
         ctx = {"fout": "Kies minstens één bestand."}
         return _templates(request).TemplateResponse(request, "upload.html", ctx, status_code=400)
