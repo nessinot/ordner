@@ -49,7 +49,8 @@ def _snippet(tekst: str, i: int, woord: str) -> str:
 def zoek(index: Index, query: str) -> list[Treffer]:
     """AND over alle woorden (substring, hoofdletterongevoelig) over alle velden van een document.
 
-    Alle treffers in de volgorde van index.alle() (documentdatum desc, rel desc); afkappen doet de weergave.
+    Alle treffers op documentdatum desc, daarna rel desc (onafhankelijk van de volgorde van index.alle(),
+    die sinds pakket 34 op uploaddatum staat); afkappen doet de weergave.
     """
     woorden = query.lower().split()
     if not woorden:
@@ -80,4 +81,5 @@ def zoek(index: Index, query: str) -> list[Treffer]:
                 bron=bron,
             )
         )
+    treffers.sort(key=lambda t: (t.documentdatum, t.rel), reverse=True)
     return treffers

@@ -67,6 +67,19 @@ async def test_pdf_te_weinig_tekst_valt_terug_op_ocrmypdf(mock_cmd: CmdMock, tmp
     assert ocr[-1].endswith("uit.pdf")
 
 
+async def test_pdf_onbruikbare_tekstlaag_valt_terug_op_ocrmypdf(mock_cmd: CmdMock, tmp_path: Path) -> None:
+    # Kapotte ToUnicode-CMap: elke letter in het U+FF00-bereik, veel tekens maar geen letters (pakket 34).
+    brij = "､｡ｧｴ･ｫ･ｮｩｮｧ ＲＷＭＰＲＭＲＰＲＱ\n" * 80
+    mock_cmd.register("pdfinfo", stdout=b"Pages: 1\n")
+    mock_cmd.register("pdftotext", stdout=brij.encode("utf-8"))
+    mock_cmd.register("ocrmypdf", handler=_sidecar_handler("dagtekening 27-02-2021"))
+    pdf = tmp_path / "aanslag.pdf"
+    pdf.write_bytes(b"%PDF")
+
+    assert await extract_pdf(pdf, TALEN) == "dagtekening 27-02-2021"
+    assert "ocrmypdf" in _programmas(mock_cmd)
+
+
 async def test_pdf_zonder_pages_regel_drempel_50(mock_cmd: CmdMock, tmp_path: Path) -> None:
     mock_cmd.register("pdfinfo", stdout=b"Title: geen paginatelling\n")
     mock_cmd.register("pdftotext", stdout=b"y" * 60)

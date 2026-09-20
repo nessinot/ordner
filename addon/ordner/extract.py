@@ -15,8 +15,11 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
-MIN_TEKENS_PER_PAGINA = 50
+MIN_TEKENS_PER_PAGINA = 50  # bruikbare tekens (letters en cijfers, Latijns schrift) per pagina
 AFBEELDINGEN = {".jpg", ".jpeg", ".png", ".heic"}
+# Een kapotte tekstlaag (bijv. een ToUnicode-CMap die alles in het U+FF00-bereik zet) levert veel
+# tekens maar geen letters; die telt niet mee, zodat zo'n pdf alsnog via OCR gaat (pakket 34).
+_BRUIKBAAR = re.compile(r"[0-9A-Za-zÀ-ÖØ-öø-ÿ]")
 
 
 class ExtractieFout(Exception):
@@ -64,15 +67,15 @@ async def _paginas(pad: Path) -> int:
 
 
 async def extract_pdf(pad: Path, talen: str) -> str:
-    """Tekstlaag via pdftotext; te weinig tekst per pagina -> OCR via ocrmypdf-sidecar."""
+    """Tekstlaag via pdftotext; te weinig bruikbare tekst per pagina -> OCR via ocrmypdf-sidecar."""
     paginas = await _paginas(pad)
 
     rc, out, _ = await run_cmd(["pdftotext", "-layout", str(pad), "-"])
     tekst = _normaliseer(_decode(out)) if rc == 0 else ""
-    if len(tekst.strip()) >= MIN_TEKENS_PER_PAGINA * paginas:
+    if len(_BRUIKBAAR.findall(tekst)) >= MIN_TEKENS_PER_PAGINA * paginas:
         return tekst
 
-    log.info("te weinig tekstlaag in %s (%d pagina's), OCR via ocrmypdf", pad.name, paginas)
+    log.info("te weinig bruikbare tekstlaag in %s (%d pagina's), OCR via ocrmypdf", pad.name, paginas)
     with tempfile.TemporaryDirectory() as tmp:
         sidecar = Path(tmp) / "tekst.txt"
         uit = Path(tmp) / "uit.pdf"

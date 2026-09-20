@@ -35,8 +35,10 @@ def reconciler(archief: Archief, queue: Queue) -> Reconciler:
     return Reconciler(archief, bouw_index(archief), queue)
 
 
-def _doc(archief: Archief, titel: str = "Factuur", datum: date = DATUM, *bestanden: str) -> Path:
-    doc = archief.maak_document(titel, datum)
+def _doc(
+    archief: Archief, titel: str = "Factuur", datum: date = DATUM, *bestanden: str, nu: datetime | None = None
+) -> Path:
+    doc = archief.maak_document(titel, datum, nu=nu)
     for naam in bestanden:
         archief.voeg_bestand_toe(doc, naam, b"x")
     return doc
@@ -74,12 +76,13 @@ def test_bouw_index_slaat_kapotte_meta_over(archief: Archief) -> None:
     assert list(index.docs) == [archief.relatief(goed)]
 
 
-def test_alle_sorteert_datum_desc_dan_rel_desc(archief: Archief) -> None:
-    oud = _doc(archief, "Oud", date(2025, 1, 1))
-    a = _doc(archief, "A", date(2026, 5, 5))
-    b = _doc(archief, "B", date(2026, 5, 5))
+def test_alle_sorteert_uploaddatum_desc_dan_rel_desc(archief: Archief) -> None:
+    # Upload-volgorde tegengesteld aan de documentdatum: de laatst opgenomen staat bovenaan (pakket 34).
+    nieuw = _doc(archief, "Nieuw", date(2026, 5, 5), nu=datetime(2026, 9, 1, 10, 0))
+    a = _doc(archief, "A", date(2025, 1, 1), nu=datetime(2026, 9, 2, 10, 0))
+    b = _doc(archief, "B", date(2025, 1, 1), nu=datetime(2026, 9, 2, 10, 0))
     index = bouw_index(archief)
-    assert [e.map for e in index.alle()] == [b, a, oud]
+    assert [e.map for e in index.alle()] == [b, a, nieuw]
 
 
 def test_tellingen(archief: Archief) -> None:

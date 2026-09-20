@@ -53,7 +53,7 @@ Eventuele eigen notities. Deze tekst wordt meegezocht.
 |---|---|
 | `titel` | Verplicht. Wordt getoond in de lijst en meegezocht. |
 | `omschrijving` | Korte toelichting, één regel. Meegezocht. |
-| `documentdatum` | Verplicht, `JJJJ-MM-DD`. Datum van het document zelf, niet van het uploaden. Bepaalt de sortering. |
+| `documentdatum` | Verplicht, `JJJJ-MM-DD`. Datum van het document zelf, niet van het uploaden. Bepaalt de volgorde van zoekresultaten. |
 | `uploaddatum` | Wanneer het document is aangemaakt. Informatief. |
 | `tags` | Lijst met trefwoorden. Meegezocht. |
 | `bestanden` | De originelen in deze map. Wordt door Ordner bijgehouden; bestanden die je via Samba toevoegt worden bij de volgende verversing opgenomen. |
@@ -106,7 +106,7 @@ Op de documentpagina zie je achter de datum een label **datum uit tekst** of **d
 
 ## Zoeken
 
-Het tabblad **Documenten** (het startscherm) toont de 20 nieuwste documenten. Staan er meer in de ordner, dan zegt een regel onder de lijst hoeveel er in totaal zijn; oudere documenten vind je via het zoekveld.
+Het tabblad **Documenten** (het startscherm) toont de 20 laatst toegevoegde documenten, het nieuwste bovenaan; de datum op elke regel is de documentdatum. Staan er meer in de ordner, dan zegt een regel onder de lijst hoeveel er in totaal zijn; oudere documenten vind je via het zoekveld. Zoekresultaten staan op documentdatum, de nieuwste bovenaan.
 
 Zoeken werkt op alle woorden tegelijk (elk woord moet voorkomen), zonder onderscheid in hoofdletters, over titel, omschrijving, tags, documentdatum, notities en de gelezen tekst van de bestanden. Een datum of jaartal (`2024`, `2024-03`) telt als zoekwoord, dus `energie 2024` vindt alleen energiedocumenten uit 2024. Bij meer dan 50 treffers worden de 50 nieuwste getoond; de kop noemt het echte aantal en onder de lijst staat een link **Toon alle** voor de volledige lijst. Meestal is een extra zoekwoord sneller.
 
@@ -220,6 +220,8 @@ Na een wijziging de add-on herstarten.
 ## Als OCR faalt
 
 Krijgt een document de status `failed`, dan is de tekst van minstens één bestand niet gelezen. Oorzaken: een beschadigde of met wachtwoord beveiligde pdf, een te grote afbeelding, of een time-out (tien minuten per bestand). Details staan in het add-on-log.
+
+Sommige pdf's hebben een tekstlaag die er goed uitziet maar bij het lezen alleen onzin oplevert (vreemde tekens in plaats van letters). Ordner merkt dat op en leest zo'n pdf dan via OCR, net als een scan. Zit er in je ordner al een document met zulke onleesbare tekst (te zien in de `.txt` naast het bestand), gebruik dan **OCR opnieuw** op de documentpagina.
 
 Wat je kunt doen:
 

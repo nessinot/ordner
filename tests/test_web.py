@@ -793,7 +793,7 @@ def test_onleesbaar_bestand_wordt_na_opslaan_gequeued(client: TestClient, mock_c
 
 
 def test_meta_bewerken_zet_datumbron_op_gebruiker(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
-    mock_cmd.register("pdftotext", stdout=b"Datum: 12-03-2024" + b" x" * 30)
+    mock_cmd.register("pdftotext", stdout=b"Datum: 12-03-2024" + b" x" * 50)  # >= 50 bruikbare tekens (pakket 34)
     _upload(client, titel="Brief", datum="2024-03-12", bestanden=[("b.pdf", _PDF, "application/pdf")])
     doc = _root(client) / "2024" / "2024-03-12_brief"
     assert lees_meta(doc).datumbron == "tekst"

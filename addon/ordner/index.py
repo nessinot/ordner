@@ -89,8 +89,8 @@ class Index:
                 del self._hashes[h]
 
     def alle(self) -> list[DocEntry]:
-        """Documentdatum desc, daarna rel desc."""
-        return sorted(self.docs.values(), key=lambda d: (d.meta.documentdatum, d.rel), reverse=True)
+        """Uploaddatum desc, daarna rel desc (pakket 34; zoeken sorteert zelf op documentdatum)."""
+        return sorted(self.docs.values(), key=lambda d: (d.meta.uploaddatum, d.rel), reverse=True)
 
     def tellingen(self) -> dict[str, int]:
         tel = {"totaal": len(self.docs), "pending": 0, "done": 0, "failed": 0}

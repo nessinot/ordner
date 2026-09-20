@@ -2,6 +2,11 @@
 
 Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. Nieuwste versie bovenaan; de bovenste kop moet gelijk zijn aan `version` in `config.yaml` (dat controleert `tests/test_addon_config.py`).
 
+## 0.20.0 (2026-09-20)
+
+- **Laatst toegevoegde documenten bovenaan.** Het tabblad Documenten sorteert nu op het moment van toevoegen in plaats van op de documentdatum, zodat wat je net hebt opgenomen bovenaan staat. Zoekresultaten blijven op documentdatum staan, de nieuwste bovenaan.
+- **Pdf's met een onleesbare tekstlaag worden alsnog gelezen.** Sommige pdf's (bijvoorbeeld van gemeentelijke aanslagen) bevatten tekst die er op het scherm goed uitziet maar bij het uitlezen alleen vreemde tekens oplevert. Ordner zag dat vroeger aan voor echte tekst, waardoor datum en titel niet werden herkend en zoeken niets vond. Nu herkent Ordner dat er geen leesbare letters in zitten en leest het bestand via OCR. Staat zo'n document al in je ordner, gebruik dan één keer **OCR opnieuw** op de documentpagina.
+
 ## 0.19.4 (2026-09-19)
 
 - **Na een update meteen het nieuwe scherm.** De browser (ook de Home Assistant-app) kon na een update van Ordner nog een oude versie van de opmaak en het script uit zijn cache gebruiken, waardoor bijvoorbeeld het uploadscherm er nog uitzag als voor 0.19.0. Ordner geeft die bestanden nu een kenmerk mee dat verandert zodra hun inhoud verandert, zodat de browser ze na een update altijd opnieuw ophaalt. Zie je toch nog een oud scherm, wis dan nog één keer de cache (in de Home Assistant-app op de iPhone: **Clear web view cache**).

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 import pytest
@@ -102,6 +102,17 @@ def test_tags_en_notities(index: Index) -> None:
     bezwaar = zoek(index, "bezwaar")
     assert [t.titel for t in bezwaar] == ["WOZ-beschikking 2026"]
     assert bezwaar[0].bron == "notities"
+
+
+def test_sortering_documentdatum_desc(archief: Archief) -> None:
+    # De lijst staat op uploaddatum, zoeken op documentdatum: het later geüploade maar oudere document staat onderaan.
+    index = Index()
+    oud = archief.maak_document("Voltaria oud", date(2024, 1, 1), nu=datetime(2026, 9, 2, 10, 0))
+    nieuw = archief.maak_document("Voltaria nieuw", date(2026, 1, 1), nu=datetime(2026, 9, 1, 10, 0))
+    index.herlaad(archief, oud)
+    index.herlaad(archief, nieuw)
+    assert [e.meta.titel for e in index.alle()] == ["Voltaria oud", "Voltaria nieuw"]
+    assert [t.titel for t in zoek(index, "voltaria")] == ["Voltaria nieuw", "Voltaria oud"]
 
 
 def test_omschrijving(index: Index) -> None:
