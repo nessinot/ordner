@@ -15,6 +15,7 @@ def test_config_yaml() -> None:
     config = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
     assert config["slug"] == "ordner"
     assert config["ingress"] is True
+    assert config["ingress_stream"] is True  # anders buffert de Supervisor de body en weigert hij boven 16 MiB (pakket 35)
     assert config["ingress_port"] == 8099
     assert "share:rw" in config["map"]
     assert set(config["options"]) <= set(config["schema"])

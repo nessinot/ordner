@@ -2,10 +2,14 @@
 
 Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. Nieuwste versie bovenaan; de bovenste kop moet gelijk zijn aan `version` in `config.yaml` (dat controleert `tests/test_addon_config.py`).
 
+## 0.20.1 (2026-09-20)
+
+- **Grote bestanden uploaden werkt nu.** Een upload van meer dan 16 MB (bijvoorbeeld een lange pdf) strandde via Home Assistant op de melding "Maximum request body size 16777216 exceeded". Home Assistant stuurt zulke bestanden nu in delen door naar Ordner, zodat de grens vervalt. Na de update werkt dit meteen.
+
 ## 0.20.0 (2026-09-20)
 
 - **Laatst toegevoegde documenten bovenaan.** Het tabblad Documenten sorteert nu op het moment van toevoegen in plaats van op de documentdatum, zodat wat je net hebt opgenomen bovenaan staat. Zoekresultaten blijven op documentdatum staan, de nieuwste bovenaan.
-- **Pdf's met een onleesbare tekstlaag worden alsnog gelezen.** Sommige pdf's (bijvoorbeeld van gemeentelijke aanslagen) bevatten tekst die er op het scherm goed uitziet maar bij het uitlezen alleen vreemde tekens oplevert. Ordner zag dat vroeger aan voor echte tekst, waardoor datum en titel niet werden herkend en zoeken niets vond. Nu herkent Ordner dat er geen leesbare letters in zitten en leest het bestand via OCR. Staat zo'n document al in je ordner, gebruik dan één keer **OCR opnieuw** op de documentpagina.
+- **Pdf's met een onleesbare tekstlaag worden alsnog gelezen.** Sommige pdf's bevatten tekst die er op het scherm goed uitziet maar bij het uitlezen alleen vreemde tekens oplevert. Ordner zag dat vroeger aan voor echte tekst, waardoor datum en titel niet werden herkend en zoeken niets vond. Nu herkent Ordner dat er geen leesbare letters in zitten en leest het bestand via OCR. Staat zo'n document al in je ordner, gebruik dan één keer **OCR opnieuw** op de documentpagina.
 
 ## 0.19.4 (2026-09-19)
 
