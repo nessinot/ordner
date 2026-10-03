@@ -2,6 +2,10 @@
 
 Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. Nieuwste versie bovenaan; de bovenste kop moet gelijk zijn aan `version` in `config.yaml` (dat controleert `tests/test_addon_config.py`).
 
+## 0.20.2 (2026-10-03)
+
+- **Pdf's op de telefoon: inzoomen en doorbladeren.** In de Home Assistant-app toont een pdf op de telefoon alleen de eerste pagina, zonder inzoomen en zonder manier om verder te bladeren. Dat komt doordat het bestand daar in een venster binnen een venster staat. De link **Open het bestand los** onder de pdf stapt daar nu uit, zodat de pdf-weergave van het apparaat zelf het overneemt: alle pagina's, en inzoomen werkt. Je gaat terug met de terugknop van de browser.
+
 ## 0.20.1 (2026-09-20)
 
 - **Grote bestanden uploaden werkt nu.** Een upload van meer dan 16 MB (bijvoorbeeld een lange pdf) strandde via Home Assistant op de melding "Maximum request body size 16777216 exceeded". Home Assistant stuurt zulke bestanden nu in delen door naar Ordner, zodat de grens vervalt. Na de update werkt dit meteen.

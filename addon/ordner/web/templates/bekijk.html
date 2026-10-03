@@ -13,7 +13,7 @@
   </div>
   {% if soort == 'pdf' %}
   <iframe class="bekijk-vlak" src="{{ url }}" title="{{ naam }}"></iframe>
-  <p class="hint">Blijft het vlak leeg, dan kan deze browser geen pdf tonen. <a href="{{ url }}">Open het bestand los</a>.</p>
+  <p class="hint">Blijft het vlak leeg, dan kan deze browser geen pdf tonen. <a href="{{ url }}" target="_top">Open het bestand los</a>.</p>
   {% elif soort == 'afbeelding' %}
   <img class="bekijk-vlak" src="{{ url }}" alt="{{ naam }}">
   {% else %}
