@@ -8,6 +8,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from ordner.extract import ExtractieFout
 from ordner.meta import lees_meta, schrijf_meta
 from ordner.web.app import STATIC_DIR
 
@@ -55,6 +56,11 @@ def _wacht_op(pad: Path, seconden: float = 2.0) -> bool:
 
 def _root(client: TestClient) -> Path:
     return client.app.state.archief.root  # type: ignore[attr-defined]
+
+
+def _faalt_hard(args: list[str]) -> tuple[int, bytes, bytes]:
+    """Alsof het programma niet op het pad staat, zoals lokaal zonder poppler."""
+    raise ExtractieFout(f"programma niet gevonden: {args[0]}")
 
 
 # --- zoeken ---------------------------------------------------------------
@@ -970,6 +976,88 @@ def test_document_niet_in_index_wordt_herladen(client: TestClient) -> None:
     assert doc.is_dir()
 
 
+# --- pdf-pagina's als afbeelding (pakket 36) -------------------------------
+
+
+def _pagina_handler(data: bytes):
+    """Doet wat pdftoppm doet: één bestand neerzetten op het meegegeven uitvoerpad."""
+
+    def handler(args: list[str]) -> tuple[int, bytes, bytes]:
+        Path(args[-1]).with_suffix(".jpg").write_bytes(data)
+        return 0, b"", b""
+
+    return handler
+
+
+def test_pdf_pagina_als_afbeelding(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
+    _upload(client)
+    mock_cmd.register("pdfinfo", stdout=b"Pages: 2")
+    mock_cmd.register("pdftoppm", handler=_pagina_handler(b"jpeg-bytes"))
+
+    r = client.get("/doc/2026/2026-03-01_test/pagina/a.pdf/2")
+
+    assert r.status_code == 200
+    assert r.content == b"jpeg-bytes"
+    assert r.headers["content-type"] == "image/jpeg"
+    assert "max-age" in r.headers["cache-control"]
+    call = next(c for c in mock_cmd.calls if c[0] == "pdftoppm")
+    assert call[call.index("-f") + 1] == "2"
+    assert call[call.index("-l") + 1] == "2"
+
+
+def test_pdf_pagina_grenzen_en_soort_404(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
+    _upload(client, bestanden=[_A_PDF, ("b.png", b"png", "image/png")])
+    mock_cmd.register("pdfinfo", stdout=b"Pages: 2")
+    mock_cmd.register("pdftoppm", handler=_pagina_handler(b"jpeg-bytes"))
+    doc = "/doc/2026/2026-03-01_test"
+
+    assert client.get(f"{doc}/pagina/a.pdf/0").status_code == 404
+    assert client.get(f"{doc}/pagina/a.pdf/3").status_code == 404
+    assert client.get(f"{doc}/pagina/b.png/1").status_code == 404
+    assert client.get(f"{doc}/pagina/nietbestaand.pdf/1").status_code == 404
+    assert client.get("/doc/2026/..%5C..%5Cx/pagina/a.pdf/1").status_code == 404
+    assert client.get(f"{doc}/pagina/..%5Cmeta.md/1").status_code == 404
+
+
+def test_bekijk_pagina_toont_pdf_paginas(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
+    _upload(client)
+    mock_cmd.register("pdfinfo", stdout=b"Pages: 3")
+    doc = "/doc/2026/2026-03-01_test"
+
+    r = client.get(f"{doc}/bekijk/a.pdf")
+
+    assert r.status_code == 200
+    assert r.text.count('class="bekijk-pagina"') == 3
+    assert f'src="{doc}/pagina/a.pdf/1"' in r.text
+    assert f'src="{doc}/pagina/a.pdf/3"' in r.text
+    # het iframe blijft er voor een breed scherm, maar wordt daar niet meer opgehaald op een smal scherm
+    assert '<div class="bekijk-pdf alleen-breed">' in r.text
+    assert f'<iframe class="bekijk-vlak" src="{doc}/bestand/a.pdf" title="a.pdf" loading="lazy">' in r.text
+    assert 'target="_top"' not in r.text
+
+
+def test_bekijk_pagina_zonder_paginatelling_alleen_iframe(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
+    """Zonder poppler (lokaal draaien) blijft de kijkpagina werken: geen afbeeldingen, wel het iframe."""
+    _upload(client)
+    mock_cmd.register("pdfinfo", handler=_faalt_hard)
+    doc = "/doc/2026/2026-03-01_test"
+
+    r = client.get(f"{doc}/bekijk/a.pdf")
+
+    assert r.status_code == 200
+    assert 'class="bekijk-pagina"' not in r.text
+    assert '<div class="bekijk-pdf">' in r.text
+
+
+def test_documentpagina_toont_eerste_pagina(client: TestClient) -> None:
+    _upload(client)
+    doc = "/doc/2026/2026-03-01_test"
+
+    r = client.get(doc)
+
+    assert f'<img class="pagina-voorbeeld" src="{doc}/pagina/a.pdf/1"' in r.text
+
+
 # --- static ----------------------------------------------------------------
 
 
@@ -1335,6 +1423,22 @@ def test_prullenbak_bestand_en_bekijk(client: TestClient) -> None:
     assert "Terug naar “Weg ermee”" in r.text
     r = client.get(f"/prullenbak/{naam}/bekijk/b.png")
     assert f'<img class="bekijk-vlak" src="/prullenbak/{naam}/bestand/b.png"' in r.text
+
+
+def test_prullenbak_pdf_pagina(client: TestClient, mock_cmd) -> None:  # type: ignore[no-untyped-def]
+    naam = _weggegooid_naam(client, bestanden=[_A_PDF])
+    mock_cmd.register("pdfinfo", stdout=b"Pages: 1")
+    mock_cmd.register("pdftoppm", handler=_pagina_handler(b"jpeg-bytes"))
+
+    r = client.get(f"/prullenbak/{naam}/bekijk/a.pdf")
+    assert f'src="/prullenbak/{naam}/pagina/a.pdf/1"' in r.text
+
+    r = client.get(f"/prullenbak/{naam}/pagina/a.pdf/1")
+    assert r.status_code == 200
+    assert r.content == b"jpeg-bytes"
+    assert r.headers["content-type"] == "image/jpeg"
+    assert client.get(f"/prullenbak/{naam}/pagina/a.pdf/2").status_code == 404
+    assert client.get(f"/prullenbak/{naam}/pagina/..%5Cmeta.md/1").status_code == 404
 
 
 def test_prullenbak_kijkpagina_404(client: TestClient) -> None:

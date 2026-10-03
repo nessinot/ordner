@@ -94,7 +94,9 @@ Goed om te weten:
 
 ## Bestanden bekijken
 
-Op de documentpagina staan de bestanden van het document. Foto's zie je meteen; een pdf wordt op een breed scherm ook op de pagina zelf getoond. Met **Open** bij een bestand krijg je het op een eigen pagina, groot en met een terugknop naar het document, ook in de Home Assistant-app op de telefoon. Kan de browser een pdf niet zelf tonen (sommige Android-browsers), dan staat onder het lege vlak een link om het bestand los te openen of te downloaden.
+Op de documentpagina staan de bestanden van het document. Foto's zie je meteen. Een pdf zie je op een breed scherm in de pdf-weergave van je browser; op een telefoon staat daar de eerste pagina als afbeelding, want een ingesloten pdf is op een telefoon niet te gebruiken.
+
+Met **Open** bij een bestand krijg je het op een eigen pagina, groot en met een terugknop naar het document, ook in de Home Assistant-app op de telefoon. Op een telefoon staan daar alle pagina's van de pdf als afbeelding onder elkaar: doorbladeren is scrollen, en inzoomen gaat zoals bij een foto. In de Home Assistant-app moet daarvoor **Knijpen om te zoomen** aan staan (App settings › Algemeen › Pagina). Op een breed scherm staat er de pdf-weergave van de browser, met daaronder een link om het bestand los te openen of te downloaden.
 
 ## Documentdatum
 

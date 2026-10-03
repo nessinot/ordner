@@ -12,8 +12,12 @@
     <h2>{{ naam }}</h2>
   </div>
   {% if soort == 'pdf' %}
-  <iframe class="bekijk-vlak" src="{{ url }}" title="{{ naam }}"></iframe>
-  <p class="hint">Blijft het vlak leeg, dan kan deze browser geen pdf tonen. <a href="{{ url }}" target="_top">Open het bestand los</a>.</p>
+  <div class="bekijk-pdf{% if pagina_urls %} alleen-breed{% endif %}">
+    <iframe class="bekijk-vlak" src="{{ url }}" title="{{ naam }}" loading="lazy"></iframe>
+    <p class="hint">Blijft het vlak leeg, dan kan deze browser geen pdf tonen. <a href="{{ url }}">Open het bestand los</a>.</p>
+  </div>
+  {% for p in pagina_urls %}<img class="bekijk-pagina" src="{{ p }}" alt="Pagina {{ loop.index }} van {{ naam }}" loading="lazy">
+  {% endfor %}
   {% elif soort == 'afbeelding' %}
   <img class="bekijk-vlak" src="{{ url }}" alt="{{ naam }}">
   {% else %}

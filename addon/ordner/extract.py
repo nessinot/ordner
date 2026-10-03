@@ -16,6 +16,8 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 MIN_TEKENS_PER_PAGINA = 50  # bruikbare tekens (letters en cijfers, Latijns schrift) per pagina
+PDF_PAGINA_DPI = 200  # pagina als afbeelding (pakket 36): genoeg om op een telefoon in te zoomen
+PDF_PAGINA_KWALITEIT = 75  # jpeg-kwaliteit van zo'n pagina
 AFBEELDINGEN = {".jpg", ".jpeg", ".png", ".heic"}
 # Een kapotte tekstlaag (bijv. een ToUnicode-CMap die alles in het U+FF00-bereik zet) levert veel
 # tekens maar geen letters; die telt niet mee, zodat zo'n pdf alsnog via OCR gaat (pakket 34).
@@ -58,7 +60,7 @@ def _decode(data: bytes) -> str:
     return data.decode("utf-8", "replace")
 
 
-async def _paginas(pad: Path) -> int:
+async def pdf_paginas(pad: Path) -> int:
     rc, out, _ = await run_cmd(["pdfinfo", str(pad)])
     if rc != 0:
         return 1
@@ -68,7 +70,7 @@ async def _paginas(pad: Path) -> int:
 
 async def extract_pdf(pad: Path, talen: str) -> str:
     """Tekstlaag via pdftotext; te weinig bruikbare tekst per pagina -> OCR via ocrmypdf-sidecar."""
-    paginas = await _paginas(pad)
+    paginas = await pdf_paginas(pad)
 
     rc, out, _ = await run_cmd(["pdftotext", "-layout", str(pad), "-"])
     tekst = _normaliseer(_decode(out)) if rc == 0 else ""
@@ -87,6 +89,38 @@ async def extract_pdf(pad: Path, talen: str) -> str:
         if not sidecar.is_file():
             raise ExtractieFout(f"ocrmypdf leverde geen sidecar op voor {pad.name}")
         return _normaliseer(sidecar.read_text("utf-8", errors="replace"))
+
+
+async def pdf_pagina_jpeg(pad: Path, pagina: int) -> bytes:
+    """Eén pagina van een pdf als JPEG (pakket 36); de bytes gaan naar de browser, niets naar schijf.
+
+    Renderen gebeurt in een lege tempmap en het enige bestand dat daar ontstaat wordt teruggelezen,
+    zodat we niet hoeven te vertrouwen op de naam die `pdftoppm` kiest of op uitvoer via stdout.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        rc, _, err = await run_cmd(
+            [
+                "pdftoppm",
+                "-jpeg",
+                "-jpegopt",
+                f"quality={PDF_PAGINA_KWALITEIT}",
+                "-r",
+                str(PDF_PAGINA_DPI),
+                "-f",
+                str(pagina),
+                "-l",
+                str(pagina),
+                "-singlefile",
+                str(pad),
+                str(Path(tmp) / "pagina"),
+            ]
+        )
+        if rc != 0:
+            raise ExtractieFout(f"pdftoppm faalde ({rc}): {_decode(err[-500:]).strip()}")
+        uit = sorted(Path(tmp).iterdir())
+        if len(uit) != 1:
+            raise ExtractieFout(f"pdftoppm leverde {len(uit)} bestanden op voor pagina {pagina} van {pad.name}")
+        return uit[0].read_bytes()
 
 
 def _bereid_afbeelding_voor(pad: Path, tmpdir: Path) -> Path:

@@ -12,6 +12,7 @@ from ordner.extract import (
     extract_afbeelding,
     extract_bestand,
     extract_pdf,
+    pdf_pagina_jpeg,
     run_cmd,
 )
 
@@ -123,6 +124,53 @@ async def test_pdf_ocrmypdf_zonder_sidecar(mock_cmd: CmdMock, tmp_path: Path) ->
 
     with pytest.raises(ExtractieFout, match="sidecar"):
         await extract_pdf(pdf, TALEN)
+
+
+# --- pdf_pagina_jpeg ------------------------------------------------------
+
+
+def _pagina_handler(data: bytes):
+    """Doet wat pdftoppm doet: één bestand neerzetten op het meegegeven uitvoerpad."""
+
+    def handler(args: list[str]) -> tuple[int, bytes, bytes]:
+        Path(args[-1]).with_suffix(".jpg").write_bytes(data)
+        return 0, b"", b""
+
+    return handler
+
+
+async def test_pdf_pagina_jpeg(mock_cmd: CmdMock, tmp_path: Path) -> None:
+    mock_cmd.register("pdftoppm", handler=_pagina_handler(b"jpeg-bytes"))
+    pdf = tmp_path / "scan.pdf"
+    pdf.write_bytes(b"%PDF")
+
+    assert await pdf_pagina_jpeg(pdf, 3) == b"jpeg-bytes"
+
+    call = mock_cmd.calls[0]
+    assert "-jpeg" in call
+    assert call[call.index("-jpegopt") + 1] == f"quality={extract.PDF_PAGINA_KWALITEIT}"
+    assert call[call.index("-r") + 1] == str(extract.PDF_PAGINA_DPI)
+    assert call[call.index("-f") + 1] == "3"
+    assert call[call.index("-l") + 1] == "3"
+    assert call[-2] == str(pdf)
+
+
+async def test_pdf_pagina_jpeg_faalt(mock_cmd: CmdMock, tmp_path: Path) -> None:
+    mock_cmd.register("pdftoppm", rc=1, stderr=b"kapot")
+    pdf = tmp_path / "scan.pdf"
+    pdf.write_bytes(b"%PDF")
+
+    with pytest.raises(ExtractieFout, match="kapot"):
+        await pdf_pagina_jpeg(pdf, 1)
+
+
+async def test_pdf_pagina_jpeg_zonder_uitvoer(mock_cmd: CmdMock, tmp_path: Path) -> None:
+    mock_cmd.register("pdftoppm", rc=0)
+    pdf = tmp_path / "scan.pdf"
+    pdf.write_bytes(b"%PDF")
+
+    with pytest.raises(ExtractieFout, match="0 bestanden"):
+        await pdf_pagina_jpeg(pdf, 1)
 
 
 # --- extract_afbeelding ---------------------------------------------------

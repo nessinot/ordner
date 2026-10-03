@@ -16,6 +16,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.datastructures import URL
 
 from ordner.dubbel import Dubbel, sha256_van, sha256_van_bestand, zoek_dubbelen, zoek_dubbelen_van_hashes
+from ordner.extract import ExtractieFout, pdf_pagina_jpeg, pdf_paginas
 from ordner.index import DocEntry, Index, Reconciler
 from ordner.ingest import LeesTekst, Voorbereid, lees_vooraf, maak_document_uit_voorbereid
 from ordner.meta import MetaFout, OcrStatus, is_extraheerbaar, schrijf_meta, txt_pad
@@ -625,7 +626,7 @@ async def prullenbak_document(request: Request, naam: str) -> Response:
 async def prullenbak_bekijk(request: Request, naam: str, bestand: str) -> Response:
     item = _prullenbak_item(request, naam)
     try:
-        _archief(request).prullenbak_bestand(naam, bestand)
+        pad = _archief(request).prullenbak_bestand(naam, bestand)
     except OngeldigPad:
         raise HTTPException(status_code=404, detail="Bestand niet gevonden") from None
     return _bekijk_pagina(
@@ -634,6 +635,7 @@ async def prullenbak_bekijk(request: Request, naam: str, bestand: str) -> Respon
         url=_pad_van(request.url_for("prullenbak_bestand", naam=naam, bestand=bestand)),
         terug_url=_pad_van(request.url_for("prullenbak_document", naam=naam)),
         terug_titel=item.meta.titel if item.meta is not None else item.naam,
+        pagina_urls=await _pagina_urls(request, pad, "prullenbak_bestand_pagina", naam=naam, bestand=bestand),
     )
 
 
@@ -649,6 +651,16 @@ async def prullenbak_bestand(request: Request, naam: str, bestand: str) -> Respo
         content_disposition_type="inline",
         filename=bestand,
     )
+
+
+@router.get("/prullenbak/{naam}/pagina/{bestand}/{nummer}", name="prullenbak_bestand_pagina")
+async def prullenbak_bestand_pagina(request: Request, naam: str, bestand: str, nummer: int) -> Response:
+    """Pagina `nummer` van een weggegooide pdf als afbeelding (pakket 36)."""
+    try:
+        pad = _archief(request).prullenbak_bestand(naam, bestand)
+    except OngeldigPad:
+        raise HTTPException(status_code=404, detail="Bestand niet gevonden") from None
+    return await _pdf_pagina_response(pad, nummer)
 
 
 def _hashes_van(item: PrullenbakDocument) -> list[tuple[str, str]]:
@@ -875,6 +887,7 @@ async def bekijk(request: Request, jaar: str, map: str, naam: str) -> Response:
         url=_pad_van(request.url_for("bestand", jaar=jaar, map=map, naam=naam)),
         terug_url=_pad_van(terug),
         terug_titel=entry.meta.titel,
+        pagina_urls=await _pagina_urls(request, pad, "bestand_pagina", jaar=jaar, map=map, naam=naam),
     )
 
 
@@ -883,10 +896,64 @@ def _pad_van(url: URL) -> str:
     return url.path + (f"?{url.query}" if url.query else "")
 
 
-def _bekijk_pagina(request: Request, naam: str, url: str, terug_url: str, terug_titel: str) -> Response:
-    """`bekijk.html` voor een bestand in het archief of in de prullenbak (pakket 20)."""
-    ctx = {"naam": naam, "soort": _soort(naam), "url": url, "terug_url": terug_url, "terug_titel": terug_titel}
+def _bekijk_pagina(
+    request: Request,
+    naam: str,
+    url: str,
+    terug_url: str,
+    terug_titel: str,
+    pagina_urls: list[str] | None = None,
+) -> Response:
+    """`bekijk.html` voor een bestand in het archief of in de prullenbak (pakket 20).
+
+    `pagina_urls` zijn de gerenderde pdf-pagina's voor een smal scherm (pakket 36); leeg betekent
+    alleen het iframe, zoals bij een openstaande upload, waarvan de bestanden nog niet op schijf staan.
+    """
+    ctx = {
+        "naam": naam,
+        "soort": _soort(naam),
+        "url": url,
+        "terug_url": terug_url,
+        "terug_titel": terug_titel,
+        "pagina_urls": pagina_urls or [],
+    }
     return _templates(request).TemplateResponse(request, "bekijk.html", ctx)
+
+
+async def _pagina_urls(request: Request, pad: Path, route: str, **params: str) -> list[str]:
+    """URL's van de pagina-afbeeldingen van een pdf; leeg voor elk ander bestand.
+
+    Zonder poppler op het pad (lokaal draaien) blijft de lijst leeg en valt de kijkpagina terug
+    op het iframe, in plaats van een 500 te geven.
+    """
+    if _soort(pad.name) != "pdf":
+        return []
+    try:
+        aantal = await pdf_paginas(pad)
+    except ExtractieFout as e:
+        log.warning("paginatelling van %s mislukt, geen pagina-afbeeldingen: %s", pad.name, e)
+        return []
+    return [_pad_van(request.url_for(route, nummer=n, **params)) for n in range(1, aantal + 1)]
+
+
+async def _pdf_pagina_response(pad: Path, nummer: int) -> Response:
+    """Eén pdf-pagina als JPEG, bij elk verzoek opnieuw gerenderd; er wordt niets bewaard (pakket 36)."""
+    if _soort(pad.name) != "pdf":
+        raise HTTPException(status_code=404, detail="Geen pdf")
+    try:
+        aantal = await pdf_paginas(pad)
+    except ExtractieFout as e:
+        log.warning("paginatelling van %s mislukt: %s", pad.name, e)
+        raise HTTPException(status_code=500, detail="Pagina kon niet worden gerenderd") from None
+    if not 1 <= nummer <= aantal:
+        raise HTTPException(status_code=404, detail="Pagina bestaat niet")
+    try:
+        data = await pdf_pagina_jpeg(pad, nummer)
+    except ExtractieFout as e:
+        log.warning("pagina %d van %s renderen mislukt: %s", nummer, pad.name, e)
+        raise HTTPException(status_code=500, detail="Pagina kon niet worden gerenderd") from None
+    log.info("pagina %d van %s gerenderd (%d bytes)", nummer, pad.name, len(data))
+    return Response(content=data, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"})
 
 
 @router.get("/doc/{jaar}/{map}/bestand/{naam}", name="bestand")
@@ -906,6 +973,18 @@ async def bestand(request: Request, jaar: str, map: str, naam: str) -> Response:
 
 
 # --- status-API -----------------------------------------------------------
+
+
+@router.get("/doc/{jaar}/{map}/pagina/{naam}/{nummer}", name="bestand_pagina")
+async def bestand_pagina(request: Request, jaar: str, map: str, naam: str, nummer: int) -> Response:
+    """Pagina `nummer` van een pdf als afbeelding, voor een smal scherm (pakket 36)."""
+    try:
+        pad = _archief(request).veilig_pad(jaar, map, naam)
+    except OngeldigPad:
+        raise HTTPException(status_code=404, detail="Bestand niet gevonden") from None
+    if not pad.is_file():
+        raise HTTPException(status_code=404, detail="Bestand niet gevonden")
+    return await _pdf_pagina_response(pad, nummer)
 
 
 @router.get("/api/status", name="status")

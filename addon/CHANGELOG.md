@@ -2,6 +2,11 @@
 
 Home Assistant toont dit bestand onder het tabblad **Changelog** van de add-on. Nieuwste versie bovenaan; de bovenste kop moet gelijk zijn aan `version` in `config.yaml` (dat controleert `tests/test_addon_config.py`).
 
+## 0.21.0 (2026-10-03)
+
+- **Pdf's zijn op de telefoon te lezen.** In de Home Assistant-app toonde een pdf op de telefoon alleen de eerste pagina, zonder inzoomen en zonder manier om door te bladeren. Dat is een beperking van de telefoon zelf bij een pdf binnen een venster. Ordner toont een pdf op een smal scherm nu als afbeeldingen, één per pagina, onder elkaar: doorbladeren is scrollen en inzoomen gaat zoals bij een foto. Op de documentpagina zie je op de telefoon de eerste pagina als voorbeeld, waar eerst niets stond. Op een computer verandert niets, daar blijft de pdf-weergave van je browser. Let op: inzoomen in de Home Assistant-app vraagt dat **Knijpen om te zoomen** aan staat, bij App settings › Algemeen › Pagina.
+- **De link onder een pdf blijft binnen Home Assistant.** Sinds 0.20.2 opende **Open het bestand los** de pdf schermvullend buiten Home Assistant. Dat gaf wel een goede pdf-weergave, maar in de app geen weg terug. Die link werkt nu weer als voorheen.
+
 ## 0.20.2 (2026-10-03)
 
 - **Pdf's op de telefoon: inzoomen en doorbladeren.** In de Home Assistant-app toont een pdf op de telefoon alleen de eerste pagina, zonder inzoomen en zonder manier om verder te bladeren. Dat komt doordat het bestand daar in een venster binnen een venster staat. De link **Open het bestand los** onder de pdf stapt daar nu uit, zodat de pdf-weergave van het apparaat zelf het overneemt: alle pagina's, en inzoomen werkt. Je gaat terug met de terugknop van de browser.
